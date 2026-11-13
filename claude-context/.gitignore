@@ -1,0 +1,9 @@
+
+# .claude/ is a directory junction to this folder, so machine-local files that
+# Claude Code writes into .claude/ land here. Keep them out of the repo.
+settings.local.json
+*.local.json
+# Personal state of the user's own server and clients (PC names, IPs, networks).
+*.local.md
+# Python bytecode of the hooks and skill scripts.
+__pycache__/
