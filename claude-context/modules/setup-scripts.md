@@ -81,12 +81,19 @@ run_update   (all post-pull code is in this function, parsed before the pull; en
              of active otel parts: less → fail, < 1.5× → warn; BACKUP_DIR=<dir> backup.sh dump; rowcounts.tsv
   code       upstream → git pull --ff-only; no upstream / no repo → warn, files as they are
   exec       CCT_UPDATE=1 CCT_UPDATE_DIR=<dir> CCT_UPDATE_PREV=<prev> bash setup-server.sh <args minus --update>
-re-run       steps 2–6, then finish_update: every table rows now ≥ before, else LOST banner + restore command, exit 1
+re-run       steps 2–6; in step 3 after views-init exited 0 → reload_changed_config (below)
+             then finish_update: every table rows now ≥ before, else LOST banner + restore command, exit 1
              after a pull prints the rollback: git checkout <prev> && bash setup-server.sh
 EXIT trap    failing exit once the dump folder is set → prints it (+ rollback command after a pull)
 ```
 - `CCT_UPDATE_DIR` is honoured only with `CCT_UPDATE=1`, under `backup/`, without `..`, as an
   existing folder; the three variables are unset at start.
+- `reload_changed_config` (only with dump folder + prev): `git diff --name-only <prev> HEAD` →
+  `otel-collector.yaml` → `compose restart otel-collector`; `grafana/provisioning/*` →
+  `compose restart grafana`; ok line per service, else "nothing to restart". git fails → warn
+  (restart by hand), continue; restart fails → fail (EXIT trap prints dump folder + rollback).
+- No reload needed: `clickhouse/` (views) — `compose up -d` starts the exited one-shot views-init
+  again on every run; `grafana/dashboards/` — Grafana re-reads it every 30 s.
 - Nothing is removed (no `down -v`); earlier dumps stay. With `sudo docker` the dump files belong to root.
 
 ## Clients

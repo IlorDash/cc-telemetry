@@ -22,6 +22,16 @@ The Docker services, how data moves between them, what is exposed and where it i
 | `views-init` | `clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-25.8}` | — | one-shot, `restart: "no"`; `bash /init/init-views.sh`; `docker compose ps -a` shows `Exited (0)` when fine |
 | `grafana` | `grafana/grafana:12.1.0` | `${GRAFANA_BIND:-127.0.0.1}:${GRAFANA_PORT:-3000}:3000` | plugin via `GF_PLUGINS_PREINSTALL_SYNC=grafana-clickhouse-datasource` (4.23.5 at first install); home dashboard = `cc-usage.json` |
 
+Bind mounts (read-only) — `compose up -d` recreates a container only when its service
+definition changes, so an edited file is picked up as follows:
+
+| Host path | Service | Picked up by |
+| --- | --- | --- |
+| `otel-collector.yaml` | `otel-collector` | restart (`setup-server.sh --update` does it when the file changed) |
+| `grafana/provisioning/` | `grafana` | restart (same, for any file under it) |
+| `grafana/dashboards/` | `grafana` | re-read every 30 s |
+| `clickhouse/` | `views-init` | next views-init run (`compose up -d` starts it again; or `compose run --rm views-init`) |
+
 All services but `views-init` are `restart: unless-stopped`; in wsl mode they come up when the
 docker service starts with the distro; on Linux `setup-server.sh` checks (and offers to enable)
 the docker service at boot.

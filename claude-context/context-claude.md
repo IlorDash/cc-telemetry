@@ -17,7 +17,7 @@ ClickHouse and shows them in Grafana. Everything stays on the LAN. Single branch
 | skill attribution | tool call → skill via `tool_result.request_id` → `api_request.skill.name` |
 | keepalive | hidden `wsl.exe --exec sleep infinity` that keeps the WSL distro (and Docker) running |
 | empty session | startup-only `session.id` from a VS Code extension process: no prompt, no request; hidden on the dashboard |
-| update | `setup-server.sh --update`: safety dump + row counts, `git pull --ff-only`, re-run, row-count check |
+| update | `setup-server.sh --update`: safety dump + row counts, `git pull --ff-only`, re-run, restart of collector/Grafana when their config changed, row-count check |
 | old ARM | `aarch64` without `lrcpc` (Raspberry Pi 4): only ClickHouse ≤ 22.3 runs → `CLICKHOUSE_VERSION=22.3.20.29` |
 
 ## Data flow

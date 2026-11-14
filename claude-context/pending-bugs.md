@@ -40,7 +40,8 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
 - **M?** Whether running Claude Code sessions reconnect after the collector restarts is
   unconfirmed (2026-11-14: no events for ~50 min after a restart, cause unknown).
   A plain `setup-server.sh --update` (`compose up -d`) recreates only changed containers, so the
-  collector restarts only when its service definition (image tag, environment, ports) changes.
+  collector restarts only when its service definition (image tag, environment, ports) changes,
+  or when the pulled commits changed `otel-collector.yaml` (`reload_changed_config`).
 
 ## views (`clickhouse/views.sql`)
 
