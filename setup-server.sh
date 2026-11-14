@@ -66,8 +66,8 @@ Grafana (port 3000, admin login) are published on all interfaces and opened in u
                      ClickHouse image tag (CLICKHOUSE_VERSION in .env, default 25.8). On an ARM CPU
                      without lrcpc (Raspberry Pi 4) a missing key (or the 23.3.22.3 that an earlier
                      version of this script wrote, which does not run there) is set to 22.3.20.29
-  --update           update a running server after a new version is published: stop Claude Code
-                     sessions first, run this, start them again. It checks that ClickHouse answers and
+  --update           update a running server after a new version is published without losing data.
+                     It checks that ClickHouse answers and
                      that the git working tree has no local changes, dumps all data to
                      backup/pre-update-<time>/ (earlier dumps stay), records the row count per table,
                      runs `git pull --ff-only` (skipped with a warning when there is no upstream), runs
@@ -363,6 +363,33 @@ finish_update() {
   [ -z "$UPDATE_PREV" ] || echo "   Rollback if something is wrong: git checkout $UPDATE_PREV && bash setup-server.sh"
 }
 
+# Update re-run, after `compose up -d`: that recreates only containers whose service definition changed,
+# so a pulled change to a bind-mounted config file stays unloaded. Restart the services those files
+# belong to. ./grafana/dashboards is re-read by Grafana every 30 s: no restart. ./clickhouse is read by
+# the one-shot views-init, which `compose up -d` starts again on every run: nothing to do for it.
+reload_changed_config() {
+  local files svc restart=() f s
+  [ -n "$UPDATE_DIR" ] && [ -n "$UPDATE_PREV" ] || return 0
+  step 'Update: reload changed configuration'
+  if ! files="$(git diff --name-only "$UPDATE_PREV" HEAD 2>/dev/null)"; then
+    warn "could not list the files changed since $UPDATE_PREV: restart otel-collector and grafana yourself if their config changed (docker compose restart <service>)"
+    return 0
+  fi
+  while IFS= read -r f; do
+    case "$f" in
+      otel-collector.yaml) svc=otel-collector ;;
+      grafana/provisioning/*) svc=grafana ;;
+      *) continue ;;
+    esac
+    case " ${restart[*]-} " in *" $svc "*) ;; *) restart+=("$svc") ;; esac
+  done <<< "$files"
+  for s in "${restart[@]+"${restart[@]}"}"; do
+    compose restart "$s" || fail "docker compose restart $s failed, see the output above."
+    ok "$s restarted (its config changed)"
+  done
+  if [ "${#restart[@]}" -eq 0 ]; then ok 'no collector or Grafana provisioning change: nothing to restart'; fi
+}
+
 if [ "$UPDATE" -eq 1 ]; then run_update; fi
 
 # ---------------------------------------------------------------- 2. .env
@@ -494,6 +521,7 @@ done
 if [ "$state" = 'exited 0' ]; then ok 'cc.* views are ready'
 else compose logs views-init || true; fail "views-init did not finish cleanly ($state)"
 fi
+reload_changed_config
 
 # ---------------------------------------------------------------- 4. checks
 step 'Checks'

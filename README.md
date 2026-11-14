@@ -150,8 +150,9 @@ The first time, run `git pull` yourself: older versions of the script have no `-
 3. runs `git pull --ff-only`. It never merges or rebases. If the branch has no upstream, it prints a warning and continues with
    the files as they are;
 4. runs `setup-server.sh` again from the updated file with your other options. This starts changed containers, recreates the
-   `cc.*` views and repeats the checks. Containers whose image and configuration did not change keep running, and the data
-   volumes are never removed;
+   `cc.*` views and repeats the checks. Containers whose image and configuration did not change keep running, except that a
+   changed collector config (`otel-collector.yaml`) or Grafana provisioning (`grafana/provisioning/`) is reloaded by restarting
+   that service (dashboard files are re-read by Grafana by itself). The data volumes are never removed;
 5. compares the row counts. Every table must have at least as many rows as before; the script prints `OK`, or a `FAIL` banner
    with the dump folder, and exits with status 1.
 

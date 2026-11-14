@@ -20,9 +20,6 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
 
 - **L** The final summary prints `.\setup-client.ps1` for other PCs, while in the repo the file is
   `client\setup-client.ps1` (right only for a copied file).
-- **L** Working tree has CRLF for the grafana provisioning yaml (`dashboards.yaml`,
-  `clickhouse.yaml`; `core.autocrlf=true` vs `.gitattributes` LF; the index is LF). They are
-  bind-mounted into containers; `.gitattributes` says CRLF breaks `init-views.sh`, same risk here.
 
 ## setup-server.sh
 
@@ -42,7 +39,8 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
 
 - **M?** Whether running Claude Code sessions reconnect after the collector restarts is
   unconfirmed (2026-11-14: no events for ~50 min after a restart, cause unknown).
-  `setup-server.sh --update` therefore always asks to restart the client sessions.
+  A plain `setup-server.sh --update` (`compose up -d`) recreates only changed containers, so the
+  collector restarts only when its service definition (image tag, environment, ports) changes.
 
 ## views (`clickhouse/views.sql`)
 
