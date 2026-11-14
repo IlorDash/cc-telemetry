@@ -98,7 +98,8 @@ and Linux (`bash setup-client.sh --server-ip <server-ip> --project <project fold
 
 Options: `--local-only` (4317 and Grafana on this PC only), `--lan` (back to all interfaces after an earlier `--local-only`;
 `--enable-lan` is the same), `--lan-ip <address>` (if the LAN address is detected wrong), `--grafana-port <n>`,
-`--clickhouse-version <tag>`, `--yes` (do not ask before installing Docker, using `sudo` or enabling the service), `--help`.
+`--clickhouse-version <tag>`, `--update` (see "Updating the server"), `--yes` (do not ask before installing Docker, using `sudo`
+or enabling the service), `--help`.
 
 **Ports and the firewall.** Docker publishes ports through its own `iptables` rules, which `ufw` and `firewalld` do not
 filter. Therefore the script controls access with the address Docker publishes each port on, two lines in `.env`:
@@ -131,6 +132,57 @@ views and every dashboard query were checked on 23.3 (see the verification notes
 
 **Security.** Grafana is plain HTTP behind the `admin` login (no anonymous access); OTLP has no authentication. Use the LAN
 mode on a trusted home or office network only, or `--local-only` and an SSH tunnel for Grafana.
+
+**Updating the server.** To move a running Linux server to a newer version of this repository without losing data:
+
+1. Close the Claude Code sessions on the clients that send to this server.
+2. Run `bash setup-server.sh --update` in the `cc-telemetry` folder (add the options you normally use, for example `--local-only`).
+3. Start the Claude Code sessions on the clients again. Sessions that were running during the update may not reconnect to the
+   restarted collector.
+
+The first time, run `git pull` yourself: older versions of the script have no `--update`. The command:
+
+1. stops with a message if ClickHouse does not answer or if the git working tree has local changes to tracked files (`.env`
+   and `backup/` are git-ignored and do not count);
+2. dumps all `otel.*` tables to `backup/pre-update-<date>-<time>/` and records the row count of every table there. Earlier dumps
+   stay; delete old `pre-update-*` folders yourself. Before dumping, it compares the free disk space with the uncompressed size
+   of the data (the dump is that large) and stops if there is less, or warns if there is less than 1.5 times that. If Docker
+   needs `sudo` here, the dump files belong to root;
+3. runs `git pull --ff-only`. It never merges or rebases. If the branch has no upstream, it prints a warning and continues with
+   the files as they are;
+4. runs `setup-server.sh` again from the updated file with your other options. This starts changed containers, recreates the
+   `cc.*` views and repeats the checks. Containers whose image and configuration did not change keep running, and the data
+   volumes are never removed;
+5. compares the row counts. Every table must have at least as many rows as before; the script prints `OK`, or a `FAIL` banner
+   with the dump folder, and exits with status 1.
+
+If `git pull` fails (for example because the branch diverged), nothing on the stack has changed. Fix the repository and run
+`--update` again.
+
+**Roll back** to the previous version (the script prints its commit):
+
+```bash
+git checkout <previous commit>
+bash setup-server.sh
+```
+
+The data stays in the volume, so the rollback needs no restore. Use the dump only if a table lost rows (the `FAIL` banner).
+`restore` appends rows, so use it only for tables that are empty now:
+
+```bash
+BACKUP_DIR=backup/pre-update-<date>-<time> bash linux-server-tools/backup.sh restore            # all tables
+BACKUP_DIR=backup/pre-update-<date>-<time> bash linux-server-tools/backup.sh restore otel_logs  # one table
+```
+
+If Docker needs `sudo` on this PC, `BACKUP_DIR=... sudo bash ...` loses the variable (sudo resets the environment) and would
+restore the default `backup` folder. Pass it after sudo instead (the script prints the right form):
+
+```bash
+sudo env BACKUP_DIR=backup/pre-update-<date>-<time> bash linux-server-tools/backup.sh restore
+```
+
+After a rollback, `git checkout main` returns the branch for the next `--update` (on a detached `HEAD` there is no upstream and
+nothing is pulled).
 
 ### 1c. Both
 
@@ -281,6 +333,9 @@ bash linux-server-tools/backup.sh dump              # otel.* tables -> backup/<t
 bash linux-server-tools/backup.sh restore           # appends rows: use on a fresh, empty stack
 bash linux-server-tools/backup.sh restore <table>   # one table only
 ```
+
+`BACKUP_DIR=<folder>` in front of the command uses another folder instead of `backup` (for dump and restore). A relative
+folder is relative to the `cc-telemetry` folder, not to the current directory. With `sudo`, write `sudo env BACKUP_DIR=<folder> bash ...`.
 
 With Docker in WSL the data lives inside the distro: `wsl --unregister` deletes it. Dump first.
 
