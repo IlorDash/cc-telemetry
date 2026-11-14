@@ -37,12 +37,29 @@
       - [ ] Проверить: совпадает ли requestId из JSONL с request_id в api_request
       - [ ] Проверить: session.id = имя файла сессии
       - [ ] Решить, куда писать (отдельная таблица ClickHouse) и как доставлять с клиента
+      - [ ] Клиенты на Windows и Linux: вариант для setup-client.ps1 и setup-client.sh
       - [ ] Импорт только того, чего нет в телеметрии: title, git_branch, cwd
       - [ ] Использовать название вместо first_prompt в таблицах сессий
+      - [ ] cwd как самый надёжный источник project в cc.session_project (до label-эвристики по путям)
     ```md
     Гибрид OTel + JSONL. Токены из JSONL не импортировать: нужна дедупликация и своя
     таблица цен, нельзя смешивать с точным cost_usd.
+    cwd закрыл бы ограничения угадывания проекта по путям (pending-bugs: cc.session_project).
     Группа 4: последний шаг меняет таблицы сессий в Overview и Sessions — после группы 3.
+    ```
+
+### Производительность на слабом сервере
+
+  - tags: [data, performance]
+  - priority: low
+  - workload: Hard
+  - steps:
+      - [ ] Замерить Overview и Tips после группы 3 на ARMv8.0 / ClickHouse 22.3
+      - [ ] Если медленно: materialized-таблица для cc.session_project или кэш запросов Grafana
+    ```md
+    pending-bugs: каждый запрос к cc.events читает otel_logs ~4 раза. Отложено до появления
+    реальных тормозов; группы 1–3 добавляют много новых панелей и cc.tips — риск растёт.
+    Без группы: брать, только если замер покажет проблему.
     ```
 
 ## To Do
@@ -54,7 +71,8 @@
   - workload: Easy
   - steps:
       - [ ] timepicker.quick_ranges в JSON дашборда
-      - [ ] Проверить, что All не грузит ClickHouse чрезмерно (views не materialized)
+      - [ ] Проверить, что All не грузит ClickHouse чрезмерно (views не materialized; каждый запрос к cc.events читает otel_logs ~4 раза)
+      - [ ] Замерить время Overview на All на слабом сервере (ARMv8.0, ClickHouse 22.3)
     ```md
     Аналог кнопок диапазона на скриншоте.
     Группа 1: делается в текущем cc-usage.json, разбивка (группа 2) копирует timepicker во все дашборды.
@@ -76,8 +94,11 @@
       - [ ] Медленный хук
       - [ ] Высокий ttft_ms
       - [ ] Колонки: category, title, body, scope, metric, link
+      - [ ] Работает на ClickHouse 22.3–25.8: соединения через ON, не несколько USING
+      - [ ] Время запроса на слабом сервере: UNION из ~9 правил поверх cc.events
     ```md
     Аналог tips.py из token-dashboard на SQL (UNION правил). Пороги потом подстроить.
+    Правило по cache hit rate — по эффективному project (метка или угаданный по путям).
     Своей таблицы цен не заводить — только cost_usd.
     Группа 1: трогает только views.sql; в группе 3 views.sql занят вью cc.prompts.
     ```
@@ -96,9 +117,13 @@
       - [ ] GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH → Overview
       - [ ] Зафиксировать uid всех дашбордов (на них ссылаются группа 3 и cc.tips)
       - [ ] Разметить Overview заготовками: по одной пустой панели с фиксированными id и gridPos на каждую карточку группы 3
+      - [ ] claude-context/scripts/check-dashboard.js: проверять все файлы в grafana/dashboards/, а не только cc-usage.json
+      - [ ] Проверить setup-server.sh --update: новые файлы дашбордов подхватываются без рестарта, смена GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH пересоздаёт grafana
     ```md
     Ссылки между дашбордами выглядят как вкладки token-dashboard.
     Текущий uid cc-usage сохранить за Overview, чтобы старые закладки не сломались.
+    Docs impact (обновлять по запросу): modules/dashboard.md, context-claude.md,
+    guides/conventions.md и verification.md, agents/developer.md — все сейчас про один cc-usage.json.
     Группа 2 — одна, потому что меняет все файлы дашбордов. Заготовки на Overview нужны,
     чтобы в группе 3 каждая карточка меняла только свою панель и не конфликтовала с соседями.
     ```
@@ -116,6 +141,7 @@
     ```md
     Заменить текущие 4 stat-панели Summary рядом из 7 карточек, как в token-dashboard.
     Turns = число api_request с actor = main (или число user_prompt — решить при реализации).
+    Задевает запись pending-bugs «Summary Sessions vs panel 7»: решить, как считать Sessions.
     ```
 
 ### Overview: график «Daily work» по дням
@@ -165,8 +191,10 @@
   - steps:
       - [ ] barchart / bargauge: total_tokens и cost_usd по project
       - [ ] Ссылка с проекта на var-project
+      - [ ] unknown показывать отдельно, не прятать
     ```md
     Сравнение проектов на главной странице.
+    project — эффективный: метка из OTEL_RESOURCE_ATTRIBUTES, иначе угаданный по путям инструментов.
     ```
 
 ### Overview: доля по моделям (donut)
@@ -310,6 +338,7 @@
       - [ ] Выбор промпта (переменная) → его запросы и вызовы инструментов
       - [ ] Ссылка на сессию
       - [ ] Проверить на живом стеке: суммы совпадают с cc.sessions
+      - [ ] Работает на ClickHouse 22.3–25.8: соединения через ON, не несколько USING
     ```md
     Аналог вкладки Prompts из token-dashboard. prompt.id есть на каждом событии.
     Текст промпта есть только при OTEL_LOG_USER_PROMPTS=1.
@@ -338,10 +367,10 @@
   - steps:
       - [ ] Список дашбордов и что в каждом
       - [ ] Подсказки Tips и их пороги
-      - [ ] Импортёр JSONL, если он сделан
+      - [ ] Импортёр JSONL, если он сделан (для Windows- и Linux-клиентов)
       - [ ] Отметить: история хранится без срока, в отличие от JSONL (~30 дней)
     ```md
-    README публичный: без личных данных.
+    README публичный: без личных данных. README уже описывает Windows и Linux — оба пути.
     Группа 5: описывает результат всех предыдущих групп.
     ```
 
