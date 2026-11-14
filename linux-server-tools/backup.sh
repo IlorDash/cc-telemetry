@@ -1,10 +1,10 @@
 #!/bin/bash
 # Dumps or restores all otel.* tables (ClickHouse Native format) to/from ./backup/<table>.native.
-# Usage (from the cc-telemetry folder):  wsl -d Ubuntu -- bash wsl/backup.sh dump|restore [table]
+# Usage (from the cc-telemetry folder):  wsl -d Ubuntu -- bash linux-server-tools/backup.sh dump|restore [table]
 # restore appends rows, so run it on an empty stack (fresh install), after setup-server.ps1.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-CH=(bash wsl/ch.sh)
+CH=(bash linux-server-tools/ch.sh)
 mkdir -p backup
 case "${1:-}" in
   dump)

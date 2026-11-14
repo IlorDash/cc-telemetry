@@ -18,6 +18,12 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
   `-Distro` other than the one already kept alive, the new keepalive is not started this time
   (the Startup file is correct, so it starts after the next logon).
 
+- **L** The final summary prints `.\setup-client.ps1` for other PCs, while in the repo the file is
+  `client\setup-client.ps1` (right only for a copied file).
+- **L** Working tree has CRLF for `clickhouse/views.sql` and the grafana provisioning yaml
+  (`core.autocrlf=true` vs `.gitattributes` LF; the index is LF). They are bind-mounted into
+  containers; `.gitattributes` says CRLF breaks `init-views.sh`, same risk for `views.sql`.
+
 ## setup-client.ps1
 
 - **L** `-PcName` defaults to `$env:COMPUTERNAME` (upper case); a PC configured by hand with a

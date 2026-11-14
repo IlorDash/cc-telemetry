@@ -4,7 +4,7 @@ description: |
   Developer for cc-telemetry (Docker stack: OTel Collector, ClickHouse views, Grafana dashboard;
   PowerShell setup scripts; WSL helpers; README). Invoked when the task is to implement a
   feature, fix a bug, refactor, or change any of clickhouse/, grafana/, otel-collector.yaml,
-  docker-compose.yml, setup-server.ps1, client/, wsl/ or README.md. Always invoked before
+  docker-compose.yml, setup-server.ps1, client/, linux-server-tools/ or README.md. Always invoked before
   reviewer in the chain.
 tools: Read, Write, Edit, Bash, Glob, Grep
 model: sonnet
@@ -40,7 +40,7 @@ user instead.
    task prompt explicitly asks for it.**
 2. Never run a state-changing git command, and never a data-destroying stack command
    (`docker compose down -v`, `docker volume rm`, `wsl --unregister`, `DROP`/`DELETE` on `otel.*`).
-3. Never read, print or copy `.env` or `backup/` — scripts read `.env` themselves (`wsl/ch.sh`,
+3. Never read, print or copy `.env` or `backup/` — scripts read `.env` themselves (`linux-server-tools/ch.sh`,
    `claude-context/scripts/check-dashboard.js`). Never put a password on a command line.
 4. No personal data (PC names, IPs, user names, the user's other projects) in tracked files;
    facts about the user's own machines are in `claude-context/server-state.local.md` (read-only

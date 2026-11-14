@@ -52,7 +52,7 @@ Grafana :3000  dashboard uid cc-usage (home page)
 | `modules/stack.md` | `docker-compose.yml`, `otel-collector.yaml`, `.env`, ClickHouse tables, Grafana provisioning, ports |
 | `modules/telemetry-data.md` | events and attributes Claude Code sends, `clickhouse/views.sql`, `clickhouse/init-views.sh` |
 | `modules/dashboard.md` | `grafana/dashboards/cc-usage.json`: variables, panels, drill-down links |
-| `modules/setup-scripts.md` | `setup-server.ps1`, `client/setup-client.ps1`, `client/*.json`, `wsl/*.sh`, keepalive, LAN access |
+| `modules/setup-scripts.md` | `setup-server.ps1`, `client/setup-client.ps1`, `client/*.json`, `linux-server-tools/*.sh`, keepalive, LAN access |
 
 ## Key conventions (details in `guides/`, index in CLAUDE.md)
 

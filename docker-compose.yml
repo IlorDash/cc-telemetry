@@ -1,11 +1,12 @@
 # Claude Code telemetry stack: OTLP -> OTel Collector -> ClickHouse -> Grafana
 # Start:  docker compose up -d        (from this folder, after copying .env.example to .env)
-# Grafana: http://localhost:3000  (admin / GRAFANA_ADMIN_PASSWORD)
-# OTLP:    gRPC :4317, HTTP :4318  (open 4317 in Windows Firewall for other PCs)
+# Grafana: http://localhost:3000  (admin / GRAFANA_ADMIN_PASSWORD; other PCs: see GRAFANA_BIND below)
+# OTLP:    gRPC :4317, HTTP :4318  (4317 for other PCs: see OTLP_BIND below and the setup scripts)
 
 services:
   clickhouse:
-    image: clickhouse/clickhouse-server:25.8
+    # CLICKHOUSE_VERSION in .env overrides the tag (setup-server.sh sets 23.3 on ARM CPUs without LRCPC, e.g. Raspberry Pi 4).
+    image: clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-25.8}
     restart: unless-stopped
     environment:
       CLICKHOUSE_DB: otel
@@ -31,8 +32,10 @@ services:
     volumes:
       - ./otel-collector.yaml:/etc/otelcol/config.yaml:ro
     ports:
-      - "4317:4317"   # OTLP gRPC  (Claude Code clients)
-      - "4318:4318"   # OTLP HTTP
+      # OTLP gRPC (Claude Code clients). OTLP_BIND in .env: 127.0.0.1 = this PC only, 0.0.0.0 = LAN.
+      # setup-server.sh sets it; unset keeps the Windows behaviour (the Windows firewall decides).
+      - "${OTLP_BIND:-0.0.0.0}:4317:4317"
+      - "127.0.0.1:4318:4318"   # OTLP HTTP, this PC only
     depends_on:
       clickhouse:
         condition: service_healthy
@@ -40,7 +43,7 @@ services:
   # One-shot: waits until the collector has created otel.otel_logs, then (re)creates the cc.* views.
   # Re-run after editing clickhouse/views.sql:  docker compose run --rm views-init
   views-init:
-    image: clickhouse/clickhouse-server:25.8
+    image: clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-25.8}
     restart: "no"
     entrypoint: ["bash", "/init/init-views.sh"]
     environment:
@@ -67,7 +70,9 @@ services:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
     ports:
-      - "3000:3000"
+      # GRAFANA_BIND in .env: 127.0.0.1 = this PC only (default, Windows), 0.0.0.0 = LAN (setup-server.sh on Linux).
+      # GRAFANA_PORT in .env: the host port (default 3000); the container port stays 3000.
+      - "${GRAFANA_BIND:-127.0.0.1}:${GRAFANA_PORT:-3000}:3000"
     depends_on:
       clickhouse:
         condition: service_healthy

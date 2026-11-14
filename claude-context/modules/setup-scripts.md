@@ -8,9 +8,9 @@ How `setup-server.ps1` and `client/setup-client.ps1` work, the WSL helpers, and 
 | --- | --- |
 | `setup-server.ps1` | server setup, re-runnable; doubles as a health check |
 | `client/setup-client.ps1` | per-user client setup, re-runnable |
-| `wsl/install-docker.sh` | Docker Engine + compose plugin from download.docker.com into Ubuntu (run as root) |
-| `wsl/ch.sh` | SQL from stdin or args against the stack, password read from `.env` |
-| `wsl/backup.sh` | `dump` all `otel.*` tables to `backup/<table>.native`; `restore [table]` appends, skips empty files |
+| `linux-server-tools/install-docker.sh` | Docker Engine + compose plugin from download.docker.com into Ubuntu (run as root) |
+| `linux-server-tools/ch.sh` | SQL from stdin or args against the stack, password read from `.env` |
+| `linux-server-tools/backup.sh` | `dump` all `otel.*` tables to `backup/<table>.native`; `restore [table]` appends, skips empty files |
 | `client/*.json` | env templates for manual client setup |
 
 ## setup-server.ps1

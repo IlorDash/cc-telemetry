@@ -8,25 +8,33 @@ PC-1, PC-2, …  Claude Code ──OTLP gRPC :4317──►  server PC (Docker)
 Everything stays on your LAN. Claude Code exports the events itself, so client PCs need no extra software, only settings.
 Claude Code **2.1.310 or newer** is required: older versions do not put `agent_id` on tool events.
 
-Setup is two scripts: [setup-server.ps1](setup-server.ps1) once on the server PC, [client/setup-client.ps1](client/setup-client.ps1)
-on every PC whose sessions you want to see (the server PC included). Both are safe to re-run.
+Setup is one script on the server PC and one script on every PC whose sessions you want to see (the server PC included).
+Both are safe to re-run. Each comes in a Windows and a Linux variant:
+
+| | Windows (PowerShell) | Linux (bash) |
+| --- | --- | --- |
+| Server, once | [setup-server.ps1](setup-server.ps1) | [setup-server.sh](setup-server.sh) |
+| Client, every PC | [client/setup-client.ps1](client/setup-client.ps1) | [client/setup-client.sh](client/setup-client.sh) |
+
+The server and the clients are independent: they only talk OTLP over TCP port 4317. Any mix works, for example a Linux server
+with Windows clients.
 
 Contents: [1. Server](#1-server-one-pc) · [2. Clients](#2-clients-every-pc) · [3. Dashboard](#3-dashboard) ·
 [4. Maintenance](#4-maintenance) · [5. Troubleshooting](#5-troubleshooting) · [What is sent](#what-is-sent)
 
 ## 1. Server (one PC)
 
-### Requirements
+Internet access is needed on the first start (images and the Grafana ClickHouse plugin are downloaded).
+On a Windows server the ports `3000` (Grafana) and `4318` (OTLP HTTP) are published on `localhost` only; only `4317` can be opened to the LAN.
+On a Linux server `4318` stays local, while `4317` and Grafana (port `3000` by default) are opened to the LAN by default (see 1b).
 
-One of:
+### 1a. Server on Windows
+
+Requirements, one of:
 
 - **Docker Desktop** (WSL2 backend), which needs Windows 10 22H2 (build 19045) or Windows 11. Start it before running the script.
 - **Older Windows 10**: WSL2 with an Ubuntu distro and systemd enabled (`[boot]` / `systemd=true` in `/etc/wsl.conf`).
   The script installs Docker Engine inside it; Docker Desktop is not needed.
-
-Internet access is needed on the first start (images and the Grafana ClickHouse plugin are downloaded).
-
-### Run
 
 ```powershell
 cd cc-telemetry
@@ -47,14 +55,96 @@ The script:
 
 At the end it prints the Grafana address and the ready-to-run client command with the server's LAN IP.
 
-Open `http://localhost:3000`: user `admin`, password `GRAFANA_ADMIN_PASSWORD` from `.env`.
-The **Claude Code usage** dashboard is the home page.
-
 Options: `-Mode desktop|wsl` (skip auto-detection), `-Distro <name>` (default `Ubuntu`), `-LanIp <address>`
-(if the LAN address is detected wrong), `-Yes` (install Docker into WSL without asking). The OTLP port has no authentication: enable LAN access on a trusted network only.
+(if the LAN address is detected wrong), `-Yes` (install Docker into WSL without asking).
 Best reserve the server's IP in the router's DHCP; if it changes, run `setup-server.ps1 -EnableLan` again.
 
+The Windows script always checks and prints Grafana on port `3000`. If you set `GRAFANA_PORT` in `.env` by hand, Docker publishes
+that port, but the script's check and the printed address still say 3000; use the Windows script with the default port.
+
+### 1b. Server on Linux
+
+Requirements: a systemd-based distribution. On Debian, Ubuntu and derivatives the script installs Docker Engine and the compose
+plugin from `download.docker.com` if they are missing. On other distributions install
+[Docker Engine with the compose plugin](https://docs.docker.com/engine/install/) first.
+
+```bash
+cd cc-telemetry
+bash setup-server.sh              # reachable from the LAN (default: Linux servers are usually headless)
+bash setup-server.sh --local-only # this PC only
+```
+
+Run it as your normal user (it also works as root, but then no user is added to the `docker` group). It asks before it uses
+`sudo`. If you are not in the `docker` group, the script runs Docker through `sudo` and says so; `sudo usermod -aG docker $USER`
+and a new login remove the need.
+
+The script:
+
+1. checks that `docker` and the compose plugin are present and the daemon answers; if not, offers to install them (Debian/Ubuntu
+   and derivatives whose release Docker publishes packages for) or tells you what to install. The installer also enables the
+   `docker` service at boot and adds your user to the `docker` group;
+2. creates `.env` with random passwords (an existing `.env` is kept) and sets `OTLP_BIND`, `GRAFANA_BIND` and `GRAFANA_PORT` in it
+   (see below), plus `CLICKHOUSE_VERSION` on an old ARM CPU (see "Raspberry Pi 4");
+3. stops with a message if the Grafana port is taken by another program (a busy 4317/4318 is reported as a warning), then starts
+   the stack and waits until the `cc.*` views are created;
+4. checks Grafana and the OTLP port (`localhost:4317`), and that the `docker` service starts at boot
+   (offers `sudo systemctl enable docker` if not), so the stack comes back after a restart;
+5. LAN access (unless `--local-only`): publishes ports 4317 (clients) and Grafana on all interfaces, adds `ufw` or `firewalld`
+   rules for them (whichever is active; asks first) and prints the server's LAN address.
+
+At the end it prints the Grafana address (`http://<server-ip>:<grafana-port>`, log in as `admin`) and the ready-to-run client
+commands for Windows (`powershell -ExecutionPolicy Bypass -File .\setup-client.ps1 -ServerIp <server-ip> -Project <project folder>`)
+and Linux (`bash setup-client.sh --server-ip <server-ip> --project <project folder>`; copy the client script to that PC first).
+
+Options: `--local-only` (4317 and Grafana on this PC only), `--lan` (back to all interfaces after an earlier `--local-only`;
+`--enable-lan` is the same), `--lan-ip <address>` (if the LAN address is detected wrong), `--grafana-port <n>`,
+`--clickhouse-version <tag>`, `--yes` (do not ask before installing Docker, using `sudo` or enabling the service), `--help`.
+
+**Ports and the firewall.** Docker publishes ports through its own `iptables` rules, which `ufw` and `firewalld` do not
+filter. Therefore the script controls access with the address Docker publishes each port on, two lines in `.env`:
+`OTLP_BIND` (port 4317) and `GRAFANA_BIND` (Grafana), each `0.0.0.0` (every PC that can reach the host) or `127.0.0.1`
+(this PC only). The firewall rules the script adds do not limit access, they only let the traffic in; `--local-only` does not
+remove rules added earlier (remove them yourself with `ufw delete allow <port>/tcp` or `firewall-cmd --remove-port=<port>/tcp`).
+Without a flag, a missing `OTLP_BIND` becomes `0.0.0.0` and a missing `GRAFANA_BIND` copies `OTLP_BIND`; values already in `.env`
+are kept, so running the script again does not change the exposure by itself. The one exception to "unchanged": an `.env` from an
+earlier version of the script that has `OTLP_BIND=0.0.0.0` but no `GRAFANA_BIND` now gets `GRAFANA_BIND=0.0.0.0` (the script
+warns); use `--local-only` to keep Grafana on this PC. `--local-only` and `--lan` set both explicitly. A bind you set by hand,
+for example `OTLP_BIND=192.168.1.5`, counts as reachable from the LAN: the script opens the firewall for it and prints that address.
+
+If you start the stack by hand with a plain `docker compose up -d`: with no `GRAFANA_BIND` Grafana is published on `localhost`
+only, with no `OTLP_BIND` port 4317 is published on `0.0.0.0` (and `ufw`/`firewalld` do not stop it). Put both lines into `.env`
+first (the script on Linux writes `GRAFANA_BIND=0.0.0.0` for the LAN default).
+
+**Grafana port.** If another program already uses port 3000 (for example another Grafana), Docker cannot publish it and the
+script stops with "port is already in use". Run `bash setup-server.sh --grafana-port 3001`: the port is stored as `GRAFANA_PORT`
+in `.env` (a plain re-run keeps it), and the checks, the firewall rule and the printed addresses use it. The ports 4317 and 4318
+are fixed; the script only warns if another program holds them.
+
+**Raspberry Pi 4 and other old ARM CPUs.** ClickHouse builds for ARM since 23.4 need ARMv8.2 with the `lrcpc` CPU feature; on a
+Raspberry Pi 4 (Cortex-A72, ARMv8.0) the current image stops with `Illegal instruction`. On `aarch64` without `lrcpc` in
+`/proc/cpuinfo` the script writes `CLICKHOUSE_VERSION=23.3.22.3` (the last release of the 23.3 line) to `.env` if the key is
+missing, and warns. `--clickhouse-version <tag>` sets another tag on any machine; remove the line from `.env` to return to the
+default. Caveats: 23.3 has not been supported since 2024 (no security fixes: use it on a trusted LAN only), a data volume written
+by a newer ClickHouse does not start with it (so a Pi 4 needs a fresh volume), and a Native dump from a newer server
+(`linux-server-tools/backup.sh`) should be restored into a fresh stack and checked with a row count per table. The collector's tables, the `cc.*`
+views and every dashboard query were checked on 23.3 (see the verification notes in section 5).
+
+**Security.** Grafana is plain HTTP behind the `admin` login (no anonymous access); OTLP has no authentication. Use the LAN
+mode on a trusted home or office network only, or `--local-only` and an SSH tunnel for Grafana.
+
+### 1c. Both
+
+Open `http://localhost:3000` (or your `GRAFANA_PORT`): user `admin`, password `GRAFANA_ADMIN_PASSWORD` from `.env`.
+The **Claude Code usage** dashboard is the home page.
+
+The OTLP port has no authentication: enable LAN access on a trusted network only.
+
 ## 2. Clients (every PC)
+
+Run the client script on every PC whose Claude Code sessions you want to see, the server PC included. It changes only
+your own user's files. It needs the server's address: the LAN IP printed by the server script, or `localhost` on the server PC itself.
+
+### 2a. Client on Windows
 
 Copy [client/setup-client.ps1](client/setup-client.ps1) to the PC (it is the only file a client needs) and run:
 
@@ -62,20 +152,38 @@ Copy [client/setup-client.ps1](client/setup-client.ps1) to the PC (it is the onl
 powershell -ExecutionPolicy Bypass -File .\setup-client.ps1 -ServerIp <SERVER_IP> -Project C:\Projects\ProjA, C:\Projects\ProjB
 ```
 
-- `-ServerIp`: the server's LAN address (printed by `setup-server.ps1`); `localhost` on the server PC itself.
+- `-ServerIp`: the server's address.
 - `-Project`: the folders you open in Claude Code. Add more later by re-running with other folders.
 - `-PcName`: optional, the computer name by default; letters, digits, `.`, `_`, `-`.
+- `-WhatIf`: show the result and write nothing.
 
-The script:
+It adds the telemetry keys to the `env` section of `%USERPROFILE%\.claude\settings.json` and
+`OTEL_RESOURCE_ATTRIBUTES=project=<folder name>,host=<PC name>` to `<project>\.claude\settings.local.json` (created if missing).
+It leaves every other key (permissions, model, plugins, …) as it was, saves `<file>.bak` before the first change,
+checks that the result is valid JSON (Windows PowerShell 5.1 re-indents it; the content stays the same)
+and tests the connection to `<SERVER_IP>:4317`.
 
-- adds the telemetry keys to the `env` section of `%USERPROFILE%\.claude\settings.json`;
-- adds `OTEL_RESOURCE_ATTRIBUTES=project=<folder name>,host=<PC name>` to `<project>\.claude\settings.local.json`
-  (created if missing);
-- leaves every other key (permissions, model, plugins, …) as it was, saves `<file>.bak` before the first change,
-  checks that the result is valid JSON (Windows PowerShell 5.1 re-indents it; the content stays the same);
-- tests the connection to `<SERVER_IP>:4317`.
+### 2b. Client on Linux
 
-Then:
+Copy [client/setup-client.sh](client/setup-client.sh) to the PC (it is the only file a client needs). It needs `jq` or `python3`.
+Run it as your normal user, without `sudo`:
+
+```bash
+bash setup-client.sh --server-ip <SERVER_IP> --project ~/projects/ProjA --project ~/projects/ProjB
+```
+
+- `--server-ip`: the server's address (required).
+- `--project`: a folder you open in Claude Code; repeat the option for more. Add more later by re-running with other folders.
+- `--pc-name`: optional, `hostname -s` by default; letters, digits, `.`, `_`, `-`.
+- `--settings-dir`: project settings folder if it is not `.claude`.
+- `--dry-run`: show the result and write nothing.
+
+It does the same as the Windows script: it merges the keys into `~/.claude/settings.json` and
+`<project>/.claude/settings.local.json`, leaves every other key as it was, saves `<file>.bak` before the first change,
+checks that the result is valid JSON (the JSON is re-indented with two spaces; the content stays the same)
+and tests the connection to `<SERVER_IP>:4317`.
+
+### 2c. After the client script
 
 1. Claude Code must be **2.1.310 or newer** (`claude --version`, otherwise `claude update`).
 2. Project settings are read only in a **trusted** folder: if a project was never opened in Claude Code on this PC,
@@ -84,13 +192,15 @@ Then:
    in the terminal exit and continue with `claude -c`.
 4. Make any request. Within 5–10 s the project appears in the **Project** dropdown in Grafana.
 
-Only sessions started after the setup are recorded. Telemetry is sent live: past sessions in `%USERPROFILE%\.claude\projects`
-are not uploaded, and events produced while the server is unreachable are dropped after a short retry.
+Only sessions started after the setup are recorded. Telemetry is sent live: past sessions in `~/.claude/projects`
+(`%USERPROFILE%\.claude\projects` on Windows) are not uploaded, and events produced while the server is unreachable
+are dropped after a short retry.
 
 <details>
-<summary>Manual client setup (what the script writes)</summary>
+<summary>Manual client setup (what the scripts write)</summary>
 
-`%USERPROFILE%\.claude\settings.json`, **add** to `"env"` (don't replace the section):
+User settings (`%USERPROFILE%\.claude\settings.json` on Windows, `~/.claude/settings.json` on Linux), **add** to `"env"`
+(don't replace the section):
 
 ```json
 "env": {
@@ -106,7 +216,7 @@ are not uploaded, and events produced while the server is unreachable are droppe
 }
 ```
 
-Each project's `.claude\settings.local.json`, add to `"env"`:
+Each project's `.claude/settings.local.json`, add to `"env"`:
 
 ```json
 "OTEL_RESOURCE_ATTRIBUTES": "project=<project folder name, lower case>,host=<PC_NAME>"
@@ -142,10 +252,12 @@ The refresh rate is picked at the top right (from 5 s), as in any Grafana dashbo
 
 ## 4. Maintenance
 
-With Docker in WSL, prefix these with `wsl -d Ubuntu --` (run from the `cc-telemetry` folder).
-Re-running `setup-server.ps1` is also a quick health check.
+Run these from the `cc-telemetry` folder. Re-running the server script is also a quick health check.
 
-```powershell
+On a Windows server with Docker in WSL, prefix the commands with `wsl -d Ubuntu --`. On a Linux server run them as they are
+(add `sudo` if you are not in the `docker` group).
+
+```bash
 docker compose ps                         # all Up (views-init: Exited (0))
 docker compose run --rm views-init        # recreate the views after editing clickhouse/views.sql
 docker compose down                       # stop (data stays in the volume)
@@ -154,15 +266,20 @@ docker compose down                       # stop (data stays in the volume)
 SQL without typing the password (taken from `.env`, never printed):
 
 ```powershell
-"SELECT event, count() FROM cc.events GROUP BY event" | wsl -d Ubuntu -- bash wsl/ch.sh
+"SELECT event, count() FROM cc.events GROUP BY event" | wsl -d Ubuntu -- bash linux-server-tools/ch.sh   # Windows server, Docker in WSL
 ```
 
-Backup and restore of all collected data (`backup/` is git-ignored: it contains your prompts):
+```bash
+echo "SELECT event, count() FROM cc.events GROUP BY event" | bash linux-server-tools/ch.sh               # Linux server
+```
 
-```powershell
-wsl -d Ubuntu -- bash wsl/backup.sh dump              # otel.* tables -> backup\<table>.native
-wsl -d Ubuntu -- bash wsl/backup.sh restore           # appends rows: use on a fresh, empty stack
-wsl -d Ubuntu -- bash wsl/backup.sh restore <table>   # one table only
+Backup and restore of all collected data (`backup/` is git-ignored: it contains your prompts). Shown for a Linux server;
+on Windows with Docker in WSL run `wsl -d Ubuntu -- bash linux-server-tools/backup.sh …` from PowerShell:
+
+```bash
+bash linux-server-tools/backup.sh dump              # otel.* tables -> backup/<table>.native
+bash linux-server-tools/backup.sh restore           # appends rows: use on a fresh, empty stack
+bash linux-server-tools/backup.sh restore <table>   # one table only
 ```
 
 With Docker in WSL the data lives inside the distro: `wsl --unregister` deletes it. Dump first.
@@ -174,15 +291,22 @@ so editing `views.sql` recomputes the whole history.
 
 | Symptom | What to check |
 | --- | --- |
-| Dashboard is empty | `docker compose logs otel-collector` (ClickHouse errors?), `Test-NetConnection` from the client, `CLAUDE_CODE_ENABLE_TELEMETRY` in `settings.json`, sessions restarted after the setup |
+| Dashboard is empty | `docker compose logs otel-collector` (ClickHouse errors?), the client's connection test (`Test-NetConnection <SERVER_IP> -Port 4317` on Windows, the last line of `setup-client.sh` on Linux), `CLAUDE_CODE_ENABLE_TELEMETRY` in `settings.json`, sessions restarted after the setup |
 | "Unknown table cc.events" | `docker compose logs views-init`, then `docker compose run --rm views-init` |
 | Variable dropdowns are empty | Dashboard settings → Variables → open the variable → Run query → Save |
 | ClickHouse plugin does not load | no internet on first start; `docker compose restart grafana` |
 | `project = unknown` | no `settings.local.json` with `OTEL_RESOURCE_ATTRIBUTES`, or the folder is not trusted |
 | `actor = agent?` | the subagent is still running and its name has not arrived yet, or Claude Code is older than 2.1.310 |
 | Stack in WSL is down from time to time | `wsl -l -v` shows `Stopped`: the keepalive is not running; re-run `setup-server.ps1` |
-| Port 4317 closed from another PC but open on the server's `localhost` | `setup-server.ps1 -EnableLan` not run, or the server's LAN IP changed (re-run it); network marked Public |
+| Port 4317 closed from another PC but open on the server's `localhost` (Windows server) | `setup-server.ps1 -EnableLan` not run, or the server's LAN IP changed (re-run it); network marked Public |
+| Port 4317 closed from another PC but open on the server's `localhost` (Linux server) | `setup-server.sh` was run with `--local-only` (`OTLP_BIND=127.0.0.1` in `.env`; use `--lan`), or a firewall other than `ufw`/`firewalld` blocks it |
+| Grafana does not open from another PC (Linux server) | `GRAFANA_BIND=127.0.0.1` in `.env` (run `setup-server.sh --lan`), or a firewall other than `ufw`/`firewalld` blocks the Grafana port; use `http://<server-ip>:<GRAFANA_PORT>` (3000 by default) |
+| Linux server: "port is already allocated" / "address already in use" for Grafana | another program uses the port: `bash setup-server.sh --grafana-port 3001` |
+| Linux server: `clickhouse` restarts with `Illegal instruction` | the ARM CPU is too old for the current ClickHouse (Raspberry Pi 4): see "Raspberry Pi 4" in 1b; re-run `setup-server.sh` or set `CLICKHOUSE_VERSION=23.3.22.3` in `.env` |
+| Linux server: stack is down after a reboot | `systemctl is-enabled docker`; run `sudo systemctl enable docker` or re-run `setup-server.sh` |
+| Linux server: `permission denied` for `docker` | you are not in the `docker` group: `sudo usermod -aG docker $USER`, log in again |
 | `setup-client.ps1` cannot be run | run it as shown, via `powershell -ExecutionPolicy Bypass -File …` |
+| `setup-client.sh`: "jq or python3 is required" | install one of them, for example `sudo apt install jq` |
 
 ## Verified on first deployment (2026-11-13, Docker Engine 29.9.3 in WSL2, Claude Code 2.1.323)
 
@@ -199,8 +323,16 @@ so editing `views.sql` recomputes the whole history.
 - Session titles (`/rename` → `custom-title`, auto `ai-title`) are **not** in telemetry: they live only in the local
   transcripts `~/.claude/projects/*/<session>.jsonl`. The Sessions table therefore shows the first prompt instead.
 - `setup-server.ps1 -Yes` on a freshly installed WSL Ubuntu 26.04.1 LTS (systemd on by default, no Docker): installs
-  Docker Engine 29.9.3, starts the stack, all checks pass (2026-11-14). The data was then restored with `wsl/backup.sh`.
+  Docker Engine 29.9.3, starts the stack, all checks pass (2026-11-14). The data was then restored with `linux-server-tools/backup.sh`.
 - `.sh/.sql/.yaml` are pinned to LF in `.gitattributes`: with CRLF, `init-views.sh` fails inside the container.
+- `setup-server.sh` (health-check run with `--local-only`) and `setup-client.sh` (with `python3`) on Ubuntu 26.04 in WSL2
+  (2026-11-14): the stack answers on `localhost` from Windows with the ports bound to `127.0.0.1`. The Docker install, firewall
+  and `jq` paths of the Linux scripts are not verified on a physical Linux host.
+- ClickHouse 23.3.22.3 (x86, a separate compose project): the collector creates `otel_logs` and the five `otel_metrics_*` tables,
+  `views-init` creates all `cc.*` views, they return rows for sample events (prompt, requests with a subagent and a skill, tool
+  calls, subagent end), and all 23 dashboard queries pass (the Skills panel was changed from two `USING` joins to `ON`, which
+  23.3 rejects). A Native dump of `otel_logs` and `otel_metrics_sum` from 25.8 was inserted into 23.3 unchanged. Not tested on
+  a real Raspberry Pi 4 (arm64 image of the same version).
 
 ## What is sent
 

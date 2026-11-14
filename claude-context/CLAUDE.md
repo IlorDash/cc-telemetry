@@ -50,7 +50,7 @@ the repo root).
 ## Secrets and private data
 - `.env` holds the ClickHouse and Grafana passwords; `backup/` holds dumps of the telemetry
   (the user's prompts). Never print, copy or read them. Scripts read `.env` themselves
-  (`wsl/ch.sh`, `claude-context/scripts/check-dashboard.js`) — use those.
+  (`linux-server-tools/ch.sh`, `claude-context/scripts/check-dashboard.js`) — use those.
 - The hook `hooks/guard-secrets.py` and `Read` deny rules block calls naming them; a blocked call
   is final — never rephrase the path, ask the user.
 - No personal data (PC names, IPs, user names, networks, the user's other projects) in tracked
@@ -59,7 +59,7 @@ the repo root).
 ## Safety
 Never without the user's explicit "yes": anything that deletes data (`docker compose down -v`,
 `docker volume rm`, `wsl --unregister`, `DELETE`/`DROP` in ClickHouse — dump first with
-`wsl/backup.sh dump`); Windows system settings (network profile, firewall, services); commands
+`linux-server-tools/backup.sh dump`); Windows system settings (network profile, firewall, services); commands
 needing admin rights (hand them to the user). Never help bypass corporate controls (VPN,
 firewalls, IT policy); warn before corporate data would go to a personal server. Client setup is
 always per-user, never system-wide.

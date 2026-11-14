@@ -39,7 +39,7 @@ re-run and must keep existing data, `.env` and foreign settings keys).
 
 ## Shell (`*.sh`) and config
 - `#!/bin/bash`, `set -euo pipefail`, LF endings (`.gitattributes`).
-- Never put a password on a command line you print; read `.env` inside the script (`wsl/ch.sh`).
+- Never put a password on a command line you print; read `.env` inside the script (`linux-server-tools/ch.sh`).
 - `otel-collector.yaml`: secrets via `${env:NAME}`; a new processor must be added to the pipeline
   list too; restart the collector and check its log for `Everything is ready`.
 - Image tags pinned to exact versions.
@@ -47,6 +47,6 @@ re-run and must keep existing data, `.env` and foreign settings keys).
 ## Tooling traps (this PC)
 - Git Bash rewrites `/mnt/c/...` arguments of `wsl` — run WSL-path commands from PowerShell.
 - Quoting PowerShell → `wsl` → bash breaks: put SQL in a scratchpad file and pipe it to
-  `wsl/ch.sh`; put bash logic in a `.sh` file.
+  `linux-server-tools/ch.sh`; put bash logic in a `.sh` file.
 - The Grep tool fails (no `rg`); use `grep` in Bash. No Python except `py -3`; Node is available.
 - Grafana's API escapes `>` as `>` — parse the JSON before searching it.

@@ -1,13 +1,13 @@
 """PreToolUse hook: keep agents away from the stack's secrets and the telemetry dumps.
 
   - .env       ClickHouse and Grafana passwords (in clear text)
-  - backup/    dumps of otel.* tables made by wsl/backup.sh: the user's prompts,
+  - backup/    dumps of otel.* tables made by linux-server-tools/backup.sh: the user's prompts,
                file paths, Bash commands, account email
 Read(...) deny rules cover only the Read/Grep/Glob tools, and Bash(...) rules
 only match the start of a command; native Windows has no Bash sandbox. This hook
 checks the whole Bash / PowerShell command and the paths of Read/Grep/Glob.
 
-Scripts that need the passwords read .env themselves (wsl/ch.sh,
+Scripts that need the passwords read .env themselves (linux-server-tools/ch.sh,
 claude-context/scripts/check-dashboard.js) - their command lines do not name it.
 
 It is a text heuristic, not a boundary: a deliberately obfuscated name gets
@@ -24,7 +24,7 @@ import sys
 SECRET_PATTERNS = [
     # .env as a file name: not .env.example, not $env:NAME, not a .envrc
     re.compile(r"(^|[\s\"'=/\\(])\.env(?![\w.-])", re.IGNORECASE),
-    # the backup/ folder (wsl/backup.sh itself is fine: "backup." not "backup/")
+    # the backup/ folder (linux-server-tools/backup.sh itself is fine: "backup." not "backup/")
     re.compile(r"(^|[\s\"'=/\\(])backup[/\\]", re.IGNORECASE),
     re.compile(r"(^|[\s\"'=/\\(])backup[\"']?\s*$", re.IGNORECASE),
 ]
@@ -43,7 +43,7 @@ CHAINING = re.compile(r"[;&|<>`]|\$\(")
 def block(reason):
     sys.stderr.write(
         "Blocked by guard-secrets hook: " + reason + ". .env holds the stack passwords and "
-        "backup/ holds the user's telemetry dumps; do not read them. Use wsl/ch.sh or "
+        "backup/ holds the user's telemetry dumps; do not read them. Use linux-server-tools/ch.sh or "
         "claude-context/scripts/check-dashboard.js, which read .env themselves, or ask the user.\n"
     )
     sys.exit(2)

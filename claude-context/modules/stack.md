@@ -45,7 +45,7 @@ metrics: otlp → memory_limiter → batch → clickhouse
   `ResourceAttributes` / `LogAttributes Map(LowCardinality(String), String)`, `Body`, `ScopeName`, …
   No TTL: kept indefinitely in volume `clickhouse-data`.
 - In wsl mode the volumes live inside the distro: `wsl --unregister` deletes all data — dump first
-  (`wsl/backup.sh dump`, `modules/setup-scripts.md`).
+  (`linux-server-tools/backup.sh dump`, `modules/setup-scripts.md`).
 - `grafana-data` holds only Grafana's own DB; datasource and dashboard come from files.
 
 ## Exposure

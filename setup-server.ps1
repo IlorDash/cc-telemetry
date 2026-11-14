@@ -147,7 +147,7 @@ if ($Mode -eq 'desktop') {
       if ($answer -match '^[Nn]') { Fail 'Docker is required.' }
     }
     $linuxUser = (wsl.exe -d $Distro -- whoami | Out-String).Trim()
-    & wsl.exe -d $Distro -u root --cd $root -- bash wsl/install-docker.sh $linuxUser
+    & wsl.exe -d $Distro -u root --cd $root -- bash linux-server-tools/install-docker.sh $linuxUser
     if ($LASTEXITCODE -ne 0) { Fail 'Docker installation in WSL failed, see the output above.' }
     wsl.exe --terminate $Distro | Out-Null   # applies the docker group
     if (-not (Test-WslDocker)) { Fail 'Docker was installed but does not answer. Run: wsl -d <distro> -- docker info' }

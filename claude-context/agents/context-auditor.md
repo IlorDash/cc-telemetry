@@ -26,7 +26,7 @@ claude-context) or `README.md` — those are out of scope even if they look stal
    including uncommitted changes. `git log --oneline -20` and `git diff HEAD` help find what
    changed, but the source is the ground truth.
 4. For claims about what Claude Code sends, check the live data when the stack runs (write the
-   SQL to a scratchpad file, then `Get-Content <file> | wsl -d Ubuntu -- bash wsl/ch.sh` from
+   SQL to a scratchpad file, then `Get-Content <file> | wsl -d Ubuntu -- bash linux-server-tools/ch.sh` from
    PowerShell), e.g. attribute keys per event:
    `SELECT LogAttributes['event.name'] e, groupUniqArrayArray(mapKeys(LogAttributes)) FROM otel.otel_logs GROUP BY e`.
 5. Find drift: renamed/removed views or columns, changed panels or variables, collector
@@ -52,7 +52,7 @@ All under `claude-context/`.
 | `modules/stack.md` | `docker-compose.yml`, `otel-collector.yaml`, `.env.example`, ClickHouse tables, Grafana provisioning, ports |
 | `modules/telemetry-data.md` | client env keys, events and attributes, `clickhouse/views.sql`, `init-views.sh` |
 | `modules/dashboard.md` | `grafana/dashboards/cc-usage.json`: variables, rows, panels, links |
-| `modules/setup-scripts.md` | `setup-server.ps1`, `client/setup-client.ps1`, `client/*.json`, `wsl/*.sh` |
+| `modules/setup-scripts.md` | `setup-server.ps1`, `client/setup-client.ps1`, `client/*.json`, `linux-server-tools/*.sh` |
 | `pending-bugs.md` | suspected bugs and unverified behaviour, grouped by area |
 
 ## Conventions
