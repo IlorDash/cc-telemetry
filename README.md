@@ -136,12 +136,8 @@ stack and checked with a row count per table. The collector's tables, the `cc.*`
 **Security.** Grafana is plain HTTP behind the `admin` login (no anonymous access); OTLP has no authentication. Use the LAN
 mode on a trusted home or office network only, or `--local-only` and an SSH tunnel for Grafana.
 
-**Updating the server.** To move a running Linux server to a newer version of this repository without losing data:
-
-1. Close the Claude Code sessions on the clients that send to this server.
-2. Run `bash setup-server.sh --update` in the `cc-telemetry` folder (add the options you normally use, for example `--local-only`).
-3. Start the Claude Code sessions on the clients again. Sessions that were running during the update may not reconnect to the
-   restarted collector.
+**Updating the server.** To move a running Linux server to a newer version of this repository without losing data, run
+`bash setup-server.sh --update` in the `cc-telemetry` folder (add the options you normally use, for example `--local-only`).
 
 The first time, run `git pull` yourself: older versions of the script have no `--update`. The command:
 

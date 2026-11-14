@@ -360,7 +360,6 @@ finish_update() {
     fi
     ok "update finished, no data lost (dump kept in $UPDATE_DIR; delete it when you no longer need it)"
   fi
-  echo '   Restart your Claude Code sessions on the clients (sessions started before the update may not reconnect to the restarted collector).'
   [ -z "$UPDATE_PREV" ] || echo "   Rollback if something is wrong: git checkout $UPDATE_PREV && bash setup-server.sh"
 }
 
