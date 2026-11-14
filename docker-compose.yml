@@ -5,7 +5,7 @@
 
 services:
   clickhouse:
-    # CLICKHOUSE_VERSION in .env overrides the tag (setup-server.sh sets 23.3 on ARM CPUs without LRCPC, e.g. Raspberry Pi 4).
+    # CLICKHOUSE_VERSION in .env overrides the tag (setup-server.sh sets 22.3.20.29 on ARM CPUs without LRCPC, e.g. Raspberry Pi 4).
     image: clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-25.8}
     restart: unless-stopped
     environment:

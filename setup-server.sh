@@ -45,7 +45,8 @@ fi
 unset CCT_UPDATE CCT_UPDATE_DIR CCT_UPDATE_PREV
 UPD_DIR="$UPDATE_DIR"   # while set, a failing run prints the dump folder (and the rollback command, if UPD_PREV)
 UPD_PREV="$UPDATE_PREV"
-OLD_CH_TAG=23.3.22.3   # last release of ClickHouse 23.3, the newest line that runs on ARMv8.0 (Raspberry Pi 4)
+OLD_CH_TAG=22.3.20.29   # last release of ClickHouse 22.3, the newest tag known to run on ARMv8.0 (Raspberry Pi 4); ClickHouse needs ARMv8.2 since 22.10
+OLD_CH_TAG_WRONG=23.3.22.3   # what earlier versions of this script wrote on old ARM: dies there with "Illegal instruction"
 
 usage() {
   cat <<'EOF'
@@ -63,7 +64,8 @@ Grafana (port 3000, admin login) are published on all interfaces and opened in u
                      use it when 3000 is taken by another program
   --clickhouse-version <tag>
                      ClickHouse image tag (CLICKHOUSE_VERSION in .env, default 25.8). On an ARM CPU
-                     without lrcpc (Raspberry Pi 4) a missing key is set to 23.3.22.3 automatically
+                     without lrcpc (Raspberry Pi 4) a missing key (or the 23.3.22.3 that an earlier
+                     version of this script wrote, which does not run there) is set to 22.3.20.29
   --update           update a running server after a new version is published: stop Claude Code
                      sessions first, run this, start them again. It checks that ClickHouse answers and
                      that the git working tree has no local changes, dumps all data to
@@ -95,7 +97,7 @@ while [ $# -gt 0 ]; do
         || { echo "--grafana-port '$GRAFANA_PORT_FLAG' is not a port number (1-65535)" >&2; exit 2; } ;;
     --clickhouse-version) [ $# -ge 2 ] || { echo "--clickhouse-version needs a value" >&2; exit 2; }; CH_VERSION_FLAG="$2"; shift
       [[ "$CH_VERSION_FLAG" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]] \
-        || { echo "--clickhouse-version '$CH_VERSION_FLAG' is not an image tag (like 25.8 or 23.3.22.3)" >&2; exit 2; } ;;
+        || { echo "--clickhouse-version '$CH_VERSION_FLAG' is not an image tag (like 25.8 or 22.3.20.29)" >&2; exit 2; } ;;
     --update) UPDATE=1 ;;
     --yes|-y) YES=1 ;;
     --help|-h) usage; exit 0 ;;
@@ -444,24 +446,35 @@ for p in 4317 4318; do
   fi
 done
 
-# ClickHouse image tag: --clickhouse-version wins; a missing key on an ARM CPU without lrcpc gets the
-# old tag; anything else keeps .env (no key = the compose default).
+# ClickHouse image tag: --clickhouse-version wins. On an ARM CPU without lrcpc a missing key gets the old
+# tag, and so does the one value this script itself wrote in the past (23.3.22.3, known not to run
+# there); any other value in .env is the user's and stays. No key = the compose default.
 ch_cur="$(get_env CLICKHOUSE_VERSION)"
 ch_want="$CH_VERSION_FLAG"
 ch_auto=0
-if [ -z "$ch_want" ] && [ -z "$ch_cur" ] && old_arm; then ch_want="$OLD_CH_TAG"; ch_auto=1; fi
+if [ -z "$ch_want" ] && old_arm; then
+  if [ -z "$ch_cur" ]; then ch_want="$OLD_CH_TAG"; ch_auto=1
+  elif [ "$ch_cur" = "$OLD_CH_TAG_WRONG" ]; then ch_want="$OLD_CH_TAG"; ch_auto=2
+  fi
+fi
 if [ -n "$ch_want" ] && [ "$ch_want" != "$ch_cur" ]; then
   set_env CLICKHOUSE_VERSION "$ch_want"
   if [ "$ch_auto" -eq 1 ]; then ok "ARM CPU without lrcpc detected (e.g. Raspberry Pi 4): CLICKHOUSE_VERSION=$ch_want written to .env"
+  elif [ "$ch_auto" -eq 2 ]; then warn "CLICKHOUSE_VERSION=$ch_cur does not run on this ARM CPU (Illegal instruction); replaced with $ch_want in .env."
   else ok "CLICKHOUSE_VERSION=$ch_want written to .env"
   fi
 elif [ -n "$ch_cur" ]; then ok "CLICKHOUSE_VERSION=$ch_cur kept"
 else ok 'ClickHouse image: default tag from docker-compose.yml'
 fi
 ch_ver="${ch_want:-$ch_cur}"
-ch_major="${ch_ver%%.*}"
-if [[ "$ch_major" =~ ^[0-9]+$ ]] && [ "$ch_major" -lt 24 ]; then
-  warn "ClickHouse $ch_ver is out of support (no security fixes): run it on a trusted LAN only. A data volume written by a newer ClickHouse will not start with it."
+if [[ "$ch_ver" =~ ^([0-9]+)\.([0-9]+) ]]; then
+  ch_major="${BASH_REMATCH[1]}"; ch_minor="${BASH_REMATCH[2]}"
+  if old_arm && { [ "$ch_major" -gt 22 ] || { [ "$ch_major" -eq 22 ] && [ "$ch_minor" -ge 10 ]; }; }; then
+    warn "ClickHouse $ch_ver needs ARMv8.2 (since 22.10), this ARM CPU has no lrcpc: the server will most likely die with 'Illegal instruction'. Use: bash setup-server.sh --clickhouse-version $OLD_CH_TAG"
+  fi
+  if [ "$ch_major" -lt 24 ]; then
+    warn "ClickHouse $ch_ver is long out of support (released in 2023 or earlier, no security fixes): run it on a trusted LAN only. A data volume written by a newer ClickHouse will not start with it."
+  fi
 fi
 
 # ---------------------------------------------------------------- 3. stack

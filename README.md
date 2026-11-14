@@ -121,14 +121,17 @@ script stops with "port is already in use". Run `bash setup-server.sh --grafana-
 in `.env` (a plain re-run keeps it), and the checks, the firewall rule and the printed addresses use it. The ports 4317 and 4318
 are fixed; the script only warns if another program holds them.
 
-**Raspberry Pi 4 and other old ARM CPUs.** ClickHouse builds for ARM since 23.4 need ARMv8.2 with the `lrcpc` CPU feature; on a
-Raspberry Pi 4 (Cortex-A72, ARMv8.0) the current image stops with `Illegal instruction`. On `aarch64` without `lrcpc` in
-`/proc/cpuinfo` the script writes `CLICKHOUSE_VERSION=23.3.22.3` (the last release of the 23.3 line) to `.env` if the key is
-missing, and warns. `--clickhouse-version <tag>` sets another tag on any machine; remove the line from `.env` to return to the
-default. Caveats: 23.3 has not been supported since 2024 (no security fixes: use it on a trusted LAN only), a data volume written
-by a newer ClickHouse does not start with it (so a Pi 4 needs a fresh volume), and a Native dump from a newer server
-(`linux-server-tools/backup.sh`) should be restored into a fresh stack and checked with a row count per table. The collector's tables, the `cc.*`
-views and every dashboard query were checked on 23.3 (see the verification notes in section 5).
+**Raspberry Pi 4 and other old ARM CPUs.** Since ClickHouse 22.10 (PR #41610) the ARM builds need ARMv8.2 with the `lrcpc` CPU
+feature; on a Raspberry Pi 4 (Cortex-A72, ARMv8.0) every newer image, including 23.3, stops with `Illegal instruction`
+(exit code 132). The newest tag known to run there is `22.3.20.29`. On `aarch64` without `lrcpc` in `/proc/cpuinfo` the script
+writes `CLICKHOUSE_VERSION=22.3.20.29` to `.env` if the key is missing, replaces the value `23.3.22.3` (what earlier versions of
+the script wrote, and which does not run there) and warns. Any other value you set stays; if it is 22.10 or newer, the script
+warns and suggests `bash setup-server.sh --clickhouse-version 22.3.20.29`. `--clickhouse-version <tag>` sets another tag on any
+machine; remove the line from `.env` to return to the default. Caveats: 22.3 dates from 2022 and has long been out of support
+(no security fixes: use it on a trusted LAN only), a data volume written by a newer ClickHouse does not start with it (so a Pi 4
+needs a fresh volume), and a Native dump from a newer server (`linux-server-tools/backup.sh`) should be restored into a fresh
+stack and checked with a row count per table. The collector's tables, the `cc.*` views and every dashboard query were checked on
+22.3 (see the verification notes in section 5).
 
 **Security.** Grafana is plain HTTP behind the `admin` login (no anonymous access); OTLP has no authentication. Use the LAN
 mode on a trusted home or office network only, or `--local-only` and an SSH tunnel for Grafana.
@@ -357,7 +360,7 @@ so editing `views.sql` recomputes the whole history.
 | Port 4317 closed from another PC but open on the server's `localhost` (Linux server) | `setup-server.sh` was run with `--local-only` (`OTLP_BIND=127.0.0.1` in `.env`; use `--lan`), or a firewall other than `ufw`/`firewalld` blocks it |
 | Grafana does not open from another PC (Linux server) | `GRAFANA_BIND=127.0.0.1` in `.env` (run `setup-server.sh --lan`), or a firewall other than `ufw`/`firewalld` blocks the Grafana port; use `http://<server-ip>:<GRAFANA_PORT>` (3000 by default) |
 | Linux server: "port is already allocated" / "address already in use" for Grafana | another program uses the port: `bash setup-server.sh --grafana-port 3001` |
-| Linux server: `clickhouse` restarts with `Illegal instruction` | the ARM CPU is too old for the current ClickHouse (Raspberry Pi 4): see "Raspberry Pi 4" in 1b; re-run `setup-server.sh` or set `CLICKHOUSE_VERSION=23.3.22.3` in `.env` |
+| Linux server: `clickhouse` restarts with `Illegal instruction` | the ARM CPU is too old for ClickHouse 22.10 and newer (Raspberry Pi 4): see "Raspberry Pi 4" in 1b; re-run `setup-server.sh` or set `CLICKHOUSE_VERSION=22.3.20.29` in `.env` |
 | Linux server: stack is down after a reboot | `systemctl is-enabled docker`; run `sudo systemctl enable docker` or re-run `setup-server.sh` |
 | Linux server: `permission denied` for `docker` | you are not in the `docker` group: `sudo usermod -aG docker $USER`, log in again |
 | `setup-client.ps1` cannot be run | run it as shown, via `powershell -ExecutionPolicy Bypass -File …` |
@@ -383,11 +386,14 @@ so editing `views.sql` recomputes the whole history.
 - `setup-server.sh` (health-check run with `--local-only`) and `setup-client.sh` (with `python3`) on Ubuntu 26.04 in WSL2
   (2026-11-14): the stack answers on `localhost` from Windows with the ports bound to `127.0.0.1`. The Docker install, firewall
   and `jq` paths of the Linux scripts are not verified on a physical Linux host.
-- ClickHouse 23.3.22.3 (x86, a separate compose project): the collector creates `otel_logs` and the five `otel_metrics_*` tables,
-  `views-init` creates all `cc.*` views, they return rows for sample events (prompt, requests with a subagent and a skill, tool
-  calls, subagent end), and all 23 dashboard queries pass (the Skills panel was changed from two `USING` joins to `ON`, which
-  23.3 rejects). A Native dump of `otel_logs` and `otel_metrics_sum` from 25.8 was inserted into 23.3 unchanged. Not tested on
-  a real Raspberry Pi 4 (arm64 image of the same version).
+- ClickHouse 23.3.22.3 and 22.3.20.29 (x86, a separate compose project each): the collector creates `otel_logs` and the five
+  `otel_metrics_*` tables, `views-init` creates all `cc.*` views, they return rows for sample events (prompt, requests with a
+  subagent and a skill, tool calls, subagent end), all 23 dashboard queries pass (with all variables on All and with a project,
+  session, actor and skill set) and the Grafana datasource health check is OK. The Skills panel uses `ON` joins instead of
+  `USING` for 23.3. A Native dump of `otel_logs` and `otel_metrics_sum` from a newer ClickHouse was inserted into 23.3 and
+  22.3 unchanged; the views gave the same counts and cost as on the source. 23.3 does not run on a Raspberry Pi 4 (`Illegal
+  instruction`); 22.3.20.29 does (`SELECT version()` there), but the whole stack was not run on a real Pi 4 (arm64 image of the
+  same version).
 
 ## What is sent
 
