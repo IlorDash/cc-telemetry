@@ -265,7 +265,8 @@ Claude Code does not send the working directory, so the dashboard's `project` is
    Worktree folding is a name-prefix heuristic: it can merge different projects whose names share a prefix (`my` and
    `my-app`) and is not transitive (`b`, `b-c`, `b-c-d`); an explicit `--project` label avoids it.
    Paths in hidden folders (`~/.claude`), temp and system folders are ignored.
-3. **Otherwise `unknown`**: no explicit label and no file paths in the session.
+3. **Otherwise `unknown`**: no explicit label and no file paths in the session. Files attached with an `@` mention
+   do not count: Claude Code inlines them without a tool call and its `at_mention` event carries no path.
 
 It is computed on every query, so sessions recorded earlier get their project too. A project in an unusual layout (folders
 directly under `/data/x/y/`) is named after the first folder (`data`): label it with `--project`.
