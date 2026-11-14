@@ -20,14 +20,29 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
 
 - **L** The final summary prints `.\setup-client.ps1` for other PCs, while in the repo the file is
   `client\setup-client.ps1` (right only for a copied file).
-- **L** Working tree has CRLF for `clickhouse/views.sql` and the grafana provisioning yaml
-  (`core.autocrlf=true` vs `.gitattributes` LF; the index is LF). They are bind-mounted into
-  containers; `.gitattributes` says CRLF breaks `init-views.sh`, same risk for `views.sql`.
+- **L** Working tree has CRLF for the grafana provisioning yaml (`dashboards.yaml`,
+  `clickhouse.yaml`; `core.autocrlf=true` vs `.gitattributes` LF; the index is LF). They are
+  bind-mounted into containers; `.gitattributes` says CRLF breaks `init-views.sh`, same risk here.
+
+## setup-server.sh
+
+- **M?** Unverified on a physical Linux host: the Docker install path (`install-docker.sh` on
+  Ubuntu/Debian and derivatives) and the ufw / firewalld rule paths.
 
 ## setup-client.ps1
 
 - **L** `-PcName` defaults to `$env:COMPUTERNAME` (upper case); a PC configured by hand with a
   lower-case name shows up as a second `host` value.
+
+## setup-client.sh
+
+- **M?** The jq branch (no python3, jq ≥ 1.6) never ran; only the python3 branch was tested.
+
+## collector / clients
+
+- **M?** Whether running Claude Code sessions reconnect after the collector restarts is
+  unconfirmed (2026-11-14: no events for ~50 min after a restart, cause unknown).
+  `setup-server.sh --update` therefore always asks to restart the client sessions.
 
 ## views (`clickhouse/views.sql`)
 
@@ -37,6 +52,12 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
 - **?** `query_source` of the main session in the interactive terminal CLI is unverified
   (expected `repl_main_thread`, matched by `startsWith(query_source, 'repl_main')`); any other
   value shows as `aux:<value>`.
+- **L** `cc.session_project` worktree fold is a name-prefix heuristic: it merges different
+  projects sharing a prefix (`my` and `my-app`) and is not transitive (`b`, `b-c`, `b-c-d`). A
+  project in an unusual layout (`/data/x/y/`) is named after its first folder (`data`).
+- **L?** Cost: every query on `cc.events` reads `otel.otel_logs` about 4 times (`events_raw` itself,
+  `session_project` over `path_roots`, and both halves of its `names` union). Deferred until an
+  ARMv8.0 Linux server gets slow.
 
 ## dashboard (`cc-usage.json`)
 

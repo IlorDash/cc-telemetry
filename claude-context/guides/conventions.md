@@ -12,10 +12,13 @@ re-run and must keep existing data, `.env` and foreign settings keys).
   is re-derived on every query, so a fix applies to all data.
 - Read attributes as `LogAttributes['key']`; convert with `toUInt64OrZero` / `toFloat64OrZero`
   (attributes are strings; missing → `''`).
-- Filter `ServiceName = 'claude-code'` once, in `cc.events`; other views build on `cc.events`.
-- New attribute → add a column to `cc.events`, document it in `modules/telemetry-data.md`
-  (via context-auditor) and, if it is collected text, in README "What is sent".
+- Filter `ServiceName = 'claude-code'` once, in `cc.events_raw` (the raw layer); other views build
+  on `cc.events` (effective project) or, when they feed it or need no project, on `cc.events_raw`.
+- New attribute → add a column to `cc.events_raw` (reaches `cc.events` via `e.*`), document it in
+  `modules/telemetry-data.md` (via context-auditor) and, if it is collected text, in README "What is sent".
 - Explicit column aliases in joins (`e.ts AS ts`): ClickHouse keeps the `e.` prefix otherwise.
+- Target ClickHouse 22.3 (old ARM servers) through 25.8: never several `USING` joins in one query
+  (22.3/23.3 reject them) — join with `ON`. Applies to dashboard queries too.
 
 ## Dashboard (`grafana/dashboards/cc-usage.json`)
 - Edit the file, keep its 2-space formatting; panel `id`s and `gridPos` stay unique.
@@ -40,6 +43,12 @@ re-run and must keep existing data, `.env` and foreign settings keys).
 ## Shell (`*.sh`) and config
 - `#!/bin/bash`, `set -euo pipefail`, LF endings (`.gitattributes`).
 - Never put a password on a command line you print; read `.env` inside the script (`linux-server-tools/ch.sh`).
+- `.env` may be CRLF (edited on Windows): strip `\r` when reading a key, keep the file's endings
+  when writing (`get_env` / `set_env` in `setup-server.sh`).
+- bash reads a script while it runs: code that runs after `git pull` of that script lives in a
+  function parsed before the pull and ends in `exec` (`run_update`).
+- On Linux Docker-published ports bypass ufw/firewalld: limit access with the bind address
+  (`OTLP_BIND` / `GRAFANA_BIND`), not a firewall rule.
 - `otel-collector.yaml`: secrets via `${env:NAME}`; a new processor must be added to the pipeline
   list too; restart the collector and check its log for `Everything is ready`.
 - Image tags pinned to exact versions.

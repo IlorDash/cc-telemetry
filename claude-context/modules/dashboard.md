@@ -15,7 +15,7 @@ the ClickHouse plugin's SQL editor (`editorType: sql`); `format` 1 = table, 0 = 
 
 | Variable | Query source | Filter |
 | --- | --- | --- |
-| `project` | `DISTINCT project FROM cc.events` | — |
+| `project` | `DISTINCT project FROM cc.events` (effective: label, else inferred) | — |
 | `session` | `cc.sessions`, newest first, ≤ 300 | project; `prompts > 0 OR tokens > 0` (hides empty sessions) |
 | `actor` | `DISTINCT actor FROM cc.api_requests` | project, session |
 | `skill` | `DISTINCT skill FROM cc.api_requests`, non-empty | project, session |
@@ -35,6 +35,9 @@ with `('${v}' = '__all' OR col = '${v}')` per variable and `$__timeFilter(ts)` (
 | Tools | 16 Tool calls by tool, 17 Tools × actor × skill, 18 Bash commands, 19 Rejected tool calls |
 | Files | 21 Top files, 22 Accesses by area, 23 Top directories, 24 Files re-read within one session |
 | Hooks overhead | 26 Hook time |
+
+Panel 14 joins its two subqueries with `ON` (ClickHouse 22.3/23.3 reject several `USING` joins in
+one query); panel 13 has a single `USING` join.
 
 Drill-down links rebuild the URL `/d/cc-usage/claude-code-usage?var-…&${__url_time_range}`.
 

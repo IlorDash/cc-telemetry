@@ -13,7 +13,13 @@ did not; never claim a check that did not run.
 | `*.ps1` | parse: `[System.Management.Automation.Language.Parser]::ParseFile(...)` with 0 errors; no bytes > 127; run it (below) |
 | `setup-server.ps1` | `powershell -NoProfile -ExecutionPolicy Bypass -File .\setup-server.ps1` — must exit 0 and keep `.env` (compare `Get-FileHash` before/after). `-EnableLan` needs the user (UAC) |
 | `client/setup-client.ps1` | run against copies in the scratchpad with `-UserSettings <copy>` and `-Project <copy dir>`; compare with Node: every key except `env` identical, no BOM. Never against the real files unless the user asked |
-| `linux-server-tools/*.sh` | `wsl -d Ubuntu -- bash -n linux-server-tools/<file>.sh`; run it when harmless (`backup.sh dump` is; `restore` appends — only on an empty stack) |
+| `*.sh` | `wsl -d Ubuntu -- bash -n <path>.sh` |
+| `linux-server-tools/*.sh` | run it when harmless (`backup.sh dump` is; `restore` appends — only on an empty stack) |
+| `setup-server.sh` | `wsl -d Ubuntu -- bash setup-server.sh` — must exit 0; without `--lan`/`--local-only` every `.env` key reports `kept`. Never `--update` (runs `git pull`) unless the user asks |
+| `client/setup-client.sh` | `--dry-run`, or against copies in the scratchpad with `--user-settings <copy>` and `--project <copy dir>`; same comparison as for `setup-client.ps1`. Never against the real files unless the user asked |
+
+A live check covers only the ClickHouse version the stack runs (`server-state.local.md`), not
+every supported tag.
 
 **SQL:** write the query into a scratchpad file, then
 `Get-Content <file> | wsl -d Ubuntu -- bash linux-server-tools/ch.sh` (password stays inside the script).
