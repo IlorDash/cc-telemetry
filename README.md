@@ -208,12 +208,14 @@ powershell -ExecutionPolicy Bypass -File .\setup-client.ps1 -ServerIp <SERVER_IP
 ```
 
 - `-ServerIp`: the server's address.
-- `-Project`: the folders you open in Claude Code. Add more later by re-running with other folders.
+- `-Project`: optional. Folders to label explicitly with their name; add more later by re-running with other folders.
+  Without it the server infers the project from file paths (see "Project" below).
 - `-PcName`: optional, the computer name by default; letters, digits, `.`, `_`, `-`.
 - `-WhatIf`: show the result and write nothing.
 
 It adds the telemetry keys to the `env` section of `%USERPROFILE%\.claude\settings.json` and
-`OTEL_RESOURCE_ATTRIBUTES=project=<folder name>,host=<PC name>` to `<project>\.claude\settings.local.json` (created if missing).
+`OTEL_RESOURCE_ATTRIBUTES=project=<folder name>,host=<PC name>` to `<project>\.claude\settings.local.json` (created if missing;
+only for the `-Project` folders).
 It leaves every other key (permissions, model, plugins, …) as it was, saves `<file>.bak` before the first change,
 checks that the result is valid JSON (Windows PowerShell 5.1 re-indents it; the content stays the same)
 and tests the connection to `<SERVER_IP>:4317`.
@@ -228,7 +230,8 @@ bash setup-client.sh --server-ip <SERVER_IP> --project ~/projects/ProjA --projec
 ```
 
 - `--server-ip`: the server's address (required).
-- `--project`: a folder you open in Claude Code; repeat the option for more. Add more later by re-running with other folders.
+- `--project`: optional. A folder to label explicitly with its name; repeat the option for more, add more later by re-running.
+  Without it the server infers the project from file paths (see "Project" below).
 - `--pc-name`: optional, `hostname -s` by default; letters, digits, `.`, `_`, `-`.
 - `--settings-dir`: project settings folder if it is not `.claude`.
 - `--dry-run`: show the result and write nothing.
@@ -241,11 +244,31 @@ and tests the connection to `<SERVER_IP>:4317`.
 ### 2c. After the client script
 
 1. Claude Code must be **2.1.310 or newer** (`claude --version`, otherwise `claude update`).
-2. Project settings are read only in a **trusted** folder: if a project was never opened in Claude Code on this PC,
-   run `claude` in it once and accept the trust dialog.
+2. Only if you used `-Project` / `--project`: project settings are read only in a **trusted** folder. If a project was never
+   opened in Claude Code on this PC, run `claude` in it once and accept the trust dialog.
 3. **Restart running sessions**, settings are read at start: in VS Code *Developer: Reload Window*,
    in the terminal exit and continue with `claude -c`.
-4. Make any request. Within 5–10 s the project appears in the **Project** dropdown in Grafana.
+4. Make any request. Within 5–10 s the session appears in Grafana; its project shows in the **Project** dropdown once the
+   session has touched a file (or at once with an explicit label).
+
+### Project
+
+Claude Code does not send the working directory, so the dashboard's `project` is decided on the server, per session:
+
+1. **Explicit label wins.** `project=<name>` from `OTEL_RESOURCE_ATTRIBUTES` (written by `-Project` / `--project`) is used as is.
+   Use it for projects whose sessions touch no files (pure chat, MCP only) and for folders the guess gets wrong.
+2. **Otherwise inferred** from the absolute file paths of the session's tool calls (Read, Edit, Write, Glob, Grep, ...):
+   the folder name (lower case, as with `--project`) that appears most often, ties broken alphabetically. The folder is the
+   first path segment after the home directory and generic containers such as `Documents`, `projects`, `src`, `dev`, `work`,
+   `repos`, `github`: `C:\Users\me\Documents\Projects\Alpha\a.cpp` and `/home/me/src/alpha/a.cpp` both give `alpha`.
+   A worktree folder `alpha-feature` counts as `alpha` when `alpha` is also known (seen in other paths or set as a label).
+   Worktree folding is a name-prefix heuristic: it can merge different projects whose names share a prefix (`my` and
+   `my-app`) and is not transitive (`b`, `b-c`, `b-c-d`); an explicit `--project` label avoids it.
+   Paths in hidden folders (`~/.claude`), temp and system folders are ignored.
+3. **Otherwise `unknown`**: no explicit label and no file paths in the session.
+
+It is computed on every query, so sessions recorded earlier get their project too. A project in an unusual layout (folders
+directly under `/data/x/y/`) is named after the first folder (`data`): label it with `--project`.
 
 Only sessions started after the setup are recorded. Telemetry is sent live: past sessions in `~/.claude/projects`
 (`%USERPROFILE%\.claude\projects` on Windows) are not uploaded, and events produced while the server is unreachable
@@ -271,7 +294,8 @@ User settings (`%USERPROFILE%\.claude\settings.json` on Windows, `~/.claude/sett
 }
 ```
 
-Each project's `.claude/settings.local.json`, add to `"env"`:
+Optional, only to label a project explicitly (otherwise it is inferred from file paths, see "Project"): in the project's
+`.claude/settings.local.json`, add to `"env"`:
 
 ```json
 "OTEL_RESOURCE_ATTRIBUTES": "project=<project folder name, lower case>,host=<PC_NAME>"
@@ -353,7 +377,8 @@ so editing `views.sql` recomputes the whole history.
 | "Unknown table cc.events" | `docker compose logs views-init`, then `docker compose run --rm views-init` |
 | Variable dropdowns are empty | Dashboard settings → Variables → open the variable → Run query → Save |
 | ClickHouse plugin does not load | no internet on first start; `docker compose restart grafana` |
-| `project = unknown` | no `settings.local.json` with `OTEL_RESOURCE_ATTRIBUTES`, or the folder is not trusted |
+| `project = unknown` | the session touched no file with an absolute path and has no explicit label (`settings.local.json` with `OTEL_RESOURCE_ATTRIBUTES`, folder must be trusted); `OTEL_LOG_TOOL_DETAILS` must be `1` for paths to be sent |
+| A project has an odd name (`data`, ...) | its folder sits in an unusual place; set the label with `-Project` / `--project` |
 | `actor = agent?` | the subagent is still running and its name has not arrived yet, or Claude Code is older than 2.1.310 |
 | Stack in WSL is down from time to time | `wsl -l -v` shows `Stopped`: the keepalive is not running; re-run `setup-server.ps1` |
 | Port 4317 closed from another PC but open on the server's `localhost` (Windows server) | `setup-server.ps1 -EnableLan` not run, or the server's LAN IP changed (re-run it); network marked Public |
@@ -407,7 +432,8 @@ Observed with Claude Code 2.1.323 and the client settings above:
 - **Usage**: model, tokens (incl. cache), cost, durations, time to first token, effort, subagent and skill names, permission
   decisions, hook timings; plus metrics (tokens, cost, lines of code changed, active time).
 - **Identity**: account email, account/organization IDs, plan (`pro`, …), session and prompt IDs, OS version,
-  and the `project`/`host` you set.
+  and the `host` (and optionally `project`) you set. Nothing new is sent for the project guess: the server derives it from the
+  tool-call paths above.
 
 Everything is stored only on the server PC, indefinitely. If you don't want prompts stored, remove `OTEL_LOG_USER_PROMPTS`:
 the `first_prompt` column will then be empty.

@@ -5,10 +5,12 @@
 CREATE DATABASE IF NOT EXISTS cc;
 
 -- 1. One row per Claude Code event, attributes flattened into columns.
-CREATE OR REPLACE VIEW cc.events AS
+--    project_label = the explicit label from OTEL_RESOURCE_ATTRIBUTES ('unknown' when missing).
+--    The effective project (label, else inferred from file paths) is cc.events, view 4.
+CREATE OR REPLACE VIEW cc.events_raw AS
 SELECT
     Timestamp                                                   AS ts,
-    lower(if(ResourceAttributes['project'] != '', ResourceAttributes['project'], 'unknown')) AS project,
+    lower(if(ResourceAttributes['project'] != '', ResourceAttributes['project'], 'unknown')) AS project_label,
     if(ResourceAttributes['host'] != '', ResourceAttributes['host'], 'unknown')               AS host,
     ResourceAttributes['service.version']                       AS cc_version,
     LogAttributes['event.name']                                 AS event,
@@ -44,7 +46,77 @@ SELECT
 FROM otel.otel_logs
 WHERE ServiceName = 'claude-code';
 
--- 2. agent_id -> readable agent name (context-auditor, Explore, ...).
+-- 2. Project folder of every tool call that touched an absolute path (candidate project names).
+--    Lower-cased, `\` -> `/`, `/c/` -> `c:/`, `/mnt/c/` accepted. The folder is the first path segment that is
+--    not a home dir (users/<u>, home/<u>, root) or a generic container (documents, projects, src, dev, ...):
+--    c:/users/u/documents/projects/<proj>/..., /home/u/src/<proj>/..., c:/<proj>/...
+--    Dropped: hidden folders (.claude), temp/system/AppData folders, files directly in a container.
+--    OneDrive-redirected folders (`onedrive`, `onedrive - <company>`) are containers too.
+--    Keep the two lists below (regex and IN; `onedrive - *` is a regex alternative and a startsWith) in step.
+CREATE OR REPLACE VIEW cc.path_roots AS
+SELECT session_id, cand
+FROM
+(
+    SELECT
+        session_id,
+        JSONExtractString(tool_input, 'file_path')     AS j_file,
+        JSONExtractString(tool_input, 'notebook_path') AS j_nb,
+        JSONExtractString(tool_input, 'path')          AS j_dir,
+        multiIf(j_file != '', j_file, j_nb != '', j_nb, j_dir) AS raw_path,
+        replaceRegexpOne(lower(replaceAll(raw_path, '\\', '/')), '^/([a-z])/', '\\1:/') AS p,
+        if(j_file = '' AND j_nb = '', replaceRegexpOne(p, '/*$', '/'), p) AS pp,
+        extract(pp, '^(?:/mnt/[a-z]/|/|[a-z]:/)(?:(?:users|home)/[^/]+/|root/)?(?:(?:documents|projects|project|repos|repo|src|source|sources|dev|work|code|git|github|gitlab|workspace|workspaces|desktop|downloads|onedrive(?: - [^/]*)?)/)*([^/.][^/]*)/') AS c0,
+        if(c0 IN ('users', 'home', 'root', 'mnt', 'documents', 'projects', 'project', 'repos', 'repo', 'src', 'source',
+                  'sources', 'dev', 'work', 'code', 'git', 'github', 'gitlab', 'workspace', 'workspaces', 'desktop',
+                  'downloads', 'onedrive', 'appdata', 'tmp', 'temp', 'var', 'etc', 'usr', 'proc', 'sys', 'windows', 'programdata',
+                  'program files', 'program files (x86)', 'node_modules', '$recycle.bin')
+              OR startsWith(c0, 'onedrive - '), '', c0) AS cand
+    FROM cc.events_raw
+    WHERE event = 'tool_result' AND session_id != '' AND raw_path != ''
+)
+WHERE cand != '';
+
+-- 3. Inferred project per session: the most frequent folder among its tool-call paths (ties: name order).
+--    A worktree folder <project>-<name> folds into <project> when that name is known, either as another
+--    folder seen in paths or as an explicit label (the longest such prefix wins).
+CREATE OR REPLACE VIEW cc.session_project AS
+WITH
+    (SELECT groupUniqArray(n) FROM
+        (SELECT cand AS n FROM cc.path_roots
+         UNION ALL
+         SELECT project_label AS n FROM cc.events_raw WHERE project_label != 'unknown')) AS names
+SELECT
+    session_id,
+    argMin(root, (-toInt64(cnt), root)) AS project
+FROM
+(
+    SELECT
+        session_id,
+        if(base != '', base, cand) AS root,
+        count() AS cnt
+    FROM
+    (
+        SELECT
+            session_id,
+            cand,
+            arrayFirst(n -> startsWith(cand, concat(n, '-')), arrayReverseSort(n -> length(n), names)) AS base
+        FROM cc.path_roots
+    )
+    GROUP BY session_id, root
+)
+GROUP BY session_id;
+
+-- 4. Effective events: an explicit label wins; sessions without one get the inferred project, else 'unknown'.
+--    Every other view reads this one (or cc.events_raw when it needs no project).
+CREATE OR REPLACE VIEW cc.events AS
+SELECT
+    e.* EXCEPT (project_label),
+    if(e.project_label != 'unknown', e.project_label,
+       if(s.project != '', s.project, 'unknown')) AS project
+FROM cc.events_raw AS e
+LEFT JOIN cc.session_project AS s ON s.session_id = e.session_id;
+
+-- 5. agent_id -> readable agent name (context-auditor, Explore, ...).
 --    agent.name arrives with the subagent's first API request, agent_type at completion.
 CREATE OR REPLACE VIEW cc.agents AS
 SELECT
@@ -55,20 +127,20 @@ SELECT
         anyIf(query_source, startsWith(query_source, 'agent:')) != '',
             replaceRegexpOne(anyIf(query_source, startsWith(query_source, 'agent:')), '^agent:[^:]*:', ''),
         'agent?') AS agent
-FROM cc.events
+FROM cc.events_raw
 WHERE agent_id != ''
 GROUP BY agent_id;
 
--- 3. API request -> skill that was active (Claude Code tags requests with skill.name).
+-- 6. API request -> skill that was active (Claude Code tags requests with skill.name).
 CREATE OR REPLACE VIEW cc.requests AS
 SELECT
     request_id,
     anyIf(skill_name, skill_name != '') AS skill
-FROM cc.events
+FROM cc.events_raw
 WHERE event = 'api_request' AND request_id != ''
 GROUP BY request_id;
 
--- 4. Model requests with actor (main / agent name / aux:<source>) and skill.
+-- 7. Model requests with actor (main / agent name / aux:<source>) and skill.
 CREATE OR REPLACE VIEW cc.api_requests AS
 SELECT
     e.ts AS ts, e.project AS project, e.host AS host, e.account AS account,
@@ -90,7 +162,7 @@ FROM cc.events AS e
 LEFT JOIN cc.agents AS a ON a.agent_id = e.agent_id
 WHERE e.event = 'api_request';
 
--- 5. Tool calls with actor, skill (via request_id) and a project-relative path.
+-- 8. Tool calls with actor, skill (via request_id) and a project-relative path.
 --    Worktrees <project>-<name>/ fold into the same relative path as the main folder.
 CREATE OR REPLACE VIEW cc.tool_calls AS
 SELECT
@@ -140,7 +212,7 @@ FROM
     WHERE e.event = 'tool_result'
 );
 
--- 6. One row per session.
+-- 9. One row per session.
 CREATE OR REPLACE VIEW cc.sessions AS
 SELECT
     session_id,
