@@ -51,7 +51,7 @@ All under `claude-context/`.
 | `context-claude.md` | hub: glossary, data flow, boundaries, module map, conventions summary, ledger |
 | `modules/stack.md` | `docker-compose.yml`, `otel-collector.yaml`, `.env.example`, ClickHouse tables, Grafana provisioning, ports |
 | `modules/telemetry-data.md` | client env keys, events and attributes, `clickhouse/views.sql`, `init-views.sh` |
-| `modules/dashboard.md` | `grafana/dashboards/cc-usage.json`: variables, rows, panels, links |
+| `modules/dashboard.md` | `grafana/dashboards/*.json` (seven dashboards): variables, rows, panels, links; `scripts/check-dashboard.js` |
 | `modules/setup-scripts.md` | `setup-server.ps1`, `client/setup-client.ps1`, `client/*.json`, `linux-server-tools/*.sh` |
 | `pending-bugs.md` | suspected bugs and unverified behaviour, grouped by area |
 

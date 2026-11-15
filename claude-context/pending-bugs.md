@@ -64,7 +64,11 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
 - **?** `cc.tips` rules `cache`, `big-results`, `agent-outlier`, `denials`, `slow-ttft` have not
   fired on real data yet: SQL and thresholds unconfirmed.
 
-## dashboard (`cc-usage.json`)
+## dashboards (`grafana/dashboards/*.json`)
+
+- **?** A real `setup-server.sh --update` across the `cc-usage.json` → `overview.json` rename is
+  untested: the home path changes in the `grafana` env (recreated by `compose up -d`) while the
+  provider picks up the new file only within 30 s — possibly a short window without the dashboard.
 
 - **L** Summary "Sessions" counts sessions with a model request; panel 7 also lists sessions with
   a prompt but no request, so the two numbers can differ.

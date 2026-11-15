@@ -7,7 +7,7 @@ did not; never claim a check that did not run.
 | Changed | Check |
 | --- | --- |
 | `clickhouse/views.sql` | `wsl -d Ubuntu -- docker compose run --rm views-init` (must print `cc.* views are ready`); then a `SELECT count()` per touched view and a sample of the changed columns through `linux-server-tools/ch.sh`; then the dashboard check |
-| `grafana/dashboards/cc-usage.json` | `node -e "JSON.parse(require('fs').readFileSync('grafana/dashboards/cc-usage.json','utf8'))"`; wait ≤ 30 s for Grafana to reload (dashboard `version` grows in `/api/dashboards/uid/cc-usage`); dashboard check |
+| `grafana/dashboards/*.json` | `JSON.parse` every changed file with `node -e`; wait ≤ 30 s for Grafana to reload; dashboard check (`check-dashboard.js` runs every file's queries and checks that each uid is provisioned and home = `cc-usage`) |
 | `otel-collector.yaml` | `wsl -d Ubuntu -- docker compose restart otel-collector`; log shows `Everything is ready`; a fresh event arrives (`SELECT max(Timestamp) FROM otel.otel_logs`) |
 | `docker-compose.yml` | `wsl -d Ubuntu -- docker compose up -d`; `docker compose ps -a` all Up, `views-init` Exited (0) |
 | `*.ps1` | parse: `[System.Management.Automation.Language.Parser]::ParseFile(...)` with 0 errors; no bytes > 127; run it (below) |

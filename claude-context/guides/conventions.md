@@ -20,8 +20,10 @@ re-run and must keep existing data, `.env` and foreign settings keys).
 - Target ClickHouse 22.3 (old ARM servers) through 25.8: never several `USING` joins in one query
   (22.3/23.3 reject them) — join with `ON`. Applies to dashboard queries too.
 
-## Dashboard (`grafana/dashboards/cc-usage.json`)
-- Edit the file, keep its 2-space formatting; panel `id`s and `gridPos` stay unique.
+## Dashboards (`grafana/dashboards/*.json`, seven files)
+- Edit the files, keep their 2-space formatting; panel `id`s and `gridPos` stay unique within a
+  file. Never reuse the retired ids 6, 12, 25.
+- Variables, `timepicker`, `tags` and `links` are shared: change them in all seven files alike.
 - Every query honours all four variables with `('${v}' = '__all' OR col = '${v}')` and the time
   range (`$__timeFilter(ts)`, or `$__fromTime`/`$__toTime` when filtering an aggregate).
 - Variable queries are plain strings; keep `query` and `definition` identical.

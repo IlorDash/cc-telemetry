@@ -20,7 +20,7 @@ The Docker services, how data moves between them, what is exposed and where it i
 | `clickhouse` | `clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-25.8}` | none published | db `otel`, user `otel`; healthcheck `SELECT 1`; `ulimits nofile 262144` |
 | `otel-collector` | `otel/opentelemetry-collector-contrib:0.135.0` | `${OTLP_BIND:-0.0.0.0}:4317` gRPC, `127.0.0.1:4318` HTTP | starts after clickhouse is healthy |
 | `views-init` | `clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-25.8}` | — | one-shot, `restart: "no"`; `bash /init/init-views.sh`; `docker compose ps -a` shows `Exited (0)` when fine |
-| `grafana` | `grafana/grafana:12.1.0` | `${GRAFANA_BIND:-127.0.0.1}:${GRAFANA_PORT:-3000}:3000` | plugin via `GF_PLUGINS_PREINSTALL_SYNC=grafana-clickhouse-datasource` (4.23.5 at first install); home dashboard = `cc-usage.json` |
+| `grafana` | `grafana/grafana:12.1.0` | `${GRAFANA_BIND:-127.0.0.1}:${GRAFANA_PORT:-3000}:3000` | plugin via `GF_PLUGINS_PREINSTALL_SYNC=grafana-clickhouse-datasource` (4.23.5 at first install); home dashboard = `overview.json` via `GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH` |
 
 Bind mounts (read-only) — `compose up -d` recreates a container only when its service
 definition changes, so an edited file is picked up as follows:

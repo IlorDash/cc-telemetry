@@ -101,8 +101,10 @@ cc.tips ◄── cc.api_requests, cc.tool_calls, cc.events, cc.events_raw   (la
 
 `UNION ALL` of rules over `now() - INTERVAL 7 DAY` (fixed; ignores the dashboard range and
 variables). Columns: `category`, `title`, `body`, `scope` (project / agent type / hook), `metric`
-(Float64), `link` (relative: `/d/cc-usage?var-project=…` or `?var-session=…`; slow-hook →
-`/d/cc-usage`). Not on the dashboard yet. Thresholds are first guesses, meant to be tuned.
+(Float64), `link` (relative, no slug, to the dashboard holding the related panels:
+`/d/cc-usage?var-project=…` for cache, short-opus; `/d/cc-tools?var-project=…` for repeated-read,
+big-results, denials; `/d/cc-sessions?var-session=…` for agent-outlier; `/d/cc-health` for
+slow-hook; `/d/cc-health?var-project=…` for slow-ttft). Not on a dashboard yet. Thresholds are first guesses, meant to be tuned.
 
 | category | Source | Fires when (grouped by) | metric |
 | --- | --- | --- | --- |

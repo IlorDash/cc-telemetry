@@ -70,7 +70,8 @@ down, needs admin/UAC), say "not verified: <reason>".
 ```
 client settings env ──OTLP :4317──► otel-collector (drop_response) ──► ClickHouse otel.otel_logs
    cc.events → cc.agents / cc.requests → cc.api_requests, cc.tool_calls, cc.sessions
-   Grafana: datasource uid clickhouse, dashboard uid cc-usage (file-provisioned, re-read every 30 s)
+   Grafana: datasource uid clickhouse, 7 dashboards, home = uid cc-usage (overview.json)
+            (file-provisioned from grafana/dashboards/, re-read every 30 s)
 setup-server.ps1: Docker (desktop | wsl + install-docker.sh) → .env → compose up → views-init → checks
                   → keepalive (wsl) → -EnableLan (UAC: firewall + portproxy)
 client/setup-client.ps1: merge env into user settings.json + project settings.local.json, per user

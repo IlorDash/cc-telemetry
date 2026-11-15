@@ -35,10 +35,12 @@ ClickHouse  otel.otel_logs (events), otel.otel_metrics_* (metrics, unused by the
    ▼
 cc.events_raw → cc.path_roots → cc.session_project → cc.events (effective project)
 cc.events_raw → cc.agents, cc.requests;   cc.events → cc.api_requests, cc.tool_calls, cc.sessions
-cc.tips (usage tips, last 7 days; not on the dashboard yet) ← the views above
+cc.tips (usage tips, last 7 days; not on a dashboard yet) ← the views above
    │ grafana-clickhouse-datasource (uid clickhouse, native :9000, user otel)
    ▼
-Grafana :3000 (host port GRAFANA_PORT)  dashboard uid cc-usage (home page)
+Grafana :3000 (host port GRAFANA_PORT)  7 dashboards, shared variables + links bar:
+   Overview (uid cc-usage, home page), cc-sessions, cc-agents, cc-tools, cc-health,
+   cc-prompts, cc-tips
 ```
 
 ## Boundaries
@@ -60,14 +62,14 @@ Grafana :3000 (host port GRAFANA_PORT)  dashboard uid cc-usage (home page)
 | --- | --- |
 | `modules/stack.md` | `docker-compose.yml`, `otel-collector.yaml`, `.env`, ClickHouse tables and versions, Grafana provisioning, ports |
 | `modules/telemetry-data.md` | events and attributes Claude Code sends, `clickhouse/views.sql` (incl. `cc.tips` rules), `clickhouse/init-views.sh` |
-| `modules/dashboard.md` | `grafana/dashboards/cc-usage.json`: variables, panels, drill-down links |
+| `modules/dashboard.md` | `grafana/dashboards/*.json` (7 dashboards): uids, shared variables and links bar, panels, Overview placeholders, drill-down links, `check-dashboard.js` |
 | `modules/setup-scripts.md` | `setup-server.ps1`, `setup-server.sh` (incl. `--update`), `client/setup-client.{ps1,sh}`, `client/*.json`, `linux-server-tools/*.sh`, keepalive, LAN access |
 
 ## Key conventions (details in `guides/`, index in CLAUDE.md)
 
 - Views are plain, not materialized: editing `views.sql` and re-running
   `docker compose run --rm views-init` recomputes all history; no migrations.
-- Dashboard is file-provisioned: Grafana re-reads `cc-usage.json` every 30 s; edit the file, not the UI.
+- Dashboards are file-provisioned: Grafana re-reads `grafana/dashboards/` every 30 s; edit the files, not the UI.
 - Views and dashboard queries must run on ClickHouse 22.3 through 25.8: no multiple `USING` joins.
 - Scripts run on stock Windows PowerShell 5.1: ASCII only, `setup-server.ps1` uses
   `$ErrorActionPreference = 'Continue'` + `$LASTEXITCODE` checks, JSON written without BOM.
