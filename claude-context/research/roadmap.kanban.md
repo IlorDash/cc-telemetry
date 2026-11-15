@@ -44,7 +44,7 @@
   - priority: low
   - workload: Normal
   - steps:
-      - [ ] Проверить, что cc-usage.json (schema v1) и плагин ClickHouse работают на 13.x
+      - [ ] Проверить, что дашборды grafana/dashboards/*.json (schema v1) и плагин ClickHouse работают на 13.x
       - [ ] Переоценить вкладки (dynamic dashboards — GA в 13.x): URL вкладки, drill-down, keepTime
     ```md
     Итог исследований группы 1: и вкладки, и свежие версии Business Text (>= 6.2.3 требует
@@ -52,31 +52,6 @@
     ```
 
 ## To Do
-
-### Разбить на несколько дашбордов с навигацией
-
-  - tags: [implement-group-2, ui, grafana, structure]
-  - priority: medium
-  - workload: Normal
-  - steps:
-      - [ ] Дашборды: Overview (домашний), Prompts, Sessions, Agents & skills, Tools & files, Tips, Health
-      - [ ] Общая полоса links по тегу cc, keepTime и includeVars
-      - [ ] Одинаковые переменные project / session / actor / skill во всех
-      - [ ] Перенести текущие панели 7–26 в профильные дашборды
-      - [ ] Обновить drill-down ссылки (сейчас ведут на /d/cc-usage)
-      - [ ] GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH → Overview
-      - [ ] Зафиксировать uid всех дашбордов (на них ссылаются группа 3 и cc.tips)
-      - [ ] Разметить Overview заготовками: по одной пустой панели с фиксированными id и gridPos на каждую карточку группы 3
-      - [ ] claude-context/scripts/check-dashboard.js: проверять все файлы в grafana/dashboards/, а не только cc-usage.json
-      - [ ] Проверить setup-server.sh --update: новые файлы дашбордов подхватываются без рестарта, смена GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH пересоздаёт grafana
-    ```md
-    Ссылки между дашбордами выглядят как вкладки token-dashboard.
-    Текущий uid cc-usage сохранить за Overview, чтобы старые закладки не сломались.
-    Docs impact (обновлять по запросу): modules/dashboard.md, context-claude.md,
-    guides/conventions.md и verification.md, agents/developer.md — все сейчас про один cc-usage.json.
-    Группа 2 — одна, потому что меняет все файлы дашбордов. Заготовки на Overview нужны,
-    чтобы в группе 3 каждая карточка меняла только свою панель и не конфликтовала с соседями.
-    ```
 
 ### Overview: ряд KPI из 7 карточек
 
@@ -327,6 +302,34 @@
 ## In Progress
 
 ## Done
+
+### Разбить на несколько дашбордов с навигацией
+
+  - tags: [implement-group-2, ui, grafana, structure]
+  - priority: medium
+  - workload: Normal
+  - steps:
+      - [x] Дашборды: Overview (домашний), Prompts, Sessions, Agents & skills, Tools & files, Tips, Health
+      - [x] Общая полоса links по тегу cc, keepTime и includeVars
+      - [x] Одинаковые переменные project / session / actor / skill во всех
+      - [x] Перенести текущие панели 7–26 в профильные дашборды (10–11 остались на Overview)
+      - [x] Обновить drill-down ссылки: панель 7 → cc-sessions, 13/14 → cc-agents; ссылки cc.tips → профильные дашборды
+      - [x] GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH → overview.json
+      - [x] Зафиксировать uid: cc-usage (Overview), cc-sessions, cc-agents, cc-tools, cc-health, cc-prompts, cc-tips
+      - [x] Разметить Overview заготовками: id 30–43 (42 — свёрнутый row «Что значат эти цифры?», 43 внутри)
+      - [x] claude-context/scripts/check-dashboard.js: все файлы в grafana/dashboards/ + проверка provisioning
+      - [x] Проверить setup-server.sh --update: файлы дашбордов подхватываются раз в 30 с, смена env пересоздаёт grafana (по коду и compose up -d на живом стеке)
+    ```md
+    cc-usage.json заменён на overview.json (uid cc-usage сохранён — старые закладки работают).
+    Prompts и Tips — заготовки (id 1), их наполняет группа 3.
+    Заготовки Overview для группы 3: 30 KPI, 31 Daily work, 32 Daily cache reads, 33 cache hit rate,
+    34 токены по проектам, 35 donut моделей, 36 топ инструментов, 37 последние сессии,
+    38 активные сессии, 39 heatmap, 40 стоимость vs подписка, 41 счётчик Tips, 42/43 «Что значат эти цифры?».
+    Summary 2–5 работают, пока карточка KPI их не заменит.
+    Риски: настоящий --update со сменой файла на сервере не прогонялся (возможно короткое окно без
+    дашборда); кнопки в полосе ссылок идут по алфавиту — Overview не первая.
+    README отстаёт (один дашборд) — карточка группы 5.
+    ```
 
 ### Быстрые диапазоны 5m / 1h / 24h / 7d / 30d / All
 
