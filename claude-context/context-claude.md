@@ -35,6 +35,7 @@ ClickHouse  otel.otel_logs (events), otel.otel_metrics_* (metrics, unused by the
    ▼
 cc.events_raw → cc.path_roots → cc.session_project → cc.events (effective project)
 cc.events_raw → cc.agents, cc.requests;   cc.events → cc.api_requests, cc.tool_calls, cc.sessions
+cc.tips (usage tips, last 7 days; not on the dashboard yet) ← the views above
    │ grafana-clickhouse-datasource (uid clickhouse, native :9000, user otel)
    ▼
 Grafana :3000 (host port GRAFANA_PORT)  dashboard uid cc-usage (home page)
@@ -58,7 +59,7 @@ Grafana :3000 (host port GRAFANA_PORT)  dashboard uid cc-usage (home page)
 | Module file | Covers |
 | --- | --- |
 | `modules/stack.md` | `docker-compose.yml`, `otel-collector.yaml`, `.env`, ClickHouse tables and versions, Grafana provisioning, ports |
-| `modules/telemetry-data.md` | events and attributes Claude Code sends, `clickhouse/views.sql`, `clickhouse/init-views.sh` |
+| `modules/telemetry-data.md` | events and attributes Claude Code sends, `clickhouse/views.sql` (incl. `cc.tips` rules), `clickhouse/init-views.sh` |
 | `modules/dashboard.md` | `grafana/dashboards/cc-usage.json`: variables, panels, drill-down links |
 | `modules/setup-scripts.md` | `setup-server.ps1`, `setup-server.sh` (incl. `--update`), `client/setup-client.{ps1,sh}`, `client/*.json`, `linux-server-tools/*.sh`, keepalive, LAN access |
 

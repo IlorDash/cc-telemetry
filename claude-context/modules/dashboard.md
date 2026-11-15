@@ -8,6 +8,10 @@ The single Grafana dashboard: variables, rows, panels and the drill-down links b
 | --- | --- |
 | `grafana/dashboards/cc-usage.json` | uid `cc-usage`, title "Claude Code usage", refresh 10 s, default range 7 d; Grafana home page |
 
+Time picker: `timepicker.quick_ranges` = Last 5 minutes, 1 hour, 24 hours, 7 days, 30 days, All
+(`now-10y`). A custom list **replaces** Grafana's default one, so every wanted range (short ones
+too) must be listed (observed on Grafana 12.1, 2026-11-15).
+
 Grafana re-reads the file every 30 s — edit the file, never save over it from the UI. Queries use
 the ClickHouse plugin's SQL editor (`editorType: sql`); `format` 1 = table, 0 = time series.
 
@@ -40,6 +44,11 @@ Panel 14 joins its two subqueries with `ON` (ClickHouse 22.3/23.3 reject several
 one query); panel 13 has a single `USING` join.
 
 Drill-down links rebuild the URL `/d/cc-usage/claude-code-usage?var-…&${__url_time_range}`.
+
+## Not used (decided 2026-11-15)
+- Grafana 12.1 tabs / dynamic dashboards: experimental, need schema v2 (Kubernetes format) — new
+  views go into more panels or a separate dashboard file, not tabs.
+- Business Text plugin: built-in Stat/Table suffice; its 6.2.3+ needs Grafana ≥ 12.3.
 
 ## Known limits
 - Panel 7 shows `first_prompt` (≤ 120 chars) as the session title: real titles are not in telemetry.

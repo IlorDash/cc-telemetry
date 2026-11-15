@@ -57,6 +57,12 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
 - **L?** Cost: every query on `cc.events` reads `otel.otel_logs` about 4 times (`events_raw` itself,
   `session_project` over `path_roots`, and both halves of its `names` union). Deferred until an
   ARMv8.0 Linux server gets slow.
+- **L** `cc.tips` `repeated-read` puts `cc.tool_calls.path` in the title: a file outside the
+  project keeps its absolute path there.
+- **?** `cc.tips` verified only on ClickHouse 22.3 (`count()` ~0.5 s on ~4.9k events); 25.8
+  untested. It reads `otel.otel_logs` once per rule through the views — watch the cost as data grows.
+- **?** `cc.tips` rules `cache`, `big-results`, `agent-outlier`, `denials`, `slow-ttft` have not
+  fired on real data yet: SQL and thresholds unconfirmed.
 
 ## dashboard (`cc-usage.json`)
 

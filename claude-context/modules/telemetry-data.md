@@ -8,7 +8,7 @@ rows the dashboard reads.
 
 | Path | Role |
 | --- | --- |
-| `clickhouse/views.sql` | `CREATE DATABASE cc` + nine `CREATE OR REPLACE VIEW` |
+| `clickhouse/views.sql` | `CREATE DATABASE cc` + ten `CREATE OR REPLACE VIEW` |
 | `clickhouse/init-views.sh` | waits up to 10 min for `otel.otel_logs`, then applies `views.sql` |
 | `client/user-settings.env.json`, `client/project-settings.local.env.json` | the client env keys (templates) |
 
@@ -41,7 +41,7 @@ parent `session.id`.
 | `user_prompt` | `prompt`, `prompt_text`, `prompt_length`, `command_name` |
 | `api_request` | `model`, `input/output/cache_read/cache_creation_tokens`, `cost_usd`, `duration_ms`, `ttft_ms`, `effort`, `query_source`, `request_id`, `agent_id`, `agent.name`, `skill.name` |
 | `assistant_response` | `response` (dropped by the collector), `response_length`, `model`, `request_id` |
-| `tool_result` | `tool_name`, `success`, `duration_ms`, `tool_input` (JSON: `file_path`/`notebook_path`/`path`/`pattern`/`command`), `tool_parameters` (`bash_command`), `tool_result_size_bytes`, `request_id`, `tool_use_id`, `agent_id` |
+| `tool_result` | `tool_name`, `success`, `duration_ms`, `tool_input` (JSON: `file_path`/`notebook_path`/`path`/`pattern`/`command`), `tool_parameters` (`bash_command`: first word only, e.g. `git`; reported 2026-11-15), `tool_result_size_bytes`, `request_id`, `tool_use_id`, `agent_id` |
 | `tool_decision` | `decision`, `source` (config/hook/user), `tool_name`, `permission_mode` |
 | `at_mention` | `mention_type`, `success`; **no path**: an `@` file is inlined without a tool call, so it never feeds project inference |
 | `subagent_completed` | `agent_type`, `agent_id`, `total_tokens`, `total_tool_uses`, `duration_ms`, `model` |
@@ -65,10 +65,12 @@ cc.events_raw ─┬─ cc.path_roots ─► cc.session_project   (+ explicit la
 cc.events ─┬─ cc.api_requests  (events + agents)
            ├─ cc.tool_calls    (events + agents + requests)
            └─ cc.sessions
+cc.tips ◄── cc.api_requests, cc.tool_calls, cc.events, cc.events_raw   (last 7 days)
 ```
 - `cc.events_raw`: one row per event with `ServiceName = 'claude-code'` (the only place that
   filters it); `project_label` lower-cased, `unknown` when missing; attributes flattened to typed
-  columns (`toUInt64OrZero` etc.).
+  columns (`toUInt64OrZero` etc.); last two `result_bytes` (`tool_result_size_bytes`) and
+  `ttft_ms`, passed on to `cc.events` via `e.*`.
 - `cc.path_roots`: per `tool_result` with a path (`file_path` → `notebook_path` → `path`):
   `session_id`, `cand` = candidate project folder. Path normalised (`\` → `/`, lower case,
   `/c/` → `c:/`, `/mnt/<d>/` accepted); `cand` = first segment after an optional home
@@ -94,5 +96,27 @@ cc.events ─┬─ cc.api_requests  (events + agents)
   `.claude/`, `external` outside the project.
 - `cc.sessions`: per `session_id`: first prompt, prompt/tool/agent/skill counts, cost, tokens,
   start/last event. Empty sessions (prompts = 0, tokens = 0) exist and are filtered by the dashboard.
+
+## `cc.tips` — usage tips
+
+`UNION ALL` of rules over `now() - INTERVAL 7 DAY` (fixed; ignores the dashboard range and
+variables). Columns: `category`, `title`, `body`, `scope` (project / agent type / hook), `metric`
+(Float64), `link` (relative: `/d/cc-usage?var-project=…` or `?var-session=…`; slow-hook →
+`/d/cc-usage`). Not on the dashboard yet. Thresholds are first guesses, meant to be tuned.
+
+| category | Source | Fires when (grouped by) | metric |
+| --- | --- | --- | --- |
+| `cache` | `cc.api_requests` | cache read / (read + input + creation) < 40 %, ≥ 20 requests (project) | hit % |
+| `repeated-read` | `cc.tool_calls` | `op = 'read'`, same `path` > 10 times (project, path) | count |
+| `big-results` | `cc.events` | ≥ 5 `tool_result` with `result_bytes` > 200000 (project) | count |
+| `short-opus` | `cc.api_requests` | model contains `opus`: ≥ 20 answers < 500 output tokens and ≥ half of all (project) | their `cost_usd` |
+| `agent-outlier` | `cc.events` | `subagent_completed`: max > 6 × mean and > 50k tokens, ≥ 3 runs (agent_type); link = session of the biggest run | max tokens |
+| `denials` | `cc.events` | `tool_decision` `reject` ≥ 5 (project, tool); body names the top `decision_source` | count |
+| `slow-hook` | `cc.events_raw` | `hook_execution_complete` mean > 500 ms, ≥ 10 runs (hook_name) | mean ms |
+| `slow-ttft` | `cc.events` | `api_request` mean `ttft_ms` > 3000, ≥ 10 requests (project, model) | mean ms |
+
+- Savings come from `cost_usd` only — no price table; the `short-opus` metric is an upper bound.
+- **No repeated-Bash rule, on purpose:** `bash_cmd` holds only the first word (`cd`, `git`), so
+  counting it is noise. Do not add one while Claude Code sends only that.
 
 Apply changes: `wsl -d Ubuntu -- docker compose run --rm views-init`.
