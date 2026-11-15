@@ -2,32 +2,6 @@
 
 ## Backlog
 
-### Проверить вкладки в Grafana 12 (dynamic dashboards)
-
-  - tags: [implement-group-1, ui, research, grafana]
-  - priority: low
-  - workload: Normal
-  - steps:
-      - [ ] Есть ли tabs layout в 12.1 и под каким feature flag
-      - [ ] Совместим ли с file provisioning (schema v2)
-    ```md
-    Экспериментальная функция. Альтернатива нескольким дашбордам со ссылками.
-    Группа 1: результат нужен до разбивки на дашборды (группа 2) — он может поменять её подход.
-    ```
-
-### Оценить плагин Business Text
-
-  - tags: [implement-group-1, ui, research, grafana]
-  - priority: low
-  - workload: Normal
-  - steps:
-      - [ ] Попробовать marcusolsson-dynamictext-panel для карточек сессий / промптов
-      - [ ] Решить, стоит ли добавлять плагин в GF_PLUGINS_PREINSTALL_SYNC
-    ```md
-    Только если штатных панелей Grafana окажется мало.
-    Группа 1: решение нужно до наполнения дашбордов (группа 3).
-    ```
-
 ### Импортёр JSONL: названия сессий и git-ветка
 
   - tags: [implement-group-4, data, client, research]
@@ -55,6 +29,8 @@
   - workload: Hard
   - steps:
       - [ ] Замерить Overview и Tips после группы 3 на ARMv8.0 / ClickHouse 22.3
+      - [ ] Замерить Overview на диапазоне All (now-10y) на ARM при refresh 10 с; при тормозах — поднять refresh по умолчанию
+      - [ ] Замерить cc.tips на ARM (8 правил поверх cc.events)
       - [ ] Если медленно: materialized-таблица для cc.session_project или кэш запросов Grafana
     ```md
     pending-bugs: каждый запрос к cc.events читает otel_logs ~4 раза. Отложено до появления
@@ -62,46 +38,20 @@
     Без группы: брать, только если замер покажет проблему.
     ```
 
+### Обновить Grafana до 13.x
+
+  - tags: [grafana, stack]
+  - priority: low
+  - workload: Normal
+  - steps:
+      - [ ] Проверить, что cc-usage.json (schema v1) и плагин ClickHouse работают на 13.x
+      - [ ] Переоценить вкладки (dynamic dashboards — GA в 13.x): URL вкладки, drill-down, keepTime
+    ```md
+    Итог исследований группы 1: и вкладки, и свежие версии Business Text (>= 6.2.3 требует
+    Grafana 12.3+) упираются в версию Grafana. Не срочно.
+    ```
+
 ## To Do
-
-### Быстрые диапазоны 7d / 30d / 90d / All
-
-  - tags: [implement-group-1, ui, grafana]
-  - priority: high
-  - workload: Easy
-  - steps:
-      - [ ] timepicker.quick_ranges в JSON дашборда
-      - [ ] Проверить, что All не грузит ClickHouse чрезмерно (views не materialized; каждый запрос к cc.events читает otel_logs ~4 раза)
-      - [ ] Замерить время Overview на All на слабом сервере (ARMv8.0, ClickHouse 22.3)
-    ```md
-    Аналог кнопок диапазона на скриншоте.
-    Группа 1: делается в текущем cc-usage.json, разбивка (группа 2) копирует timepicker во все дашборды.
-    ```
-
-### Tips: вью cc.tips
-
-  - tags: [implement-group-1, data, tips]
-  - priority: medium
-  - workload: Hard
-  - steps:
-      - [ ] Низкий cache hit rate (< 40 %) в проекте за 7 дней
-      - [ ] Файл прочитан > 10 раз за 7 дней
-      - [ ] Bash-команда выполнена > 15 раз
-      - [ ] ≥ 5 результатов инструментов > ~200 КБ
-      - [ ] Много коротких ответов Opus (< 500 output tokens) — оценка экономии по нашему cost_usd
-      - [ ] Выброс субагента (max > 6 × mean и > 50k токенов)
-      - [ ] Частые отказы прав по одному инструменту — кандидат в allow-list
-      - [ ] Медленный хук
-      - [ ] Высокий ttft_ms
-      - [ ] Колонки: category, title, body, scope, metric, link
-      - [ ] Работает на ClickHouse 22.3–25.8: соединения через ON, не несколько USING
-      - [ ] Время запроса на слабом сервере: UNION из ~9 правил поверх cc.events
-    ```md
-    Аналог tips.py из token-dashboard на SQL (UNION правил). Пороги потом подстроить.
-    Правило по cache hit rate — по эффективному project (метка или угаданный по путям).
-    Своей таблицы цен не заводить — только cost_usd.
-    Группа 1: трогает только views.sql; в группе 3 views.sql занят вью cc.prompts.
-    ```
 
 ### Разбить на несколько дашбордов с навигацией
 
@@ -377,6 +327,83 @@
 ## In Progress
 
 ## Done
+
+### Быстрые диапазоны 5m / 1h / 24h / 7d / 30d / All
+
+  - tags: [implement-group-1, ui, grafana]
+  - priority: high
+  - workload: Easy
+  - steps:
+      - [x] timepicker.quick_ranges в JSON дашборда: 5m, 1h, 24h, 7d, 30d, All (= now-10y); 90d не нужен
+      - [x] Проверить, что All не грузит ClickHouse чрезмерно: на 2 сутках данных 23 запроса ~3 с, самый тяжёлый ~230 мс
+      - [x] Проверить в браузере, что Grafana 12.1 показывает эти пункты в пикере
+    ```md
+    quick_ranges заменяет стандартный список пикера — короткие диапазоны добавлены явно.
+    All — окно в 10 лет, а не «всё». Дашборд обновляется раз в 10 с: на All это частый полный скан.
+    Замер на ARM перенесён в «Производительность на слабом сервере».
+    Группа 1: разбивка (группа 2) копирует timepicker во все дашборды.
+    ```
+
+### Tips: вью cc.tips
+
+  - tags: [implement-group-1, data, tips]
+  - priority: medium
+  - workload: Hard
+  - steps:
+      - [x] Низкий cache hit rate (< 40 %) в проекте за 7 дней
+      - [x] Файл прочитан > 10 раз за 7 дней
+      - [x] ~~Bash-команда выполнена > 15 раз~~ — убрано: bash_cmd содержит только первое слово (cd, git), правило давало шум
+      - [x] ≥ 5 результатов инструментов > ~200 КБ
+      - [x] Много коротких ответов Opus (< 500 output tokens) — оценка экономии по нашему cost_usd
+      - [x] Выброс субагента (max > 6 × mean и > 50k токенов)
+      - [x] Частые отказы прав по одному инструменту — кандидат в allow-list
+      - [x] Медленный хук
+      - [x] Высокий ttft_ms
+      - [x] Колонки: category, title, body, scope, metric, link
+      - [x] ClickHouse 22.3: работает, новых JOIN нет (25.8 не проверена)
+      - [x] Время запроса: count() из cc.tips 0,5 с на ~4,9 тыс. событий (22.3); замер на ARM — в «Производительность»
+    ```md
+    8 правил UNION ALL за 7 дней; в cc.events_raw добавлены result_bytes и ttft_ms.
+    На живых данных срабатывают repeated-read, short-opus, slow-hook; cache, big-results,
+    agent-outlier, denials, slow-ttft реального срабатывания ещё не видели — пороги подстроить.
+    Замечания ревью: repeated-read может показать абсолютный путь вне проекта в title;
+    metric у short-opus — верхняя граница экономии, формулировку пересмотреть.
+    ```
+
+### Проверить вкладки в Grafana 12 (dynamic dashboards)
+
+  - tags: [implement-group-1, ui, research, grafana]
+  - priority: low
+  - workload: Normal
+  - steps:
+      - [x] Есть ли tabs layout в 12.1 и под каким feature flag
+      - [x] Совместим ли с file provisioning (schema v2)
+    ```md
+    Решение: вкладки не делать, группа 2 без изменений (отдельные дашборды + полоса links).
+    12.0–12.1: experimental, флаг dashboardNewLayouts (+ kubernetesDashboards для v2), «не для
+    production». 12.4 — public preview, 13.x — GA и включено по умолчанию.
+    Tabs есть только в schema v2; file provisioning v2 — только в Kubernetes-формате
+    (apiVersion dashboard.grafana.app/v2): переписать весь JSON, миграция в 12.x необратима.
+    Time range общий для всех вкладок; URL вкладки и drill-down на вкладку не документированы.
+    Пересмотреть в карточке «Обновить Grafana до 13.x».
+    ```
+
+### Оценить плагин Business Text
+
+  - tags: [implement-group-1, ui, research, grafana]
+  - priority: low
+  - workload: Normal
+  - steps:
+      - [x] Попробовать marcusolsson-dynamictext-panel для карточек сессий / промптов (по документации, без установки)
+      - [x] Решить, стоит ли добавлять плагин в GF_PLUGINS_PREINSTALL_SYNC — нет
+    ```md
+    Решение: не добавлять — для группы 3 хватает Stat и Table (data links, цвет по порогам,
+    перенос текста). Плагин даёт только вид «карточки», новых данных нет.
+    Совместимость: 6.2.3+ требует Grafana >= 12.3; на 12.1.0 максимум 6.2.0
+    (marcusolsson-dynamictext-panel@6.2.0; формат id@version на стеке не проверен).
+    Риск XSS: текст промптов выводить только через {{...}}, не {{{...}}} и не из afterRender.
+    Вернуться, только если Table не справится с длинным текстом промптов.
+    ```
 
 ### Анализ token-dashboard и claude-code-karma
 
