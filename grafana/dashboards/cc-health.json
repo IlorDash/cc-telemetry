@@ -1,0 +1,215 @@
+{
+  "uid": "cc-health",
+  "title": "Health",
+  "tags": [
+    "cc",
+    "claude-code",
+    "otel"
+  ],
+  "timezone": "browser",
+  "editable": true,
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "timepicker": {
+    "quick_ranges": [
+      {
+        "display": "Last 5 minutes",
+        "from": "now-5m",
+        "to": "now"
+      },
+      {
+        "display": "Last 1 hour",
+        "from": "now-1h",
+        "to": "now"
+      },
+      {
+        "display": "Last 24 hours",
+        "from": "now-24h",
+        "to": "now"
+      },
+      {
+        "display": "Last 7 days",
+        "from": "now-7d",
+        "to": "now"
+      },
+      {
+        "display": "Last 30 days",
+        "from": "now-30d",
+        "to": "now"
+      },
+      {
+        "display": "All",
+        "from": "now-10y",
+        "to": "now"
+      }
+    ],
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "1h"
+    ]
+  },
+  "links": [
+    {
+      "type": "dashboards",
+      "title": "Dashboards",
+      "tags": [
+        "cc"
+      ],
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "targetBlank": false,
+      "tooltip": "",
+      "url": ""
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "project",
+        "label": "Project",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "clickhouse"
+        },
+        "query": "SELECT DISTINCT project FROM cc.events ORDER BY project",
+        "definition": "SELECT DISTINCT project FROM cc.events ORDER BY project",
+        "includeAll": true,
+        "allValue": "__all",
+        "multi": false,
+        "refresh": 2,
+        "sort": 0,
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": []
+      },
+      {
+        "name": "session",
+        "label": "Session",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "clickhouse"
+        },
+        "query": "SELECT session_id FROM cc.sessions WHERE ('${project}' = '__all' OR project = '${project}') AND (prompts > 0 OR tokens > 0) ORDER BY started DESC LIMIT 300",
+        "definition": "SELECT session_id FROM cc.sessions WHERE ('${project}' = '__all' OR project = '${project}') AND (prompts > 0 OR tokens > 0) ORDER BY started DESC LIMIT 300",
+        "includeAll": true,
+        "allValue": "__all",
+        "multi": false,
+        "refresh": 2,
+        "sort": 0,
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": []
+      },
+      {
+        "name": "actor",
+        "label": "Actor",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "clickhouse"
+        },
+        "query": "SELECT DISTINCT actor FROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') ORDER BY actor",
+        "definition": "SELECT DISTINCT actor FROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') ORDER BY actor",
+        "includeAll": true,
+        "allValue": "__all",
+        "multi": false,
+        "refresh": 2,
+        "sort": 0,
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": []
+      },
+      {
+        "name": "skill",
+        "label": "Skill",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "clickhouse"
+        },
+        "query": "SELECT DISTINCT skill FROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND skill != '' ORDER BY skill",
+        "definition": "SELECT DISTINCT skill FROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND skill != '' ORDER BY skill",
+        "includeAll": true,
+        "allValue": "__all",
+        "multi": false,
+        "refresh": 2,
+        "sort": 0,
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": []
+      }
+    ]
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 26,
+      "type": "table",
+      "title": "Hook time",
+      "description": "",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT hook_name, count() AS runs, round(sum(hook_duration_ms) / 1000, 1) AS total_s,\n       round(avg(hook_duration_ms)) AS avg_ms\nFROM cc.events WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND $__timeFilter(ts) AND event = 'hook_execution_complete'\nGROUP BY hook_name ORDER BY total_s DESC"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
+        "overrides": []
+      }
+    }
+  ]
+}

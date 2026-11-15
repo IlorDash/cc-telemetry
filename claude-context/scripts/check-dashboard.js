@@ -1,4 +1,4 @@
-// Runs every variable and panel query of grafana/dashboards/cc-usage.json through Grafana's
+// Runs every variable and panel query of every grafana/dashboards/*.json through Grafana's
 // /api/ds/query and prints ok/FAIL per query. Reads the Grafana password from .env (never prints it).
 // Usage (repo root): node claude-context/scripts/check-dashboard.js [--project p] [--session id]
 //                    [--actor a] [--skill s] [--from now-24h] [--url http://localhost:3000]
@@ -29,28 +29,53 @@ if (!pass) {
 }
 const auth = "Basic " + Buffer.from("admin:" + pass.trim()).toString("base64");
 
-const dash = JSON.parse(fs.readFileSync(path.join(root, "grafana/dashboards/cc-usage.json"), "utf8"));
+const dashDir = path.join(root, "grafana", "dashboards");
 const interp = (s) =>
   s.replace(/\$\{(\w+)(?::\w+)?\}|\$(project|session|actor|skill)\b/g, (m, a, b) => vals[a || b] ?? m);
 
 const items = [];
-for (const v of dash.templating.list) {
-  if (v.type === "query") {
-    items.push({ name: "var " + v.name, sql: typeof v.query === "string" ? v.query : v.query.rawSql, fmt: 1, qt: "table" });
-  }
-}
-const walk = (panels) => {
-  for (const p of panels) {
-    if (p.panels) walk(p.panels);
-    for (const t of p.targets || []) {
-      items.push({ name: `panel ${p.id} ${p.title}`, sql: t.rawSql, fmt: t.format, qt: t.queryType });
+const uids = [];
+const files = fs.readdirSync(dashDir).filter((f) => f.endsWith(".json")).sort();
+for (const file of files) {
+  const dash = JSON.parse(fs.readFileSync(path.join(dashDir, file), "utf8"));
+  const tag = dash.uid + " ";
+  for (const v of dash.templating.list) {
+    if (v.type === "query") {
+      items.push({ name: tag + "var " + v.name, sql: typeof v.query === "string" ? v.query : v.query.rawSql, fmt: 1, qt: "table" });
     }
   }
-};
-walk(dash.panels);
+  const walk = (panels) => {
+    for (const p of panels) {
+      if (p.panels) walk(p.panels);
+      for (const t of p.targets || []) {
+        items.push({ name: `${tag}panel ${p.id} ${p.title}`, sql: t.rawSql, fmt: t.format, qt: t.queryType });
+      }
+    }
+  };
+  walk(dash.panels);
+  uids.push(dash.uid);
+}
 
 (async () => {
   let failed = 0;
+  // Provisioning: every file's uid is served by Grafana; the home page is the dashboard uid cc-usage.
+  const get = async (p) => {
+    try {
+      const r = await fetch(url + p, { headers: { Authorization: auth } });
+      return r.ok ? await r.json() : null;
+    } catch (e) {
+      return null;
+    }
+  };
+  for (const uid of uids) {
+    const d = await get("/api/dashboards/uid/" + uid);
+    if (!d) failed++;
+    console.log((d ? "ok   " : "FAIL ") + `dashboard ${uid}`.padEnd(58) + (d ? `version=${d.dashboard.version}` : "not provisioned"));
+  }
+  const home = await get("/api/dashboards/home");
+  const homeOk = home && home.dashboard && home.dashboard.uid === "cc-usage";
+  if (!homeOk) failed++;
+  console.log((homeOk ? "ok   " : "FAIL ") + "home dashboard".padEnd(58) + (homeOk ? "cc-usage" : "not cc-usage"));
   for (const it of items) {
     const body = {
       from,
@@ -85,6 +110,6 @@ walk(dash.panels);
     }
     console.log(line);
   }
-  console.log(`${items.length - failed}/${items.length} ok`);
+  console.log(failed ? `${failed} FAILED (of ${items.length} queries + ${uids.length + 1} provisioning checks)` : `all ok (${items.length} queries + ${uids.length + 1} provisioning checks)`);
   process.exit(failed ? 1 : 0);
 })();

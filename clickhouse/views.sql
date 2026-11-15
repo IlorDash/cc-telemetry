@@ -266,7 +266,7 @@ SELECT
     concat('Read ', toString(n), ' times in 7 days in ', project, '. Consider keeping the key facts in CLAUDE.md or a note instead of rereading.'),
     project,
     toFloat64(n),
-    concat('/d/cc-usage?var-project=', encodeURLComponent(project))
+    concat('/d/cc-tools?var-project=', encodeURLComponent(project))
 FROM
 (
     SELECT project, path, count() AS n
@@ -285,7 +285,7 @@ SELECT
     concat('Largest result: ', toString(round(biggest / 1048576, 2)), ' MB. Big outputs fill the context; narrow the search or limit the read range.'),
     project,
     toFloat64(n),
-    concat('/d/cc-usage?var-project=', encodeURLComponent(project))
+    concat('/d/cc-tools?var-project=', encodeURLComponent(project))
 FROM
 (
     SELECT project, count() AS n, max(result_bytes) AS biggest
@@ -320,7 +320,7 @@ SELECT
     concat('Mean is ', toString(round(mean)), ' tokens over ', toString(n), ' runs in 7 days. Check what that run did (project ', project, ').'),
     agent_type,
     toFloat64(biggest),
-    concat('/d/cc-usage?var-session=', encodeURLComponent(session))
+    concat('/d/cc-sessions?var-session=', encodeURLComponent(session))
 FROM
 (
     SELECT agent_type, count() AS n, avg(agent_total_tokens) AS mean, max(agent_total_tokens) AS biggest,
@@ -339,7 +339,7 @@ SELECT
            '). If the rule is intended, ignore this; otherwise review the permission rules for it.'),
     project,
     toFloat64(n),
-    concat('/d/cc-usage?var-project=', encodeURLComponent(project))
+    concat('/d/cc-tools?var-project=', encodeURLComponent(project))
 FROM
 (
     SELECT project, tool_name, count() AS n, topK(1)(decision_source)[1] AS top_source
@@ -356,7 +356,7 @@ SELECT
     concat('Mean ', toString(round(mean)), ' ms over ', toString(n), ' runs in 7 days. Hooks run synchronously and delay every matching tool call.'),
     hook_name,
     toFloat64(round(mean)),
-    '/d/cc-usage'
+    '/d/cc-health'
 FROM
 (
     SELECT hook_name, count() AS n, avg(hook_duration_ms) AS mean
@@ -373,7 +373,7 @@ SELECT
     concat('Mean ', toString(round(mean)), ' ms over ', toString(n), ' requests in 7 days. Long contexts and a busy provider slow the first token.'),
     project,
     toFloat64(round(mean)),
-    concat('/d/cc-usage?var-project=', encodeURLComponent(project))
+    concat('/d/cc-health?var-project=', encodeURLComponent(project))
 FROM
 (
     SELECT project, model, count() AS n, avg(ttft_ms) AS mean
