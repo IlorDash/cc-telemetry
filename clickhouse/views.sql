@@ -48,7 +48,30 @@ SELECT
 FROM otel.otel_logs
 WHERE ServiceName = 'claude-code';
 
+-- 1b. (view 12 in the card) Session titles and working directory sent by the client hook as separate
+--     events: ServiceName 'cc-session-meta' (never read by the views above, which see only 'claude-code').
+--     A client re-sends a session only when a value changed: the latest row per session wins.
+--     Defined here because cc.path_roots reads it (a view must exist before another one reads it).
+--     title_source: 'custom' (/rename) | 'ai' | ''. cwd = first working directory of the session.
+CREATE OR REPLACE VIEW cc.session_meta AS
+SELECT
+    LogAttributes['session.id']                                 AS session_id,
+    argMax(LogAttributes['title'], Timestamp)                   AS title,
+    argMax(LogAttributes['title_source'], Timestamp)            AS title_source,
+    argMax(LogAttributes['git_branch'], Timestamp)              AS git_branch,
+    argMax(LogAttributes['cwd'], Timestamp)                     AS cwd,
+    argMax(ResourceAttributes['host'], Timestamp)               AS host,
+    argMax(LogAttributes['cc_version'], Timestamp)              AS cc_version,
+    max(Timestamp)                                              AS updated
+FROM otel.otel_logs
+WHERE ServiceName = 'cc-session-meta'
+  AND LogAttributes['event.name'] = 'session_meta'
+  AND LogAttributes['session.id'] != ''
+GROUP BY session_id;
+
 -- 2. Project folder of every tool call that touched an absolute path (candidate project names).
+--    The working directory of a session (cc.session_meta.cwd) goes through the same rules as a directory
+--    path (from_cwd = 1); cc.session_project prefers it.
 --    Lower-cased, `\` -> `/`, `/c/` -> `c:/`, `/mnt/c/` accepted. The folder is the first path segment that is
 --    not a home dir (users/<u>, home/<u>, root) or a generic container (documents, projects, src, dev, ...):
 --    c:/users/u/documents/projects/<proj>/..., /home/u/src/<proj>/..., c:/<proj>/...
@@ -56,14 +79,11 @@ WHERE ServiceName = 'claude-code';
 --    OneDrive-redirected folders (`onedrive`, `onedrive - <company>`) are containers too.
 --    Keep the two lists below (regex and IN; `onedrive - *` is a regex alternative and a startsWith) in step.
 CREATE OR REPLACE VIEW cc.path_roots AS
-SELECT session_id, cand
+SELECT session_id, cand, from_cwd
 FROM
 (
     SELECT
-        session_id,
-        JSONExtractString(tool_input, 'file_path')     AS j_file,
-        JSONExtractString(tool_input, 'notebook_path') AS j_nb,
-        JSONExtractString(tool_input, 'path')          AS j_dir,
+        session_id, from_cwd, j_file, j_nb, j_dir,
         multiIf(j_file != '', j_file, j_nb != '', j_nb, j_dir) AS raw_path,
         replaceRegexpOne(lower(replaceAll(raw_path, '\\', '/')), '^/([a-z])/', '\\1:/') AS p,
         if(j_file = '' AND j_nb = '', replaceRegexpOne(p, '/*$', '/'), p) AS pp,
@@ -73,12 +93,26 @@ FROM
                   'downloads', 'onedrive', 'appdata', 'tmp', 'temp', 'var', 'etc', 'usr', 'proc', 'sys', 'windows', 'programdata',
                   'program files', 'program files (x86)', 'node_modules', '$recycle.bin')
               OR startsWith(c0, 'onedrive - '), '', c0) AS cand
-    FROM cc.events_raw
-    WHERE event = 'tool_result' AND session_id != '' AND raw_path != ''
+    FROM
+    (
+        SELECT
+            session_id, toUInt8(0) AS from_cwd,
+            JSONExtractString(tool_input, 'file_path')     AS j_file,
+            JSONExtractString(tool_input, 'notebook_path') AS j_nb,
+            JSONExtractString(tool_input, 'path')          AS j_dir
+        FROM cc.events_raw
+        WHERE event = 'tool_result' AND session_id != ''
+        UNION ALL
+        SELECT session_id, toUInt8(1), '', '', cwd
+        FROM cc.session_meta
+        WHERE cwd != ''
+    )
+    WHERE raw_path != ''
 )
 WHERE cand != '';
 
--- 3. Inferred project per session: the most frequent folder among its tool-call paths (ties: name order).
+-- 3. Inferred project per session: the folder of its working directory (cc.session_meta.cwd) when there is
+--    one, else the most frequent folder among its tool-call paths (ties: name order).
 --    A worktree folder <project>-<name> folds into <project> when that name is known, either as another
 --    folder seen in paths or as an explicit label (the longest such prefix wins).
 CREATE OR REPLACE VIEW cc.session_project AS
@@ -89,18 +123,20 @@ WITH
          SELECT project_label AS n FROM cc.events_raw WHERE project_label != 'unknown')) AS names
 SELECT
     session_id,
-    argMin(root, (-toInt64(cnt), root)) AS project
+    argMin(root, (-toInt64(cwd_n), -toInt64(cnt), root)) AS project
 FROM
 (
     SELECT
         session_id,
         if(base != '', base, cand) AS root,
-        count() AS cnt
+        count() AS cnt,
+        sum(from_cwd) AS cwd_n
     FROM
     (
         SELECT
             session_id,
             cand,
+            from_cwd,
             arrayFirst(n -> startsWith(cand, concat(n, '-')), arrayReverseSort(n -> length(n), names)) AS base
         FROM cc.path_roots
     )
@@ -215,26 +251,37 @@ FROM
 );
 
 -- 9. One row per session.
+--    title, title_source, git_branch, cwd come from cc.session_meta ('' when the client sent none).
 CREATE OR REPLACE VIEW cc.sessions AS
 SELECT
-    session_id,
-    any(project)                                   AS project,
-    any(host)                                      AS host,
-    any(account)                                   AS account,
-    min(ts)                                        AS started,
-    max(ts)                                        AS last_event,
-    argMinIf(prompt, ts, event = 'user_prompt')    AS first_prompt,
-    countIf(event = 'user_prompt')                 AS prompts,
-    sumIf(cost_usd, event = 'api_request')         AS cost_usd,
-    sumIf(input_tokens + output_tokens + cache_read_tokens + cache_creation_tokens,
-          event = 'api_request')                   AS tokens,
-    countIf(event = 'tool_result')                 AS tool_calls,
-    countIf(event = 'subagent_completed')          AS agents_run,
-    countIf(event = 'skill_activated')             AS skills_run,
-    countIf(event = 'api_request')                 AS requests
-FROM cc.events
-WHERE session_id != ''
-GROUP BY session_id;
+    s.*,
+    m.title                                        AS title,
+    m.title_source                                 AS title_source,
+    m.git_branch                                   AS git_branch,
+    m.cwd                                          AS cwd
+FROM
+(
+    SELECT
+        session_id,
+        any(project)                                   AS project,
+        any(host)                                      AS host,
+        any(account)                                   AS account,
+        min(ts)                                        AS started,
+        max(ts)                                        AS last_event,
+        argMinIf(prompt, ts, event = 'user_prompt')    AS first_prompt,
+        countIf(event = 'user_prompt')                 AS prompts,
+        sumIf(cost_usd, event = 'api_request')         AS cost_usd,
+        sumIf(input_tokens + output_tokens + cache_read_tokens + cache_creation_tokens,
+              event = 'api_request')                   AS tokens,
+        countIf(event = 'tool_result')                 AS tool_calls,
+        countIf(event = 'subagent_completed')          AS agents_run,
+        countIf(event = 'skill_activated')             AS skills_run,
+        countIf(event = 'api_request')                 AS requests
+    FROM cc.events
+    WHERE session_id != ''
+    GROUP BY session_id
+) AS s
+LEFT JOIN cc.session_meta AS m ON m.session_id = s.session_id;
 
 -- 10. Tips: one row per finding, a UNION ALL of rules over the last 7 days (thresholds are tunable).
 --     Columns: category, title, body, scope (project / agent / hook), metric (the number behind the tip),

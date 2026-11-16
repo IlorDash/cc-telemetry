@@ -106,8 +106,8 @@
           "type": "grafana-clickhouse-datasource",
           "uid": "clickhouse"
         },
-        "query": "SELECT session_id FROM cc.sessions WHERE ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
-        "definition": "SELECT session_id FROM cc.sessions WHERE ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
+        "query": "SELECT session_id, if(title != '', concat(leftUTF8(title, 60), ' (', left(session_id, 8), ')'), session_id) AS name FROM cc.sessions WHERE ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
+        "definition": "SELECT session_id, if(title != '', concat(leftUTF8(title, 60), ' (', left(session_id, 8), ')'), session_id) AS name FROM cc.sessions WHERE ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
         "includeAll": true,
         "allValue": "__all",
         "multi": false,
@@ -1056,7 +1056,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT s.session_id AS session_id, s.started AS started, s.project AS project,\n       left(replaceAll(s.first_prompt, '\\n', ' '), 100) AS first_prompt,\n       round(s.cost_usd, 3) AS cost_usd, s.tokens AS tokens,\n       round(r.hit * 100, 1) AS cache_hit_pct,\n       dateDiff('minute', s.started, s.last_event) AS minutes\nFROM cc.sessions AS s\nLEFT JOIN (\n  SELECT session_id, sum(cache_read_tokens) / greatest(sum(cache_read_tokens) + sum(input_tokens) + sum(cache_creation_tokens), 1) AS hit\n  FROM cc.api_requests\n  WHERE session_id IN (\n    SELECT session_id FROM cc.sessions\n    WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}')\n      AND requests > 0 AND started >= $__fromTime AND started <= $__toTime\n    ORDER BY started DESC LIMIT 10)\n  GROUP BY session_id\n) AS r ON r.session_id = s.session_id\nWHERE ('${project}' = '__all' OR s.project = '${project}') AND ('${session}' = '__all' OR s.session_id = '${session}')\n  AND s.requests > 0\n  AND s.started >= $__fromTime AND s.started <= $__toTime\nORDER BY s.started DESC\nLIMIT 10"
+          "rawSql": "SELECT s.session_id AS session_id, s.started AS started, s.project AS project,\n       if(s.title != '', s.title, leftUTF8(replaceAll(s.first_prompt, '\\n', ' '), 100)) AS name, s.git_branch AS git_branch,\n       round(s.cost_usd, 3) AS cost_usd, s.tokens AS tokens,\n       round(r.hit * 100, 1) AS cache_hit_pct,\n       dateDiff('minute', s.started, s.last_event) AS minutes\nFROM cc.sessions AS s\nLEFT JOIN (\n  SELECT session_id, sum(cache_read_tokens) / greatest(sum(cache_read_tokens) + sum(input_tokens) + sum(cache_creation_tokens), 1) AS hit\n  FROM cc.api_requests\n  WHERE session_id IN (\n    SELECT session_id FROM cc.sessions\n    WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}')\n      AND requests > 0 AND started >= $__fromTime AND started <= $__toTime\n    ORDER BY started DESC LIMIT 10)\n  GROUP BY session_id\n) AS r ON r.session_id = s.session_id\nWHERE ('${project}' = '__all' OR s.project = '${project}') AND ('${session}' = '__all' OR s.session_id = '${session}')\n  AND s.requests > 0\n  AND s.started >= $__fromTime AND s.started <= $__toTime\nORDER BY s.started DESC\nLIMIT 10"
         }
       ],
       "options": {

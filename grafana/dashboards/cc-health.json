@@ -106,8 +106,8 @@
           "type": "grafana-clickhouse-datasource",
           "uid": "clickhouse"
         },
-        "query": "SELECT session_id FROM cc.sessions WHERE ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
-        "definition": "SELECT session_id FROM cc.sessions WHERE ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
+        "query": "SELECT session_id, if(title != '', concat(leftUTF8(title, 60), ' (', left(session_id, 8), ')'), session_id) AS name FROM cc.sessions WHERE ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
+        "definition": "SELECT session_id, if(title != '', concat(leftUTF8(title, 60), ' (', left(session_id, 8), ')'), session_id) AS name FROM cc.sessions WHERE ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
         "includeAll": true,
         "allValue": "__all",
         "multi": false,

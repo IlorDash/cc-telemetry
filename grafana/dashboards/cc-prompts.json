@@ -106,8 +106,8 @@
           "type": "grafana-clickhouse-datasource",
           "uid": "clickhouse"
         },
-        "query": "SELECT session_id FROM cc.sessions WHERE ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
-        "definition": "SELECT session_id FROM cc.sessions WHERE ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
+        "query": "SELECT session_id, if(title != '', concat(leftUTF8(title, 60), ' (', left(session_id, 8), ')'), session_id) AS name FROM cc.sessions WHERE ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
+        "definition": "SELECT session_id, if(title != '', concat(leftUTF8(title, 60), ' (', left(session_id, 8), ')'), session_id) AS name FROM cc.sessions WHERE ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
         "includeAll": true,
         "allValue": "__all",
         "multi": false,
@@ -172,8 +172,8 @@
           "type": "grafana-clickhouse-datasource",
           "uid": "clickhouse"
         },
-        "query": "SELECT concat(toString(round(sum(cost_usd), 2)), ' USD  ', if(max(prompt) IN ('', '<REDACTED>'), concat('prompt ', left(prompt_id, 8)), left(replaceAll(max(prompt), '\\n', ' '), 70))) AS __text, prompt_id AS __value FROM cc.prompts WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') GROUP BY prompt_id ORDER BY sum(cost_usd) DESC LIMIT 300",
-        "definition": "SELECT concat(toString(round(sum(cost_usd), 2)), ' USD  ', if(max(prompt) IN ('', '<REDACTED>'), concat('prompt ', left(prompt_id, 8)), left(replaceAll(max(prompt), '\\n', ' '), 70))) AS __text, prompt_id AS __value FROM cc.prompts WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') GROUP BY prompt_id ORDER BY sum(cost_usd) DESC LIMIT 300",
+        "query": "SELECT concat(toString(round(sum(cost_usd), 2)), ' USD  ', if(max(prompt) IN ('', '<REDACTED>'), concat('prompt ', left(prompt_id, 8)), leftUTF8(replaceAll(max(prompt), '\\n', ' '), 70))) AS __text, prompt_id AS __value FROM cc.prompts WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') GROUP BY prompt_id ORDER BY sum(cost_usd) DESC LIMIT 300",
+        "definition": "SELECT concat(toString(round(sum(cost_usd), 2)), ' USD  ', if(max(prompt) IN ('', '<REDACTED>'), concat('prompt ', left(prompt_id, 8)), leftUTF8(replaceAll(max(prompt), '\\n', ' '), 70))) AS __text, prompt_id AS __value FROM cc.prompts WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') GROUP BY prompt_id ORDER BY sum(cost_usd) DESC LIMIT 300",
         "includeAll": true,
         "allValue": "__all",
         "multi": false,
@@ -217,7 +217,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT started, prompt_id, session_id, project,\n       if(prompt IN ('', '<REDACTED>'), '(text not logged)', left(replaceAll(prompt, '\\n', ' '), 200)) AS prompt,\n       cost_usd, tokens, requests, tool_calls, agents_run,\n       round(max_result_bytes / 1048576, 2) AS max_result_mb,\n       input, output, cache_read, cache_creation,\n       dateDiff('second', started, last_event) AS seconds\nFROM cc.prompts\nWHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}')\n  AND started >= $__fromTime AND started <= $__toTime\n  AND (('${actor}' = '__all' AND '${skill}' = '__all') OR (session_id, prompt_id) IN (SELECT session_id, prompt_id FROM cc.api_requests WHERE ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}')))\nORDER BY cost_usd DESC\nLIMIT 200"
+          "rawSql": "SELECT started, prompt_id, session_id, project,\n       if(prompt IN ('', '<REDACTED>'), '(text not logged)', leftUTF8(replaceAll(prompt, '\\n', ' '), 200)) AS prompt,\n       cost_usd, tokens, requests, tool_calls, agents_run,\n       round(max_result_bytes / 1048576, 2) AS max_result_mb,\n       input, output, cache_read, cache_creation,\n       dateDiff('second', started, last_event) AS seconds\nFROM cc.prompts\nWHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}')\n  AND started >= $__fromTime AND started <= $__toTime\n  AND (('${actor}' = '__all' AND '${skill}' = '__all') OR (session_id, prompt_id) IN (SELECT session_id, prompt_id FROM cc.api_requests WHERE ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}')))\nORDER BY cost_usd DESC\nLIMIT 200"
         }
       ],
       "options": {

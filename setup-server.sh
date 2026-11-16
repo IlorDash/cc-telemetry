@@ -3,13 +3,13 @@
 #
 #  1. Docker: Docker Engine + compose plugin present and answering (offers to install on Debian/Ubuntu).
 #  2. .env with random passwords (an existing .env is kept) and the bind addresses
-#     OTLP_BIND (port 4317) and GRAFANA_BIND (Grafana), the Grafana host port GRAFANA_PORT (default
+#     OTLP_BIND (ports 4317 and 4318) and GRAFANA_BIND (Grafana), the Grafana host port GRAFANA_PORT (default
 #     3000) and, on ARM CPUs too old for current ClickHouse (Raspberry Pi 4), CLICKHOUSE_VERSION.
 #  3. Starts the stack and waits until the cc.* views are created.
-#  4. Checks Grafana and the OTLP port (:4317) on this PC; checks that Docker starts at boot.
-#  5. LAN (the default, Linux servers are usually headless): 4317 and Grafana are published on all
-#     interfaces and opened in ufw / firewalld; prints the server address and the client commands.
-#     --local-only keeps both ports on this PC.
+#  4. Checks Grafana and the OTLP ports (:4317, :4318) on this PC; checks that Docker starts at boot.
+#  5. LAN (the default, Linux servers are usually headless): 4317, 4318 and Grafana are published on
+#     all interfaces and opened in ufw / firewalld; prints the server address and the client commands.
+#     --local-only keeps all of them on this PC.
 #
 # Safe to re-run: every step checks what is already done. A re-run without --lan / --local-only
 # keeps the exposure already written to .env.
@@ -52,11 +52,11 @@ usage() {
   cat <<'EOF'
 Usage: bash setup-server.sh [options]
 
-By default the server is reachable from other PCs of the LAN: OTLP port 4317 (clients) and
+By default the server is reachable from other PCs of the LAN: OTLP ports 4317 and 4318 (clients) and
 Grafana (port 3000, admin login) are published on all interfaces and opened in ufw / firewalld
 (asks before using sudo). Plain HTTP and unauthenticated OTLP: trusted networks only.
 
-  --local-only       publish 4317 and Grafana on this PC only (OTLP_BIND / GRAFANA_BIND = 127.0.0.1)
+  --local-only       publish 4317, 4318 and Grafana on this PC only (OTLP_BIND / GRAFANA_BIND = 127.0.0.1)
   --lan              switch back to all interfaces (0.0.0.0) after an earlier --local-only
                      (--enable-lan is the same)
   --lan-ip <addr>    the LAN address to report (when detected wrong)
@@ -402,9 +402,9 @@ else
   ok '.env created with random passwords (Grafana login: admin / GRAFANA_ADMIN_PASSWORD from .env)'
 fi
 
-# OTLP_BIND decides where Docker publishes 4317. On Linux Docker's own iptables rules bypass ufw/firewalld,
+# OTLP_BIND decides where Docker publishes 4317 and 4318. On Linux Docker's own iptables rules bypass ufw/firewalld,
 # so the firewall cannot hide a port: the bind address is the real switch. GRAFANA_BIND does the same for
-# 3000; 4318 is always local. Only these two lines of .env are read or written.
+# Grafana. Only these two lines of .env are read or written.
 get_env() { # KEY -> value (CR stripped); empty when the key is missing
   grep "^$1=" .env | tail -n 1 | cut -d= -f2- | tr -d '\r' || true
 }
@@ -438,7 +438,7 @@ resolve_bind() { # KEY what-it-publishes default
 }
 otlp_was="$(get_env OTLP_BIND)"
 grafana_was="$(get_env GRAFANA_BIND)"
-resolve_bind OTLP_BIND 'port 4317' 0.0.0.0
+resolve_bind OTLP_BIND 'ports 4317 and 4318' 0.0.0.0
 otlp_bind="$BIND_RESULT"
 # A missing GRAFANA_BIND follows OTLP_BIND (as just resolved), so an earlier choice of OTLP_BIND=127.0.0.1
 # never turns Grafana into a LAN service on its own.
@@ -507,7 +507,7 @@ fi
 step 'Stack'
 if [ "$lan_on" -eq 1 ]; then
   echo '   Note: LAN access is the default: the ports below are published for every PC that can reach this host.'
-  is_local_bind "$otlp_bind" || echo "     OTLP 4317   on $otlp_bind"
+  is_local_bind "$otlp_bind" || echo "     OTLP 4317, 4318 on $otlp_bind"
   is_local_bind "$grafana_bind" || echo "     Grafana $grafana_port on $grafana_bind"
   echo '     Plain HTTP, OTLP without authentication. To keep them on this PC only: re-run with --local-only.'
 fi
@@ -535,9 +535,11 @@ done
 if [ "$grafana_ok" -eq 1 ]; then ok "Grafana: http://${g_host}:${grafana_port}"
 else warn 'Grafana does not answer yet; check: docker compose logs grafana'
 fi
-if tcp_open "$o_host" 4317; then ok "OTLP: ${o_host}:4317"
-else warn "${o_host}:4317 is closed; check: docker compose logs otel-collector"
-fi
+for p in 4317 4318; do
+  if tcp_open "$o_host" "$p"; then ok "OTLP: ${o_host}:${p}"
+  else warn "${o_host}:${p} is closed; check: docker compose logs otel-collector"
+  fi
+done
 
 # Containers use restart: unless-stopped, so they return when the docker service starts at boot.
 if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
@@ -557,7 +559,7 @@ if [ "$lan_on" -eq 1 ]; then
   step 'LAN access'
   # Ports published on all interfaces: the firewall must let them in.
   lan_ports=()
-  is_local_bind "$otlp_bind" || lan_ports+=(4317)
+  is_local_bind "$otlp_bind" || lan_ports+=(4317 4318)
   is_local_bind "$grafana_bind" || lan_ports+=("$grafana_port")
   ip_addr="$(get_lan_ip)"
   if [ -n "$ip_addr" ]; then ok "LAN address: $ip_addr"
@@ -612,9 +614,11 @@ if [ "$lan_on" -eq 1 ]; then
   o_reach="$otlp_bind"; [ "$otlp_bind" != 0.0.0.0 ] || o_reach="$ip_addr"
   g_reach="$grafana_bind"; [ "$grafana_bind" != 0.0.0.0 ] || g_reach="$ip_addr"
   if ! is_local_bind "$otlp_bind" && [ -n "$o_reach" ]; then
-    if tcp_open "$o_reach" 4317; then ok "${o_reach}:4317 is reachable"
-    else warn "${o_reach}:4317 is not reachable yet"
-    fi
+    for p in 4317 4318; do
+      if tcp_open "$o_reach" "$p"; then ok "${o_reach}:${p} is reachable"
+      else warn "${o_reach}:${p} is not reachable yet"
+      fi
+    done
   fi
   if ! is_local_bind "$grafana_bind" && [ -n "$g_reach" ]; then
     if tcp_open "$g_reach" "$grafana_port"; then ok "${g_reach}:${grafana_port} is reachable"
@@ -641,7 +645,7 @@ if ! is_local_bind "$otlp_bind"; then
   echo "     Windows:  powershell -ExecutionPolicy Bypass -File .\\setup-client.ps1 -ServerIp ${o_shown} -Project <project folder>"
   echo "     Linux:    bash setup-client.sh --server-ip ${o_shown} --project <project folder>"
 else
-  echo "   Other PCs as clients: not reachable (OTLP_BIND=${otlp_bind}); re-run with --lan to open port 4317."
+  echo "   Other PCs as clients: not reachable (OTLP_BIND=${otlp_bind}); re-run with --lan to open ports 4317 and 4318."
 fi
 
 if [ -n "$UPDATE_DIR" ]; then finish_update; fi

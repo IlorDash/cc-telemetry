@@ -6,9 +6,9 @@
   1. Finds Docker: Docker Desktop, or Docker Engine inside WSL2 (installs it there if missing).
   2. Creates .env with random passwords (an existing .env is kept).
   3. Starts the stack and waits until the cc.* views are created.
-  4. Checks Grafana (:3000) and the OTLP port (:4317).
+  4. Checks Grafana (:3000) and the OTLP ports (:4317 gRPC, :4318 HTTP).
   5. WSL only: keeps WSL running and adds that to autostart (Startup folder, no admin rights).
-  6. With -EnableLan: firewall rule for 4317 and, for WSL, a port forward from the LAN address.
+  6. With -EnableLan: firewall rules for 4317 and 4318 and, for WSL, port forwards from the LAN address.
      This step needs admin rights; the script asks for them through UAC.
   Safe to re-run: every step checks what is already done.
 
@@ -31,6 +31,8 @@ $ErrorActionPreference = 'Continue'
 $env:WSL_UTF8 = '1'
 $root = $PSScriptRoot
 Set-Location $root
+
+$otlpPorts = @(4317, 4318)   # OTLP gRPC (Claude Code) and OTLP HTTP (session-meta hook)
 
 function Step($m) { Write-Host "`n== $m" -ForegroundColor Cyan }
 function Ok($m)   { Write-Host "   OK   $m" -ForegroundColor Green }
@@ -85,11 +87,15 @@ function Enable-Lan {
   if (-not $ip) { Fail 'Could not find the LAN address. Re-run with -LanIp <address>.' }
   Ok "LAN address: $ip"
 
-  $ruleName = 'OTLP 4317 (Claude Code telemetry)'
-  if (Get-NetFirewallRule -DisplayName $ruleName -ErrorAction SilentlyContinue) { Ok 'firewall rule already exists' }
-  else {
-    New-NetFirewallRule -DisplayName $ruleName -Direction Inbound -Protocol TCP -LocalPort 4317 -Action Allow -Profile Private -ErrorAction Stop | Out-Null
-    Ok 'firewall rule created (Private networks)'
+  # 4317 = OTLP gRPC, 4318 = OTLP HTTP (session-meta hook). One rule per port; a server set up before 4318
+  # existed only has the first one, a re-run adds the missing one.
+  foreach ($port in $otlpPorts) {
+    $ruleName = "OTLP $port (Claude Code telemetry)"
+    if (Get-NetFirewallRule -DisplayName $ruleName -ErrorAction SilentlyContinue) { Ok "firewall rule for $port already exists" }
+    else {
+      New-NetFirewallRule -DisplayName $ruleName -Direction Inbound -Protocol TCP -LocalPort $port -Action Allow -Profile Private -ErrorAction Stop | Out-Null
+      Ok "firewall rule for $port created (Private networks)"
+    }
   }
 
   $alias = (Get-NetIPAddress -IPAddress $ip -ErrorAction SilentlyContinue).InterfaceAlias
@@ -100,18 +106,22 @@ function Enable-Lan {
   } else { Ok "network '$alias' profile: $netProfile" }
 
   if ($script:Mode -eq 'wsl') {
-    $existing = netsh interface portproxy show v4tov4 | Select-String '^\s*(\S+)\s+4317\s' | ForEach-Object { $_.Matches[0].Groups[1].Value }
-    foreach ($old in $existing) {
-      if ($old -ne $ip) { netsh interface portproxy delete v4tov4 listenaddress=$old listenport=4317 | Out-Null; Ok "removed old port forward ${old}:4317" }
-    }
-    if ($existing -contains $ip) { Ok "port forward ${ip}:4317 -> 127.0.0.1:4317 already exists" }
-    else {
-      netsh interface portproxy add v4tov4 listenaddress=$ip listenport=4317 connectaddress=127.0.0.1 connectport=4317 | Out-Null
-      if ($LASTEXITCODE -ne 0) { Fail "netsh portproxy add failed (exit $LASTEXITCODE)" }
-      Ok "port forward ${ip}:4317 -> 127.0.0.1:4317 added"
+    foreach ($port in $otlpPorts) {
+      $existing = @(netsh interface portproxy show v4tov4 | Select-String "^\s*(\S+)\s+$port\s" | ForEach-Object { $_.Matches[0].Groups[1].Value })
+      foreach ($old in $existing) {
+        if ($old -ne $ip) { netsh interface portproxy delete v4tov4 listenaddress=$old listenport=$port | Out-Null; Ok "removed old port forward ${old}:$port" }
+      }
+      if ($existing -contains $ip) { Ok "port forward ${ip}:$port -> 127.0.0.1:$port already exists" }
+      else {
+        netsh interface portproxy add v4tov4 listenaddress=$ip listenport=$port connectaddress=127.0.0.1 connectport=$port | Out-Null
+        if ($LASTEXITCODE -ne 0) { Fail "netsh portproxy add failed (exit $LASTEXITCODE)" }
+        Ok "port forward ${ip}:$port -> 127.0.0.1:$port added"
+      }
     }
   }
-  if (Test-Port $ip 4317) { Ok "${ip}:4317 is reachable" } else { Warn "${ip}:4317 is not reachable yet" }
+  foreach ($port in $otlpPorts) {
+    if (Test-Port $ip $port) { Ok "${ip}:$port is reachable" } else { Warn "${ip}:$port is not reachable yet" }
+  }
 }
 
 # ---------------------------------------------------------------- elevated pass
@@ -185,7 +195,9 @@ for ($i = 0; $i -lt 45 -and -not $grafanaOk; $i++) {
   try { $grafanaOk = (Invoke-WebRequest -UseBasicParsing -TimeoutSec 3 http://localhost:3000/api/health).StatusCode -eq 200 } catch { Start-Sleep 2 }
 }
 if ($grafanaOk) { Ok 'Grafana: http://localhost:3000' } else { Warn 'Grafana does not answer yet; check: docker compose logs grafana' }
-if (Test-Port 'localhost' 4317) { Ok 'OTLP: localhost:4317' } else { Warn 'localhost:4317 is closed; check: docker compose logs otel-collector' }
+foreach ($port in $otlpPorts) {
+  if (Test-Port 'localhost' $port) { Ok "OTLP: localhost:$port" } else { Warn "localhost:$port is closed; check: docker compose logs otel-collector" }
+}
 
 # ---------------------------------------------------------------- 5. WSL autostart
 if ($Mode -eq 'wsl') {

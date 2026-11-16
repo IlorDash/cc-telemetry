@@ -1,7 +1,7 @@
 # Claude Code telemetry stack: OTLP -> OTel Collector -> ClickHouse -> Grafana
 # Start:  docker compose up -d        (from this folder, after copying .env.example to .env)
 # Grafana: http://localhost:3000  (admin / GRAFANA_ADMIN_PASSWORD; other PCs: see GRAFANA_BIND below)
-# OTLP:    gRPC :4317, HTTP :4318  (4317 for other PCs: see OTLP_BIND below and the setup scripts)
+# OTLP:    gRPC :4317, HTTP :4318  (both for other PCs: see OTLP_BIND below and the setup scripts)
 
 services:
   clickhouse:
@@ -32,10 +32,11 @@ services:
     volumes:
       - ./otel-collector.yaml:/etc/otelcol/config.yaml:ro
     ports:
-      # OTLP gRPC (Claude Code clients). OTLP_BIND in .env: 127.0.0.1 = this PC only, 0.0.0.0 = LAN.
+      # OTLP gRPC 4317 (Claude Code clients) and OTLP HTTP 4318 (session-meta hook), same trust, no auth.
+      # OTLP_BIND in .env: 127.0.0.1 = this PC only, 0.0.0.0 = LAN. Both ports follow it.
       # setup-server.sh sets it; unset keeps the Windows behaviour (the Windows firewall decides).
       - "${OTLP_BIND:-0.0.0.0}:4317:4317"
-      - "127.0.0.1:4318:4318"   # OTLP HTTP, this PC only
+      - "${OTLP_BIND:-0.0.0.0}:4318:4318"
     depends_on:
       clickhouse:
         condition: service_healthy
