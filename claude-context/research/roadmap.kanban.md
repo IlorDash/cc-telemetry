@@ -50,6 +50,8 @@
 
 ## In Progress
 
+## Done
+
 ### Импортёр JSONL: названия сессий и git-ветка
 
   - tags: [implement-group-4, data, client, research]
@@ -58,21 +60,37 @@
   - steps:
       - [x] Проверить: совпадает ли requestId из JSONL с request_id в api_request — да (req_…, 1:1)
       - [x] Проверить: session.id = имя файла сессии — да (<session>.jsonl, sessionId в каждой строке)
-      - [ ] Решить, куда писать (отдельная таблица ClickHouse) и как доставлять с клиента
-      - [ ] Клиенты на Windows и Linux: вариант для setup-client.ps1 и setup-client.sh
-      - [ ] Импорт только того, чего нет в телеметрии: title, git_branch, cwd
-      - [ ] Использовать название вместо first_prompt в таблицах сессий
-      - [ ] cwd как самый надёжный источник project в cc.session_project (до label-эвристики по путям)
+      - [x] Решить, куда писать и как доставлять с клиента — хук UserPromptSubmit (async) → OTLP/HTTP :4318 → otel_logs (ServiceName cc-session-meta)
+      - [x] Этап 0 (проверено на CLI 2.1.323 логирующим хуком): см. заметку
+      - [x] Сервер: 4318 следует за OTLP_BIND; setup-server.ps1 -EnableLan / setup-server.sh — фаервол и проброс для 4318
+      - [x] Вью cc.session_meta: название (custom-title важнее ai-title), ветка, первый cwd
+      - [x] Клиенты на Windows и Linux: вариант для setup-client.ps1 и setup-client.sh
+      - [x] Импорт только того, чего нет в телеметрии: title, git_branch, cwd
+      - [x] Использовать название вместо first_prompt в таблицах сессий
+      - [x] cwd как самый надёжный источник project в cc.session_project (до label-эвристики по путям)
+      - [x] Проверить на реальном клиенте (конфиг claude-guest → тестовый сервер, 2026-11-16): названия и ветки приходят, переименование уходит со следующим промптом
+      - [ ] Продакшен (после закрытия карточки): git pull + setup-server.sh --update на сервере, setup-client -ImportHistory для основного конфига; Linux-клиент на самом сервере
+      - [x] Удалить тестовые строки из otel_logs — 81 строка, после дампа (2026-11-16)
     ```md
+    Итог: хук UserPromptSubmit (async) в setup-client.ps1 / .sh, -ImportHistory, -NoSessionMeta; 4318 следует за
+    OTLP_BIND; вью cc.session_meta, проект: метка > папка cwd > пути; названия и ветка в таблицах и списке Session.
+    Не проверено: Linux-клиент с jq без python3, Linux-клиент и setup-server.sh на настоящем Linux, ClickHouse 25.8.
     Проверено 2026-11-16 на Claude Code 2.1.325 (одна сессия): в JSONL есть ai-title, gitBranch и cwd
-    в строках user / assistant; custom-title (после /rename) в проверенных файлах не встретился.
+    в строках user / assistant; название появляется после первого ответа и не меняется, ветка одна,
+    cwd меняется при переходе в подпапку — брать первый.
+    Решение: один хук UserPromptSubmit с "async": true; отправляет только изменения (файл состояния) и
+    догоняет другие JSONL, изменённые с прошлого запуска. SessionEnd не годится (окна просто закрывают),
+    SessionStart не нужен. -ImportHistory / --import-history — разовая выгрузка старых сессий.
+    Этап 0: на входе хука session_id, transcript_path, cwd, prompt_id, prompt (SessionStart: source
+    startup / resume); env из settings доходит до хука, OTEL_* — нет (адрес сервера писать в команду хука);
+    async-хук работает в фоне; /rename пишет custom-title, но UserPromptSubmit НЕ вызывает — новое имя
+    уйдёт со следующим промптом или догонялкой; коллектор принимает OTLP/JSON на :4318 (curl из WSL и
+    Invoke-RestMethod с Windows, кириллица цела). Тестовые строки ServiceName cc-session-meta-test в otel_logs.
     Гибрид OTel + JSONL. Токены из JSONL не импортировать: нужна дедупликация и своя
     таблица цен, нельзя смешивать с точным cost_usd.
     cwd закрыл бы ограничения угадывания проекта по путям (pending-bugs: cc.session_project).
     Группа 4: последний шаг меняет таблицы сессий в Overview и Sessions — после группы 3.
     ```
-
-## Done
 
 ### Overview: ряд KPI из 7 карточек
 
