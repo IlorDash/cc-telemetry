@@ -106,8 +106,8 @@
           "type": "grafana-clickhouse-datasource",
           "uid": "clickhouse"
         },
-        "query": "SELECT session_id FROM cc.sessions WHERE ('${project}' = '__all' OR project = '${project}') AND (prompts > 0 OR tokens > 0) ORDER BY started DESC LIMIT 300",
-        "definition": "SELECT session_id FROM cc.sessions WHERE ('${project}' = '__all' OR project = '${project}') AND (prompts > 0 OR tokens > 0) ORDER BY started DESC LIMIT 300",
+        "query": "SELECT session_id FROM cc.sessions WHERE ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
+        "definition": "SELECT session_id FROM cc.sessions WHERE ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
         "includeAll": true,
         "allValue": "__all",
         "multi": false,
@@ -174,7 +174,7 @@
       "id": 7,
       "type": "table",
       "title": "Sessions (click session_id to drill down)",
-      "description": "",
+      "description": "Sessions that had at least one model request (the same rule as the Sessions card on Overview and the Session variable). Sessions with only startup events or a local command are not listed.",
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "clickhouse"
@@ -195,7 +195,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT session_id, started, project, host, account,\n       left(replaceAll(first_prompt, '\\n', ' '), 120) AS first_prompt,\n       prompts, round(cost_usd, 3) AS cost_usd, tokens, tool_calls, agents_run, skills_run,\n       dateDiff('minute', started, last_event) AS minutes\nFROM cc.sessions\nWHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}')\n  AND (prompts > 0 OR tokens > 0)\n  AND started >= $__fromTime AND started <= $__toTime\nORDER BY started DESC\nLIMIT 500"
+          "rawSql": "SELECT session_id, started, project, host, account,\n       left(replaceAll(first_prompt, '\\n', ' '), 120) AS first_prompt,\n       prompts, round(cost_usd, 3) AS cost_usd, tokens, tool_calls, agents_run, skills_run,\n       dateDiff('minute', started, last_event) AS minutes\nFROM cc.sessions\nWHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}')\n  AND requests > 0\n  AND started >= $__fromTime AND started <= $__toTime\nORDER BY started DESC\nLIMIT 500"
         }
       ],
       "options": {
@@ -277,6 +277,209 @@
         "defaults": {
           "custom": {
             "filterable": true
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 100,
+      "type": "table",
+      "title": "Session timeline: prompts, requests and tool calls",
+      "description": "Select one session in the variable above. Every prompt, model request and tool call of the session in time order (newest 1000 in the range). Prompts are shown only when Actor and Skill are All; prompt text exists only when the client logs prompts.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT time, kind, actor, what, tokens, round(cost_usd, 4) AS cost_usd, duration_ms, status\nFROM\n(\n  SELECT ts AS time, 'prompt' AS kind, 'main' AS actor, left(replaceAll(prompt, '\\n', ' '), 200) AS what,\n         toUInt64(0) AS tokens, toFloat64(0) AS cost_usd, toUInt64(0) AS duration_ms, '' AS status\n  FROM cc.events\n  WHERE event = 'user_prompt' AND '${actor}' = '__all' AND '${skill}' = '__all'\n    AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND $__timeFilter(ts)\n  UNION ALL\n  SELECT ts, 'request', actor, model, total_tokens, cost_usd, duration_ms, ''\n  FROM cc.api_requests\n  WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}')\n    AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\n  UNION ALL\n  SELECT ts, 'tool', actor, if(path != '', concat(tool_name, ' ', path), tool_name), toUInt64(0), toFloat64(0), duration_ms, if(success, 'ok', 'failed')\n  FROM cc.tool_calls\n  WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}')\n    AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\n)\nWHERE '${session}' != '__all'\nORDER BY time DESC\nLIMIT 1000"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cost_usd"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "duration_ms"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "status"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "failed": {
+                        "color": "red",
+                        "index": 0
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 101,
+      "type": "timeseries",
+      "title": "Cumulative cost over the session (pick a session)",
+      "description": "Running total of cost_usd (computed by Claude Code, API-equivalent) over the selected session, one point per model request. Empty while Session = All: select one session in the Session variable above.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 26,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "queryType": "timeseries",
+          "rawSql": "SELECT t.1 AS time, t.2 AS cost_usd\nFROM\n(\n  SELECT arrayJoin(arrayZip(arrayMap(x -> x.1, s), arrayCumSum(arrayMap(x -> x.2, s)))) AS t\n  FROM\n  (\n    SELECT arraySort(groupArray((ts, cost_usd))) AS s\n    FROM cc.api_requests\n    WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}')\n      AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}')\n      AND $__timeFilter(ts) AND '${session}' != '__all'\n  )\n)\nORDER BY time"
+        }
+      ],
+      "options": {
+        "legend": {
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 3,
+          "noValue": "Select a session in the Session variable above",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "orange"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "stepAfter",
+            "fillOpacity": 15,
+            "showPoints": "auto"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 102,
+      "type": "timeseries",
+      "title": "Cumulative tokens over the session (pick a session)",
+      "description": "Running total of all tokens (input + output + cache read + cache create) over the selected session. Cache read dominates the total. Empty while Session = All: select one session in the Session variable above.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 26,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "queryType": "timeseries",
+          "rawSql": "SELECT t.1 AS time, t.2 AS tokens\nFROM\n(\n  SELECT arrayJoin(arrayZip(arrayMap(x -> x.1, s), arrayCumSum(arrayMap(x -> x.2, s)))) AS t\n  FROM\n  (\n    SELECT arraySort(groupArray((ts, total_tokens))) AS s\n    FROM cc.api_requests\n    WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}')\n      AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}')\n      AND $__timeFilter(ts) AND '${session}' != '__all'\n  )\n)\nORDER BY time"
+        }
+      ],
+      "options": {
+        "legend": {
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "Select a session in the Session variable above",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "stepAfter",
+            "fillOpacity": 15,
+            "showPoints": "auto"
           }
         },
         "overrides": []

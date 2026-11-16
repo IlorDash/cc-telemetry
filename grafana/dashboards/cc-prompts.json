@@ -106,8 +106,8 @@
           "type": "grafana-clickhouse-datasource",
           "uid": "clickhouse"
         },
-        "query": "SELECT session_id FROM cc.sessions WHERE ('${project}' = '__all' OR project = '${project}') AND (prompts > 0 OR tokens > 0) ORDER BY started DESC LIMIT 300",
-        "definition": "SELECT session_id FROM cc.sessions WHERE ('${project}' = '__all' OR project = '${project}') AND (prompts > 0 OR tokens > 0) ORDER BY started DESC LIMIT 300",
+        "query": "SELECT session_id FROM cc.sessions WHERE ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
+        "definition": "SELECT session_id FROM cc.sessions WHERE ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
         "includeAll": true,
         "allValue": "__all",
         "multi": false,
@@ -163,6 +163,28 @@
           "value": "$__all"
         },
         "options": []
+      },
+      {
+        "name": "prompt",
+        "label": "Prompt",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "clickhouse"
+        },
+        "query": "SELECT concat(toString(round(sum(cost_usd), 2)), ' USD  ', if(max(prompt) IN ('', '<REDACTED>'), concat('prompt ', left(prompt_id, 8)), left(replaceAll(max(prompt), '\\n', ' '), 70))) AS __text, prompt_id AS __value FROM cc.prompts WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') GROUP BY prompt_id ORDER BY sum(cost_usd) DESC LIMIT 300",
+        "definition": "SELECT concat(toString(round(sum(cost_usd), 2)), ' USD  ', if(max(prompt) IN ('', '<REDACTED>'), concat('prompt ', left(prompt_id, 8)), left(replaceAll(max(prompt), '\\n', ' '), 70))) AS __text, prompt_id AS __value FROM cc.prompts WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') GROUP BY prompt_id ORDER BY sum(cost_usd) DESC LIMIT 300",
+        "includeAll": true,
+        "allValue": "__all",
+        "multi": false,
+        "refresh": 2,
+        "sort": 0,
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": []
       }
     ]
   },
@@ -171,19 +193,296 @@
   },
   "panels": [
     {
-      "id": 1,
-      "type": "text",
-      "title": "Most expensive prompts (placeholder)",
-      "description": "",
+      "id": 180,
+      "type": "table",
+      "title": "Most expensive prompts (click prompt_id to inspect, session_id to open the session)",
+      "description": "One row per user prompt with everything it triggered (main, subagent and auxiliary requests, tool calls); cost_usd is Claude Code's API-equivalent cost. Prompt text is shown only when the client sets OTEL_LOG_USER_PROMPTS=1, otherwise '(text not logged)'. The actor and skill variables keep only prompts that had a matching request; the totals stay per whole prompt. Sort by clicking a column header.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
       "gridPos": {
         "x": 0,
         "y": 0,
         "w": 24,
-        "h": 10
+        "h": 11
       },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT started, prompt_id, session_id, project,\n       if(prompt IN ('', '<REDACTED>'), '(text not logged)', left(replaceAll(prompt, '\\n', ' '), 200)) AS prompt,\n       cost_usd, tokens, requests, tool_calls, agents_run,\n       round(max_result_bytes / 1048576, 2) AS max_result_mb,\n       input, output, cache_read, cache_creation,\n       dateDiff('second', started, last_event) AS seconds\nFROM cc.prompts\nWHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}')\n  AND started >= $__fromTime AND started <= $__toTime\n  AND (('${actor}' = '__all' AND '${skill}' = '__all') OR (session_id, prompt_id) IN (SELECT session_id, prompt_id FROM cc.api_requests WHERE ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}')))\nORDER BY cost_usd DESC\nLIMIT 200"
+        }
+      ],
       "options": {
-        "mode": "markdown",
-        "content": ""
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": [
+          {
+            "displayName": "cost_usd",
+            "desc": true
+          }
+        ]
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "prompt_id"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Inspect prompt",
+                    "url": "/d/cc-prompts?var-project=${__data.fields.project}&var-session=$__all&var-actor=$__all&var-skill=$__all&var-prompt=${__value.raw}&${__url_time_range}"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "session_id"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open session",
+                    "url": "/d/cc-sessions?var-project=${__data.fields.project}&var-session=${__value.raw}&var-actor=$__all&var-skill=$__all&${__url_time_range}"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cost_usd"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 3
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 0.5
+                    },
+                    {
+                      "color": "red",
+                      "value": 2
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 181,
+      "type": "table",
+      "title": "Selected prompt",
+      "description": "Pick a prompt in the Prompt variable above, or click a prompt_id in the ranking. Totals are for the whole prompt and ignore the actor and skill variables. The Prompt list is the top 300 by cost over all time (it ignores the time range and actor/skill); a prompt that started outside the time range shows empty panels. Full text is shown only when the client sets OTEL_LOG_USER_PROMPTS=1.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 11,
+        "w": 24,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT started AS time, session_id, project, round(cost_usd, 3) AS cost_usd, tokens, requests, tool_calls,\n       if(prompt IN ('', '<REDACTED>'), '(text not logged)', prompt) AS prompt\nFROM cc.prompts\nWHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}')\n  AND prompt_id = '${prompt}' AND '${prompt}' != '__all' AND started >= $__fromTime AND started <= $__toTime\nLIMIT 20"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "lg"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "cellOptions": {
+              "type": "auto",
+              "wrapText": true
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "session_id"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open session",
+                    "url": "/d/cc-sessions?var-project=${__data.fields.project}&var-session=${__value.raw}&var-actor=$__all&var-skill=$__all&${__url_time_range}"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cost_usd"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 182,
+      "type": "table",
+      "title": "Model requests of the selected prompt",
+      "description": "Every model request triggered by the selected prompt: main, subagents and auxiliary calls. Not limited by the time range, so events after its right edge are kept; a prompt outside the Prompt list or outside the range of the table above shows nothing.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT ts AS time, actor, skill, model, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens,\n       round(cost_usd, 4) AS cost_usd, duration_ms\nFROM cc.api_requests\nWHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}')\n  AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}')\n  AND prompt_id = '${prompt}' AND '${prompt}' != '__all'\nORDER BY ts\nLIMIT 500"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cost_usd"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 183,
+      "type": "table",
+      "title": "Tool calls of the selected prompt",
+      "description": "Every tool call triggered by the selected prompt, with the project-relative path (or the first word of a Bash command). Not limited by the time range, so events after its right edge are kept; a prompt outside the Prompt list shows nothing.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT ts AS time, actor, skill, tool_name, success, duration_ms,\n       if(path != '', path, bash_cmd) AS target\nFROM cc.tool_calls\nWHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}')\n  AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}')\n  AND prompt_id = '${prompt}' AND '${prompt}' != '__all'\nORDER BY ts\nLIMIT 500"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
+        "overrides": []
       }
     }
   ]

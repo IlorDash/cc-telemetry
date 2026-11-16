@@ -106,8 +106,8 @@
           "type": "grafana-clickhouse-datasource",
           "uid": "clickhouse"
         },
-        "query": "SELECT session_id FROM cc.sessions WHERE ('${project}' = '__all' OR project = '${project}') AND (prompts > 0 OR tokens > 0) ORDER BY started DESC LIMIT 300",
-        "definition": "SELECT session_id FROM cc.sessions WHERE ('${project}' = '__all' OR project = '${project}') AND (prompts > 0 OR tokens > 0) ORDER BY started DESC LIMIT 300",
+        "query": "SELECT session_id FROM cc.sessions WHERE ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
+        "definition": "SELECT session_id FROM cc.sessions WHERE ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
         "includeAll": true,
         "allValue": "__all",
         "multi": false,
@@ -171,19 +171,257 @@
   },
   "panels": [
     {
-      "id": 1,
-      "type": "text",
-      "title": "Tips (placeholder)",
-      "description": "",
+      "id": 200,
+      "type": "stat",
+      "title": "Tips right now",
+      "description": "Number of findings in cc.tips. cc.tips always looks at the last 7 days and ignores the dashboard time range and the project / session / actor / skill variables.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
       "gridPos": {
         "x": 0,
         "y": 0,
-        "w": 24,
-        "h": 10
+        "w": 6,
+        "h": 5
       },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT count() AS tips FROM cc.tips"
+        }
+      ],
       "options": {
-        "mode": "markdown",
-        "content": ""
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 201,
+      "type": "bargauge",
+      "title": "Tips by category",
+      "description": "Findings per category in cc.tips. Fixed 7-day window: the dashboard time range and variables do not apply.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 0,
+        "w": 18,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT category, count() AS tips\nFROM cc.tips\nGROUP BY category\nORDER BY tips DESC, category"
+        }
+      ],
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "decimals": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 202,
+      "type": "table",
+      "title": "Usage tips (click a title to open the related dashboard)",
+      "description": "Source: view cc.tips. It always covers the last 7 days and does NOT use the dashboard time range or the project / session / actor / skill variables. The title link opens the related dashboard (project or session already set) with the current time range. metric is the number behind the tip; its unit is in the unit column.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 24,
+        "h": 14
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT category, title, body, scope, metric,\n       multiIf(category = 'cache', '% cache hit', category = 'short-opus', 'USD', category IN ('slow-hook', 'slow-ttft'), 'ms mean', category = 'agent-outlier', 'tokens', 'count') AS unit,\n       concat(link, if(position(link, '?') > 0, '&', '?'),\n              if(startsWith(link, '/d/cc-sessions'), 'var-project=%24__all&', '')) AS open\nFROM cc.tips\nORDER BY category, metric DESC"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "category"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "custom.width",
+                "value": 140
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "cache": {
+                        "color": "blue",
+                        "index": 0
+                      },
+                      "repeated-read": {
+                        "color": "purple",
+                        "index": 1
+                      },
+                      "big-results": {
+                        "color": "orange",
+                        "index": 2
+                      },
+                      "short-opus": {
+                        "color": "yellow",
+                        "index": 3
+                      },
+                      "agent-outlier": {
+                        "color": "red",
+                        "index": 4
+                      },
+                      "denials": {
+                        "color": "dark-red",
+                        "index": 5
+                      },
+                      "slow-hook": {
+                        "color": "green",
+                        "index": 6
+                      },
+                      "slow-ttft": {
+                        "color": "dark-green",
+                        "index": 7
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "title"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 380
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open related dashboard",
+                    "url": "${__data.fields.open}${__url_time_range}"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "open"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          }
+        ]
       }
     }
   ]

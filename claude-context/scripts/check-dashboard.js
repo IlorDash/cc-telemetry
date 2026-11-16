@@ -30,8 +30,9 @@ if (!pass) {
 const auth = "Basic " + Buffer.from("admin:" + pass.trim()).toString("base64");
 
 const dashDir = path.join(root, "grafana", "dashboards");
-const interp = (s) =>
-  s.replace(/\$\{(\w+)(?::\w+)?\}|\$(project|session|actor|skill)\b/g, (m, a, b) => vals[a || b] ?? m);
+// `own` = the dashboard's custom/constant/textbox variables (current value); the four shared ones and CLI overrides win.
+const interp = (s, own = {}) =>
+  s.replace(/\$\{(\w+)(?::\w+)?\}|\$(project|session|actor|skill)\b/g, (m, a, b) => vals[a || b] ?? own[a] ?? m);
 
 const items = [];
 const uids = [];
@@ -39,16 +40,27 @@ const files = fs.readdirSync(dashDir).filter((f) => f.endsWith(".json")).sort();
 for (const file of files) {
   const dash = JSON.parse(fs.readFileSync(path.join(dashDir, file), "utf8"));
   const tag = dash.uid + " ";
+  const own = {};
+  for (const v of dash.templating.list) {
+    if (v.name in vals) continue;
+    let c = v.current && v.current.value;
+    if (Array.isArray(c)) c = c[0];
+    if (c === undefined || c === "") {
+      c = v.includeAll ? "__all" : v.type === "custom" ? String(v.query).split(",")[0].trim() : v.type === "constant" || v.type === "textbox" ? v.query : undefined;
+    }
+    if (c === "$__all") c = v.allValue || "__all";
+    if (c !== undefined) own[v.name] = c;
+  }
   for (const v of dash.templating.list) {
     if (v.type === "query") {
-      items.push({ name: tag + "var " + v.name, sql: typeof v.query === "string" ? v.query : v.query.rawSql, fmt: 1, qt: "table" });
+      items.push({ name: tag + "var " + v.name, sql: typeof v.query === "string" ? v.query : v.query.rawSql, fmt: 1, qt: "table", own });
     }
   }
   const walk = (panels) => {
     for (const p of panels) {
       if (p.panels) walk(p.panels);
       for (const t of p.targets || []) {
-        items.push({ name: `${tag}panel ${p.id} ${p.title}`, sql: t.rawSql, fmt: t.format, qt: t.queryType });
+        items.push({ name: `${tag}panel ${p.id} ${p.title}`, sql: t.rawSql, fmt: t.format, qt: t.queryType, own });
       }
     }
   };
@@ -83,7 +95,7 @@ for (const file of files) {
       queries: [{
         refId: "A",
         datasource: { type: "grafana-clickhouse-datasource", uid: "clickhouse" },
-        rawSql: interp(it.sql),
+        rawSql: interp(it.sql, it.own),
         format: it.fmt,
         queryType: it.qt,
         editorType: "sql",

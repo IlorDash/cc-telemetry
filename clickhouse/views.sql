@@ -230,14 +230,16 @@ SELECT
           event = 'api_request')                   AS tokens,
     countIf(event = 'tool_result')                 AS tool_calls,
     countIf(event = 'subagent_completed')          AS agents_run,
-    countIf(event = 'skill_activated')             AS skills_run
+    countIf(event = 'skill_activated')             AS skills_run,
+    countIf(event = 'api_request')                 AS requests
 FROM cc.events
 WHERE session_id != ''
 GROUP BY session_id;
 
 -- 10. Tips: one row per finding, a UNION ALL of rules over the last 7 days (thresholds are tunable).
 --     Columns: category, title, body, scope (project / agent / hook), metric (the number behind the tip),
---     link (relative Grafana URL of the dashboard, filtered by project or session).
+--     link (relative Grafana URL: one evidence panel full-screen via viewPanel=panel-<id>, variables preset;
+--     it always has a query string, the dashboards append '&' + the time range).
 --     Savings are estimated only from our own cost_usd (no price table).
 CREATE OR REPLACE VIEW cc.tips AS
 -- Low cache hit rate (< 40 %) per effective project, at least 20 requests.
@@ -248,7 +250,7 @@ SELECT
            ' requests in 7 days (below 40 %). A stable prefix (CLAUDE.md, tools) and fewer /clear or model switches keep the cache warm.') AS body,
     project AS scope,
     toFloat64(round(hit * 100, 1)) AS metric,
-    concat('/d/cc-usage?var-project=', encodeURLComponent(project)) AS link
+    concat('/d/cc-usage?viewPanel=panel-57&var-project=', encodeURLComponent(project)) AS link
 FROM
 (
     SELECT project, count() AS n,
@@ -266,7 +268,7 @@ SELECT
     concat('Read ', toString(n), ' times in 7 days in ', project, '. Consider keeping the key facts in CLAUDE.md or a note instead of rereading.'),
     project,
     toFloat64(n),
-    concat('/d/cc-tools?var-project=', encodeURLComponent(project))
+    concat('/d/cc-tools?viewPanel=panel-24&var-project=', encodeURLComponent(project))
 FROM
 (
     SELECT project, path, count() AS n
@@ -285,7 +287,7 @@ SELECT
     concat('Largest result: ', toString(round(biggest / 1048576, 2)), ' MB. Big outputs fill the context; narrow the search or limit the read range.'),
     project,
     toFloat64(n),
-    concat('/d/cc-tools?var-project=', encodeURLComponent(project))
+    concat('/d/cc-tools?viewPanel=panel-140&var-project=', encodeURLComponent(project))
 FROM
 (
     SELECT project, count() AS n, max(result_bytes) AS biggest
@@ -303,7 +305,7 @@ SELECT
            toString(round(short_cost, 2)), ' together. A smaller model could handle such turns for less.'),
     project,
     toFloat64(round(short_cost, 4)),
-    concat('/d/cc-usage?var-project=', encodeURLComponent(project))
+    concat('/d/cc-prompts?viewPanel=panel-180&var-project=', encodeURLComponent(project))
 FROM
 (
     SELECT project, count() AS total, countIf(output_tokens < 500) AS short, sumIf(cost_usd, output_tokens < 500) AS short_cost
@@ -320,7 +322,8 @@ SELECT
     concat('Mean is ', toString(round(mean)), ' tokens over ', toString(n), ' runs in 7 days. Check what that run did (project ', project, ').'),
     agent_type,
     toFloat64(biggest),
-    concat('/d/cc-sessions?var-session=', encodeURLComponent(session))
+    concat('/d/cc-sessions?viewPanel=panel-100&var-session=', encodeURLComponent(session),
+           '&var-actor=', encodeURLComponent(agent_type))
 FROM
 (
     SELECT agent_type, count() AS n, avg(agent_total_tokens) AS mean, max(agent_total_tokens) AS biggest,
@@ -339,7 +342,7 @@ SELECT
            '). If the rule is intended, ignore this; otherwise review the permission rules for it.'),
     project,
     toFloat64(n),
-    concat('/d/cc-tools?var-project=', encodeURLComponent(project))
+    concat('/d/cc-tools?viewPanel=panel-19&var-project=', encodeURLComponent(project))
 FROM
 (
     SELECT project, tool_name, count() AS n, topK(1)(decision_source)[1] AS top_source
@@ -356,7 +359,7 @@ SELECT
     concat('Mean ', toString(round(mean)), ' ms over ', toString(n), ' runs in 7 days. Hooks run synchronously and delay every matching tool call.'),
     hook_name,
     toFloat64(round(mean)),
-    '/d/cc-health'
+    '/d/cc-health?viewPanel=panel-26'
 FROM
 (
     SELECT hook_name, count() AS n, avg(hook_duration_ms) AS mean
@@ -373,7 +376,7 @@ SELECT
     concat('Mean ', toString(round(mean)), ' ms over ', toString(n), ' requests in 7 days. Long contexts and a busy provider slow the first token.'),
     project,
     toFloat64(round(mean)),
-    concat('/d/cc-health?var-project=', encodeURLComponent(project))
+    concat('/d/cc-health?viewPanel=panel-161&var-project=', encodeURLComponent(project))
 FROM
 (
     SELECT project, model, count() AS n, avg(ttft_ms) AS mean
@@ -382,3 +385,33 @@ FROM
     GROUP BY project, model
     HAVING n >= 10 AND mean > 3000
 );
+
+-- 11. One row per prompt (session_id + prompt_id): the user prompt and everything it triggered
+--     (main, subagent and auxiliary requests, tool calls). Sums add up to cc.sessions.
+--     prompt is '' or '<REDACTED>' unless the client sets OTEL_LOG_USER_PROMPTS=1.
+CREATE OR REPLACE VIEW cc.prompts AS
+SELECT
+    session_id,
+    prompt_id,
+    any(project)                                   AS project,
+    any(host)                                      AS host,
+    any(account)                                   AS account,
+    min(ts)                                        AS started,
+    max(ts)                                        AS last_event,
+    argMinIf(prompt, ts, event = 'user_prompt')    AS prompt,
+    countIf(event = 'api_request')                 AS requests,
+    sumIf(cost_usd, event = 'api_request')         AS cost_usd,
+    -- aliases differ from the source columns: the `tokens` sum below would otherwise read the alias
+    sumIf(input_tokens, event = 'api_request')          AS input,
+    sumIf(output_tokens, event = 'api_request')         AS output,
+    sumIf(cache_read_tokens, event = 'api_request')     AS cache_read,
+    sumIf(cache_creation_tokens, event = 'api_request') AS cache_creation,
+    sumIf(input_tokens + output_tokens + cache_read_tokens + cache_creation_tokens,
+          event = 'api_request')                   AS tokens,
+    countIf(event = 'tool_result')                 AS tool_calls,
+    maxIf(result_bytes, event = 'tool_result')     AS max_result_bytes,
+    countIf(event = 'subagent_completed')          AS agents_run
+FROM cc.events
+WHERE session_id != '' AND prompt_id != ''
+GROUP BY session_id, prompt_id
+HAVING countIf(event IN ('user_prompt', 'api_request', 'tool_result')) > 0;
