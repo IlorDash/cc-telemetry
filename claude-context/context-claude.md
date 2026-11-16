@@ -12,7 +12,8 @@ ClickHouse and shows them in Grafana. Everything stays on the LAN. Single branch
 | desktop / wsl mode | Windows only: Docker Desktop vs Docker Engine inside a WSL2 distro (`setup-server.ps1 -Mode`) |
 | event | one OTLP log record from Claude Code, `LogAttributes['event.name']` (`api_request`, `tool_result`, ...) |
 | `project`, `host` | resource attributes the client sets via `OTEL_RESOURCE_ATTRIBUTES`; not sent by Claude Code itself |
-| project label / effective project | `project_label` = the explicit `project=` attribute; `project` = label, else inferred from tool-call paths (`cc.session_project`), else `unknown` |
+| project label / effective project | `project_label` = the explicit `project=` attribute; `project` = label, else inferred (`cc.session_project`: folder of the session's `cwd`, else tool-call paths), else `unknown` |
+| session meta | title, git branch, first `cwd` of a session, read from the local session JSONL by the client hook and sent as OTLP/HTTP logs (`service.name=cc-session-meta`) → `cc.session_meta` |
 | actor | who made a model request / tool call: `main`, an agent name, or `aux:<query_source>` |
 | skill attribution | tool call → skill via `tool_result.request_id` → `api_request.skill.name` |
 | keepalive | hidden `wsl.exe --exec sleep infinity` that keeps the WSL distro (and Docker) running |
@@ -24,8 +25,11 @@ ClickHouse and shows them in Grafana. Everything stays on the LAN. Single branch
 
 ```
 Claude Code (client, env from ~/.claude/settings.json + <project>/.claude/settings.local.json)
-   │ OTLP gRPC :4317 (no auth; LAN only)            [wsl mode: portproxy <LAN_IP>:4317 → 127.0.0.1:4317]
-   │                                                [Linux: published on OTLP_BIND from .env]
+   │ OTLP gRPC :4317 (no auth; LAN only)            [wsl mode: portproxy <LAN_IP>:<port> → 127.0.0.1:<port>
+   │                                                 for 4317 and 4318]
+   │ + async UserPromptSubmit hook <settings dir>/cc-telemetry/session-meta.{ps1,sh}:
+   │   OTLP/JSON POST :4318/v1/logs, service.name cc-session-meta (title, branch, cwd)
+   │                                                [Linux: both published on OTLP_BIND from .env]
    ▼
 otel-collector  memory_limiter → attributes/drop_response → batch
    │ clickhouse exporter, create_schema: true
@@ -33,9 +37,10 @@ otel-collector  memory_limiter → attributes/drop_response → batch
 ClickHouse  otel.otel_logs (events), otel.otel_metrics_* (metrics, unused by the dashboard)
    │ plain views (recomputed on every query), created by the one-shot views-init
    ▼
-cc.events_raw → cc.path_roots → cc.session_project → cc.events (effective project)
-cc.events_raw → cc.agents, cc.requests;   cc.events → cc.api_requests, cc.tool_calls, cc.sessions
-cc.tips (usage tips, last 7 days; not on a dashboard yet) ← the views above
+cc.events_raw + cc.session_meta → cc.path_roots → cc.session_project → cc.events (effective project)
+cc.events_raw → cc.agents, cc.requests;   cc.events → cc.api_requests, cc.tool_calls, cc.prompts,
+                                          cc.sessions (+ cc.session_meta: title, branch, cwd)
+cc.tips (usage tips, last 7 days; Tips dashboard + Overview tiles) ← the views above
    │ grafana-clickhouse-datasource (uid clickhouse, native :9000, user otel)
    ▼
 Grafana :3000 (host port GRAFANA_PORT)  7 dashboards, shared variables + links bar:
@@ -47,13 +52,16 @@ Grafana :3000 (host port GRAFANA_PORT)  7 dashboards, shared variables + links b
 
 - Claude Code decides what is sent; the stack can only drop or reinterpret it. What arrives:
   `modules/telemetry-data.md`.
-- Telemetry is live only: no backfill from `~/.claude/projects` transcripts; events produced while
-  the server is unreachable are lost after a short client retry.
-- Session titles (`/rename` → `custom-title`, `ai-title`) and the working directory are not in
-  telemetry; the project of unlabelled sessions is guessed from tool-call paths.
-- Ports beyond `localhost`: Windows — 4317 only (with `-EnableLan`), Grafana and 4318 stay local.
-  Linux (`setup-server.sh`) — 4317 and Grafana on the LAN by default, `--local-only` keeps them
-  local. 4318 and ClickHouse are never published beyond the host.
+- Telemetry is live only: no backfill of events from `~/.claude/projects` transcripts; events
+  produced while the server is unreachable are lost after a short client retry. Only session meta
+  can be backfilled (`-ImportHistory` / `--import-history` of the client scripts).
+- Session titles (`/rename` → `custom-title`, `ai-title`), git branch and working directory are not
+  in Claude Code telemetry: only the client hook sends them, from the session JSONL, with the next
+  prompt (no hook event fires on `/rename`). Clients without the hook (manual setup,
+  `-NoSessionMeta`) send none; their unlabelled sessions get a project from tool-call paths only.
+- Ports beyond `localhost`: Windows — 4317 and 4318 (with `-EnableLan`), Grafana stays local.
+  Linux (`setup-server.sh`) — 4317, 4318 and Grafana on the LAN by default, `--local-only` keeps
+  them local. ClickHouse is never published beyond the host.
 - The README is public: no personal data, no experience specific to the user's PCs.
 
 ## Module map
@@ -61,9 +69,9 @@ Grafana :3000 (host port GRAFANA_PORT)  7 dashboards, shared variables + links b
 | Module file | Covers |
 | --- | --- |
 | `modules/stack.md` | `docker-compose.yml`, `otel-collector.yaml`, `.env`, ClickHouse tables and versions, Grafana provisioning, ports |
-| `modules/telemetry-data.md` | events and attributes Claude Code sends, `clickhouse/views.sql` (incl. `cc.tips` rules), `clickhouse/init-views.sh` |
-| `modules/dashboard.md` | `grafana/dashboards/*.json` (7 dashboards): uids, shared variables and links bar, panels, Overview placeholders, drill-down links, `check-dashboard.js` |
-| `modules/setup-scripts.md` | `setup-server.ps1`, `setup-server.sh` (incl. `--update`), `client/setup-client.{ps1,sh}`, `client/*.json`, `linux-server-tools/*.sh`, keepalive, LAN access |
+| `modules/telemetry-data.md` | events and attributes Claude Code sends, session-meta records of the client hook, `clickhouse/views.sql` (incl. `cc.tips` rules), `clickhouse/init-views.sh` |
+| `modules/dashboard.md` | `grafana/dashboards/*.json` (7 dashboards): uids, shared variables and links bar, panels, fixed panel ids, drill-down links, `check-dashboard.js` |
+| `modules/setup-scripts.md` | `setup-server.ps1`, `setup-server.sh` (incl. `--update`), `client/setup-client.{ps1,sh}` (incl. the session-meta hook), `client/*.json`, `linux-server-tools/*.sh`, keepalive, LAN access |
 
 ## Key conventions (details in `guides/`, index in CLAUDE.md)
 

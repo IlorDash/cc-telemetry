@@ -8,7 +8,7 @@ rows the dashboard reads.
 
 | Path | Role |
 | --- | --- |
-| `clickhouse/views.sql` | `CREATE DATABASE cc` + ten `CREATE OR REPLACE VIEW` |
+| `clickhouse/views.sql` | `CREATE DATABASE cc` + twelve `CREATE OR REPLACE VIEW` (order matters: a view must exist before one reading it) |
 | `clickhouse/init-views.sh` | waits up to 10 min for `otel.otel_logs`, then applies `views.sql` |
 | `client/user-settings.env.json`, `client/project-settings.local.env.json` | the client env keys (templates) |
 
@@ -25,7 +25,35 @@ rows the dashboard reads.
 
 Settings are read at session start: running sessions must be restarted. The user `settings.json`
 env overrides process env; `--settings <file>` with `env` did not override it in a test.
-Claude Code does not send its working directory.
+Claude Code does not send its working directory, session title or git branch: the client hook
+does (next section).
+
+## Session meta (client hook, not Claude Code)
+
+One OTLP log record per changed session, posted by `<settings dir>/cc-telemetry/session-meta.{ps1,sh}`
+(written by the client scripts, `modules/setup-scripts.md`) to `:4318/v1/logs`.
+
+| Field | Value |
+| --- | --- |
+| resource | `service.name=cc-session-meta`, `host=<PcName>` |
+| `event.name` / body | `session_meta` |
+| `session.id` | session JSONL file name without `.jsonl` |
+| `title`, `title_source` | last `customTitle` (`custom`) over last `aiTitle` (`ai`), else `''` |
+| `git_branch` | last `gitBranch` in the file |
+| `cwd` | first `cwd` in the file |
+| `cc_version` | last `version` (digits and dots); not part of the change hash |
+
+Observed on Claude Code 2.1.323 CLI and 2.1.325 VS Code extension, 2026-11-16:
+- JSONL file name = telemetry `session.id`; JSONL `requestId` = telemetry `request_id`.
+- `ai-title` lines are written repeatedly with the same value; `custom-title` appears after
+  `/rename`; `gitBranch` and `cwd` sit on user/assistant lines. The title exists only after the
+  first answer.
+- `UserPromptSubmit` stdin: `session_id`, `transcript_path`, `cwd`, `prompt_id`, `prompt`,
+  `permission_mode`, `hook_event_name`. `SessionStart` has `source` `startup` / `resume`.
+- `"async": true` works. `settings.json` `env` reaches hooks, but `OTEL_*` variables are stripped
+  (hence server and PC name as hook arguments).
+- `/rename` does not fire `UserPromptSubmit`, and no hook event exists for title changes: a rename
+  arrives with the next prompt (confirmed end to end on a test client).
 
 ## Events (`LogAttributes['event.name']`)
 
@@ -59,26 +87,35 @@ Metrics: `claude_code.{token.usage,cost.usage,lines_of_code.count,active_time.to
 
 ```
 cc.events_raw ─┬─ cc.path_roots ─► cc.session_project   (+ explicit labels from events_raw)
-               ├─ cc.events  = events_raw LEFT JOIN session_project (effective project)
+cc.session_meta┘ (cwd)
+cc.events_raw ─┬─ cc.events  = events_raw LEFT JOIN session_project (effective project)
                ├─ cc.agents    (agent_id → name)
                └─ cc.requests  (request_id → skill)
 cc.events ─┬─ cc.api_requests  (events + agents)
            ├─ cc.tool_calls    (events + agents + requests)
-           └─ cc.sessions
+           ├─ cc.sessions      (+ LEFT JOIN cc.session_meta)
+           └─ cc.prompts
 cc.tips ◄── cc.api_requests, cc.tool_calls, cc.events, cc.events_raw   (last 7 days)
 ```
-- `cc.events_raw`: one row per event with `ServiceName = 'claude-code'` (the only place that
-  filters it); `project_label` lower-cased, `unknown` when missing; attributes flattened to typed
+- `ServiceName` is filtered in exactly two views: `cc.events_raw` (`claude-code`) and
+  `cc.session_meta` (`cc-session-meta`); every other view reads one of them.
+- `cc.events_raw`: one row per Claude Code event; `project_label` lower-cased, `unknown` when
+  missing; attributes flattened to typed
   columns (`toUInt64OrZero` etc.); last two `result_bytes` (`tool_result_size_bytes`) and
   `ttft_ms`, passed on to `cc.events` via `e.*`.
-- `cc.path_roots`: per `tool_result` with a path (`file_path` → `notebook_path` → `path`):
-  `session_id`, `cand` = candidate project folder. Path normalised (`\` → `/`, lower case,
+- `cc.session_meta` (defined right after `events_raw`, because `path_roots` reads it): per
+  `session_id` the latest value (`argMax(…, Timestamp)`) of `title`, `title_source`, `git_branch`,
+  `cwd`, `host`, `cc_version`, plus `updated`; only `event.name = 'session_meta'`, non-empty id.
+- `cc.path_roots`: per `tool_result` with a path (`file_path` → `notebook_path` → `path`), plus
+  per session with a `cc.session_meta.cwd` (`from_cwd = 1`, treated as a directory path):
+  `session_id`, `cand` = candidate project folder, `from_cwd`. Path normalised (`\` → `/`, lower case,
   `/c/` → `c:/`, `/mnt/<d>/` accepted); `cand` = first segment after an optional home
   (`users/<u>/`, `home/<u>/`, `root/`) and any run of container folders (`documents`, `projects`,
   `src`, `dev`, `work`, `repos`, `github`, `desktop`, `downloads`, `onedrive`, `onedrive - *`, ...).
   Dropped: hidden folders, temp/system/AppData/`node_modules` names, files directly in a
   container. The regex and the `IN` stop list must stay in step.
-- `cc.session_project`: per session the most frequent `cand` (ties: name order). A folder
+- `cc.session_project`: per session the `cwd` folder if any, else the most frequent `cand` (ties:
+  name order); so the effective project = label > cwd folder > path heuristic. A folder
   `<n>-<x>` (worktree) folds into the longest known `<n>` — known = any `cand` or explicit label.
   Limits: pending-bugs.md.
 - `cc.events`: `cc.events_raw` minus `project_label`, plus `project` = label if not `unknown`,
@@ -94,17 +131,35 @@ cc.tips ◄── cc.api_requests, cc.tool_calls, cc.events, cc.events_raw   (la
   the first `/<project>` in the path; worktree folders `<project>-<name>/` fold into the same
   relative path; `area` = first path segment, `claude-context` for `claude-context/` and
   `.claude/`, `external` outside the project.
-- `cc.sessions`: per `session_id`: first prompt, prompt/tool/agent/skill counts, cost, tokens,
-  start/last event. Empty sessions (prompts = 0, tokens = 0) exist and are filtered by the dashboard.
+- `cc.sessions`: per `session_id`: first prompt, prompt/tool/agent/skill/`requests` counts, cost,
+  tokens, start/last event; `title`, `title_source`, `git_branch`, `cwd` from `cc.session_meta`
+  (`''` when the client sent none). Empty sessions (no request) exist; the dashboard keeps
+  `requests > 0`.
+- `cc.prompts`: per (`session_id`, `prompt_id`): the prompt text and everything it triggered
+  (requests incl. subagent/aux, cost, input/output/cache tokens, tool calls, `max_result_bytes`,
+  agents); rows without a prompt, request or tool result are dropped. Sums add up to `cc.sessions`.
 
 ## `cc.tips` — usage tips
 
 `UNION ALL` of rules over `now() - INTERVAL 7 DAY` (fixed; ignores the dashboard range and
 variables). Columns: `category`, `title`, `body`, `scope` (project / agent type / hook), `metric`
-(Float64), `link` (relative, no slug, to the dashboard holding the related panels:
-`/d/cc-usage?var-project=…` for cache, short-opus; `/d/cc-tools?var-project=…` for repeated-read,
-big-results, denials; `/d/cc-sessions?var-session=…` for agent-outlier; `/d/cc-health` for
-slow-hook; `/d/cc-health?var-project=…` for slow-ttft). Not on a dashboard yet. Thresholds are first guesses, meant to be tuned.
+(Float64), `link` (relative, no slug, one evidence panel full-screen via `viewPanel=panel-<id>`,
+variables preset; always has a query string — the dashboards append `&` + the time range).
+Shown on the Tips dashboard and the Overview tiles 58/59 (`modules/dashboard.md`). Thresholds
+are first guesses, meant to be tuned.
+
+| category | link target |
+| --- | --- |
+| `cache` | `/d/cc-usage` panel 57, `var-project` |
+| `repeated-read` | `/d/cc-tools` panel 24, `var-project` |
+| `big-results` | `/d/cc-tools` panel 140, `var-project` |
+| `short-opus` | `/d/cc-prompts` panel 180, `var-project` |
+| `agent-outlier` | `/d/cc-sessions` panel 100, `var-session` (biggest run), `var-actor` |
+| `denials` | `/d/cc-tools` panel 19, `var-project` |
+| `slow-hook` | `/d/cc-health` panel 26 |
+| `slow-ttft` | `/d/cc-health` panel 161, `var-project` |
+
+These panel ids are fixed: renumbering one breaks its tip link.
 
 | category | Source | Fires when (grouped by) | metric |
 | --- | --- | --- | --- |

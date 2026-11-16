@@ -7,9 +7,9 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
 
 ## setup-server.ps1
 
-- **M** `Enable-Lan` deletes every `portproxy` entry on port 4317 whose listen address is not the
-  current LAN IP — also a forward the user added on purpose for a second adapter. Only one LAN
-  address can be served.
+- **M** `Enable-Lan` deletes every `portproxy` entry on port 4317 or 4318 whose listen address is
+  not the current LAN IP — also a forward the user added on purpose for a second adapter. Only one
+  LAN address can be served.
 - **M?** Desktop mode never ran (no Docker Desktop on the test PC): `Test-DesktopDocker`, `Compose`
   without `wsl`, the summary output.
 - **L** `Get-LanIp` takes the up adapter with a default gateway and the lowest interface metric; a
@@ -30,10 +30,13 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
 
 - **L** `-PcName` defaults to `$env:COMPUTERNAME` (upper case); a PC configured by hand with a
   lower-case name shows up as a second `host` value.
+- **L** Not two-phase like the .sh: the user settings file is written before the `-Project` folders
+  are resolved, so a missing project folder (`Resolve-Path`) stops the script after the first write.
 
 ## setup-client.sh
 
-- **M?** The jq branch (no python3, jq ≥ 1.6) never ran; only the python3 branch was tested.
+- **M?** The jq branch (no python3, jq ≥ 1.6) never ran; only the python3 branch was tested. Same
+  for the jq paths of the generated `session-meta.sh` (`JQ_META`, `JQ_PAYLOAD`, `hook_json`).
 
 ## collector / clients
 
@@ -54,9 +57,10 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
 - **L** `cc.session_project` worktree fold is a name-prefix heuristic: it merges different
   projects sharing a prefix (`my` and `my-app`) and is not transitive (`b`, `b-c`, `b-c-d`). A
   project in an unusual layout (`/data/x/y/`) is named after its first folder (`data`).
-- **L?** Cost: every query on `cc.events` reads `otel.otel_logs` about 4 times (`events_raw` itself,
-  `session_project` over `path_roots`, and both halves of its `names` union). Deferred until an
-  ARMv8.0 Linux server gets slow.
+- **L?** Cost: every query on `cc.events` reads `otel.otel_logs` about 6 times (`events_raw` itself;
+  `session_project` over `path_roots`, which reads `events_raw` and `session_meta`; and both halves
+  of its `names` union, `path_roots` again plus `events_raw`). Deferred until an ARMv8.0 Linux
+  server gets slow.
 - **L** `cc.tips` `repeated-read` puts `cc.tool_calls.path` in the title: a file outside the
   project keeps its absolute path there.
 - **?** `cc.tips` verified only on ClickHouse 22.3 (`count()` ~0.5 s on ~4.9k events); 25.8

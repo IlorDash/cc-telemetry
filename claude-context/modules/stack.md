@@ -18,7 +18,7 @@ The Docker services, how data moves between them, what is exposed and where it i
 | Service | Image | Ports | Notes |
 | --- | --- | --- | --- |
 | `clickhouse` | `clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-25.8}` | none published | db `otel`, user `otel`; healthcheck `SELECT 1`; `ulimits nofile 262144` |
-| `otel-collector` | `otel/opentelemetry-collector-contrib:0.135.0` | `${OTLP_BIND:-0.0.0.0}:4317` gRPC, `127.0.0.1:4318` HTTP | starts after clickhouse is healthy |
+| `otel-collector` | `otel/opentelemetry-collector-contrib:0.135.0` | `${OTLP_BIND:-0.0.0.0}:4317` gRPC (Claude Code), `${OTLP_BIND:-0.0.0.0}:4318` HTTP (session-meta hook) | starts after clickhouse is healthy |
 | `views-init` | `clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-25.8}` | — | one-shot, `restart: "no"`; `bash /init/init-views.sh`; `docker compose ps -a` shows `Exited (0)` when fine |
 | `grafana` | `grafana/grafana:12.1.0` | `${GRAFANA_BIND:-127.0.0.1}:${GRAFANA_PORT:-3000}:3000` | plugin via `GF_PLUGINS_PREINSTALL_SYNC=grafana-clickhouse-datasource` (4.23.5 at first install); home dashboard = `overview.json` via `GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH` |
 
@@ -68,7 +68,8 @@ metrics: otlp → memory_limiter → batch → clickhouse
 
 - `otel.otel_logs`: `Timestamp DateTime64(9)`, `ServiceName LowCardinality(String)`,
   `ResourceAttributes` / `LogAttributes Map(LowCardinality(String), String)`, `Body`, `ScopeName`, …
-  No TTL: kept indefinitely in volume `clickhouse-data`.
+  No TTL: kept indefinitely in volume `clickhouse-data`. `ServiceName` = `claude-code` (Claude
+  Code events) or `cc-session-meta` (client hook); the views filter it.
 - In wsl mode the volumes live inside the distro: `wsl --unregister` deletes all data — dump first
   (`linux-server-tools/backup.sh dump`, `modules/setup-scripts.md`).
 - `grafana-data` holds only Grafana's own DB; datasource and dashboard come from files.
@@ -78,10 +79,9 @@ metrics: otlp → memory_limiter → batch → clickhouse
 | Port | Where | Who reaches it |
 | --- | --- | --- |
 | Grafana (`GRAFANA_PORT`, 3000) | `GRAFANA_BIND` (unset → `127.0.0.1`); `setup-server.sh` writes `0.0.0.0` unless `--local-only` | Windows: the server PC only; Linux: the LAN by default |
-| 4317 | `OTLP_BIND` (unset → `0.0.0.0`). wsl mode: Windows `localhost`, LAN via firewall rule + portproxy; Linux: `setup-server.sh` writes `0.0.0.0` or `127.0.0.1` (`--local-only`) | clients |
-| 4318 | `127.0.0.1` always | unused by clients |
+| 4317, 4318 | both follow `OTLP_BIND` (unset → `0.0.0.0`). wsl mode: Windows `localhost`, LAN via one firewall rule + portproxy per port; Linux: `setup-server.sh` writes `0.0.0.0` or `127.0.0.1` (`--local-only`) | clients: 4317 Claude Code (gRPC), 4318 the session-meta hook (OTLP/JSON `POST /v1/logs`) |
 | 9000/8123 | container network only | collector, grafana, views-init |
 
 On Linux Docker's own iptables rules bypass ufw/firewalld: the bind address, not a firewall rule,
-limits who connects. Do not publish ClickHouse ports or 4318, or change a bind in `.env`, without
-the user asking.
+limits who connects. Do not publish ClickHouse ports, or change a bind in `.env`, without the
+user asking. 4318 has the same trust as 4317: no authentication.

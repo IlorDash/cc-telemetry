@@ -9,12 +9,12 @@ update flow and the LAN path.
 | --- | --- |
 | `setup-server.ps1` | Windows server setup (Docker Desktop or WSL2), re-runnable; doubles as a health check |
 | `setup-server.sh` | Linux server setup, re-runnable; `--update` updates a running server |
-| `client/setup-client.ps1` | per-user client setup on Windows, re-runnable |
-| `client/setup-client.sh` | per-user client setup on Linux (python3, or jq ≥ 1.6), re-runnable |
+| `client/setup-client.ps1` | per-user client setup on Windows, re-runnable; embeds and installs the session-meta hook `session-meta.ps1` |
+| `client/setup-client.sh` | per-user client setup on Linux (python3, or jq ≥ 1.6), re-runnable; embeds and installs `session-meta.sh` |
 | `linux-server-tools/install-docker.sh` | Docker Engine + compose plugin from download.docker.com on Ubuntu/Debian and derivatives (`ID`/`ID_LIKE`; a derivative's codename is checked against download.docker.com first); enables the service, adds the user to `docker`; run as root |
 | `linux-server-tools/ch.sh` | SQL from stdin or args against the stack, password read from `.env` |
 | `linux-server-tools/backup.sh` | `dump` all `otel.*` tables to `$BACKUP_DIR/<table>.native` (default `backup/`; fails if `SHOW TABLES` fails); `restore [table]` appends, skips empty files and missing tables |
-| `client/*.json` | env templates for manual client setup |
+| `client/*.json` | env templates for manual client setup (no hook: no session meta) |
 
 ## setup-server.ps1 (Windows)
 
@@ -24,14 +24,17 @@ update flow and the LAN path.
                 → wsl --terminate (docker group)
 2 .env     created with two random 32-hex passwords (UTF-8 no BOM, LF); existing file kept
 3 stack    docker compose up -d; poll views-init until Exited, must be 0
-4 checks   GET localhost:3000/api/health; TCP localhost:4317
+4 checks   GET localhost:3000/api/health; TCP localhost:4317 and :4318
 5 wsl      write <Startup>/cc-telemetry-keepalive.vbs (hidden wsl --exec sleep infinity), start it if not running
 6 -EnableLan  not admin → relaunch itself elevated (UAC) with -LanOnly, transcript in %TEMP%\cc-telemetry-lan.log
-           firewall rule "OTLP 4317 (Claude Code telemetry)" Private; warn if the LAN profile is Public
-           wsl: portproxy <LAN_IP>:4317 → 127.0.0.1:4317, deletes other *:4317 forwards
+           per port in $otlpPorts (4317, 4318):
+             firewall rule "OTLP <port> (Claude Code telemetry)" Private (a re-run adds a missing one)
+             wsl: portproxy <LAN_IP>:<port> → 127.0.0.1:<port>, deletes other *:<port> forwards
+             TCP test <LAN_IP>:<port>
+           warn if the LAN profile is Public
 ```
 - Params: `-Mode auto|desktop|wsl`, `-Distro` (`Ubuntu`), `-EnableLan`, `-LanIp`, `-Yes`, internal `-LanOnly`.
-- Writes no bind/port keys: compose defaults apply (4317 on `0.0.0.0`, Grafana `127.0.0.1:3000`);
+- Writes no bind/port keys: compose defaults apply (4317, 4318 on `0.0.0.0`, Grafana `127.0.0.1:3000`);
   the checks assume Grafana on `localhost:3000`.
 - LAN IP = IPv4 of the up adapter with a default gateway and the lowest interface metric.
 - Compose in wsl mode: `wsl -d <distro> --cd <repo> -- docker compose …`.
@@ -56,11 +59,12 @@ args       --local-only | --lan (= --enable-lan), --lan-ip <IPv4>, --grafana-por
            4317/4318 busy by another program → warn only
            warn: tag ≥ 22.10 on old ARM; tag < 24 = out of support
 3 stack    LAN note when a bind is not local; compose up -d; poll views-init until exited, must be 0
-4 checks   http <bind|127.0.0.1>:<GRAFANA_PORT>/api/health; TCP 4317; docker enabled at boot (ask → enable)
+4 checks   http <bind|127.0.0.1>:<GRAFANA_PORT>/api/health; TCP 4317, 4318; docker enabled at boot (ask → enable)
 5 LAN      only if OTLP_BIND or GRAFANA_BIND is not 127.0.0.1/localhost
+           lan_ports = 4317 4318 (OTLP_BIND not local) + GRAFANA_PORT (GRAFANA_BIND not local)
            LAN IP = --lan-ip or src of `ip -4 route get 1.1.1.1`
            firewalld (active): ask → runtime + permanent port rules; ufw (if active): ask → allow
-           warn: Docker bypasses the firewall; TCP test of <LAN IP>:4317 / :GRAFANA_PORT
+           warn: Docker bypasses the firewall; TCP test of <LAN IP>:4317, :4318 / :GRAFANA_PORT
 6 summary  client commands for this PC (setup-client.sh --server-ip localhost) and other PCs (.ps1 / .sh)
   update re-run → finish_update
 ```
@@ -100,11 +104,11 @@ EXIT trap    failing exit once the dump folder is set → prints it (+ rollback 
 
 | | `setup-client.ps1` | `setup-client.sh` |
 | --- | --- | --- |
-| params | `-ServerIp` (required), `-PcName` (`$env:COMPUTERNAME`), `-Project` folders, `-SettingsDir` (`.claude`), `-UserSettings` (test override), `-WhatIf` | `--server-ip` (required, `[A-Za-z0-9._-]+`), `--pc-name` (`hostname -s`), `--project` (repeat), `--settings-dir`, `--user-settings`, `--dry-run` |
+| params | `-ServerIp` (required, `[A-Za-z0-9._-]+`), `-PcName` (`$env:COMPUTERNAME`), `-Project` folders, `-SettingsDir` (`.claude`), `-UserSettings` (test override), `-NoSessionMeta`, `-ImportHistory`, `-WhatIf` | `--server-ip` (required, `[A-Za-z0-9._-]+`), `--pc-name` (`hostname -s`), `--project` (repeat), `--settings-dir`, `--user-settings`, `--no-session-meta`, `--import-history`, `--dry-run` |
 | JSON | `ConvertFrom-Json`; 5.1 re-indents (content unchanged) | python3 preferred, else jq with `$ARGS` (≥ 1.6), else fail |
-| order | file by file | two phases: merge all in memory (invalid JSON / non-object / non-object `env` → stop before any write), then write |
+| order | hook script, user settings, then project files one by one | two phases: merge all in memory (invalid JSON / non-object / non-object `env` / bad `hooks` layout → stop before any write), then hook script, then write |
 | write | UTF-8 without BOM, re-parse | shell redirection (keeps mode, follows symlinks), re-validate |
-| end | TCP test via `Test-NetConnection` | TCP test via `/dev/tcp` (timeout 3 s) |
+| end | TCP test of 4317 and (hook on) 4318 via `Test-NetConnection`; then the import | same via `/dev/tcp` (timeout 3 s); then the import |
 
 - Both merge into `env` of the user settings (9 keys, `project=unknown`) and of
   `<project>/<SettingsDir>/settings.local.json` (`project=<folder lower-case>,host=<PcName>`);
@@ -114,12 +118,42 @@ EXIT trap    failing exit once the dump folder is set → prints it (+ rollback 
 - A project whose `.claude` is a junction/symlink to another folder needs no `-SettingsDir`: the
   write goes through it.
 
+### Session-meta hook (default; data: `modules/telemetry-data.md`)
+
+```
+install    <settings dir>/cc-telemetry/session-meta.{ps1,sh} rewritten on every run (.sh: chmod 700)
+           user settings hooks.UserPromptSubmit: our entry = command containing cc-telemetry/session-meta
+           (\ → /); updated in place, never duplicated, other hooks kept; new: {type command, async true,
+           timeout 60}; command passes server (localhost → 127.0.0.1) and PC name as arguments
+           ps1: powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "<path, />" ...
+run        stdin transcript_path → projects root = its grandparent; silent, always exit 0
+           back-off: last failed send < 600 s ago → do nothing (a fail time in the future counts as expired)
+           files = current JSONL + every <root>/*/*.jsonl (not agent-*) changed since last scan − 120 s
+                   (no scan yet → current only; import → all)
+           per file: title (custom-title over ai-title), last gitBranch, first cwd, version
+           skip if all empty or hash(src,title,branch,cwd) = state; POST batches of 100 to
+           http://<server>:4318/v1/logs (5 s timeout); first failed batch → rest counted failed
+           state: scan time kept on any failure; fail time set when a batch failed
+-NoSessionMeta  removes our hook entry (and empty hooks keys) + script, state, state temp files;
+                the folder only if empty. Cannot be combined with -ImportHistory
+-ImportHistory  runs the hook once with --import-history over <settings dir>/projects, prints
+                "found, sent, unchanged, failed"; skipped under -WhatIf / --dry-run
+```
+- State file `session-meta.state.json` (ps1) / `session-meta.state` (sh): keyed by `server|PC`
+  (another key = fresh state), holds only hashes; merged with the file on disk, replaced atomically.
+- Reads only title/branch/cwd/version lines, never prompt or answer text.
+- `session-meta.sh` needs bash 4+, GNU `find` (`-newermt`), python3 or jq, curl or python3;
+  otherwise it exits silently. Its jq path is untested (pending-bugs.md).
+- ps1 parses lines by string search (no JSON parse per line), opens files with shared read.
+
 ## Client reachability
 
 ```
-Windows server: client ──TCP 4317──► LAN IP ── firewall (Private profile) ── [wsl: portproxy] ── 127.0.0.1:4317 ── wslrelay ── collector
-Linux server:   client ──TCP 4317──► LAN IP ── Docker publish on OTLP_BIND (ufw/firewalld bypassed) ── collector
+Windows server: client ──TCP 4317/4318──► LAN IP ── firewall (Private profile) ── [wsl: portproxy] ── 127.0.0.1:<port> ── wslrelay ── collector
+Linux server:   client ──TCP 4317/4318──► LAN IP ── Docker publish on OTLP_BIND (ufw/firewalld bypassed) ── collector
 ```
+- A server set up before 4318 was published: Claude Code telemetry still arrives, session meta does
+  not (client prints a hint) until the server setup is updated and re-run.
 - Public network profile → rule does not apply → connection refused; the fix is the user's (mark
   the network Private) — never change it yourself.
 - Corporate VPN clients usually cannot be reached from the corporate side (gateway policy): not

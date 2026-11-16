@@ -14,6 +14,8 @@ re-run and must keep existing data, `.env` and foreign settings keys).
   (attributes are strings; missing → `''`).
 - Filter `ServiceName = 'claude-code'` once, in `cc.events_raw` (the raw layer); other views build
   on `cc.events` (effective project) or, when they feed it or need no project, on `cc.events_raw`.
+  The one exception: `cc.session_meta` reads the client hook's records (`ServiceName = 'cc-session-meta'`)
+  straight from `otel.otel_logs`.
 - New attribute → add a column to `cc.events_raw` (reaches `cc.events` via `e.*`), document it in
   `modules/telemetry-data.md` (via context-auditor) and, if it is collected text, in README "What is sent".
 - Explicit column aliases in joins (`e.ts AS ts`): ClickHouse keeps the `e.` prefix otherwise.
