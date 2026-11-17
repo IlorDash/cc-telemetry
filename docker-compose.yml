@@ -8,6 +8,7 @@ services:
     # CLICKHOUSE_VERSION in .env overrides the tag (setup-server.sh sets 22.3.20.29 on ARM CPUs without LRCPC, e.g. Raspberry Pi 4).
     image: clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-25.8}
     restart: unless-stopped
+    cpus: 2
     environment:
       CLICKHOUSE_DB: otel
       CLICKHOUSE_USER: otel
@@ -15,6 +16,8 @@ services:
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
     volumes:
       - clickhouse-data:/var/lib/clickhouse
+      - ./clickhouse/config.d/low-resource.xml:/etc/clickhouse-server/config.d/low-resource.xml:ro
+      - ./clickhouse/users.d/low-resource.xml:/etc/clickhouse-server/users.d/low-resource.xml:ro
     ulimits:
       nofile: { soft: 262144, hard: 262144 }
     healthcheck:
@@ -63,7 +66,7 @@ services:
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
       GF_PLUGINS_PREINSTALL_SYNC: grafana-clickhouse-datasource
-      GF_DASHBOARDS_MIN_REFRESH_INTERVAL: 5s
+      GF_DASHBOARDS_MIN_REFRESH_INTERVAL: 1m
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/overview.json
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
     volumes:

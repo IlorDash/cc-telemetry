@@ -1,0 +1,12 @@
+<clickhouse>
+  <profiles>
+    <default>
+      <max_threads>3</max_threads>
+      <max_memory_usage>1500000000</max_memory_usage>
+      <query_profiler_real_time_period_ns>0</query_profiler_real_time_period_ns>
+      <query_profiler_cpu_time_period_ns>0</query_profiler_cpu_time_period_ns>
+      <log_query_threads>0</log_query_threads>
+      <background_pool_size>2</background_pool_size>
+    </default>
+  </profiles>
+</clickhouse>
