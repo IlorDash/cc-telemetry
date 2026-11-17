@@ -123,5 +123,8 @@
         ]
       }
     ]
+  },
+  "enabledPlugins": {
+    "context7@anthropic-plugin-directory": true
   }
 }
