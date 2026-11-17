@@ -16,8 +16,11 @@ SELECT
     LogAttributes['event.name']                                 AS event,
     LogAttributes['session.id']                                 AS session_id,
     LogAttributes['prompt.id']                                  AS prompt_id,
-    LogAttributes['user.email']                                 AS account,
-    LogAttributes['agent_id']                                   AS agent_id,
+    LogAttributes['user.account_uuid']                          AS account_uuid,
+    -- display label: email, else the first 8 characters of the account uuid, else ''
+    if(LogAttributes['user.email'] != '', LogAttributes['user.email'],
+       left(LogAttributes['user.account_uuid'], 8))             AS account,
+    LogAttributes['agent_id']                                  AS agent_id,
     LogAttributes['request_id']                                 AS request_id,
     LogAttributes['query_source']                               AS query_source,
     LogAttributes['agent.name']                                 AS agent_name,
@@ -181,7 +184,7 @@ GROUP BY request_id;
 -- 7. Model requests with actor (main / agent name / aux:<source>) and skill.
 CREATE OR REPLACE VIEW cc.api_requests AS
 SELECT
-    e.ts AS ts, e.project AS project, e.host AS host, e.account AS account,
+    e.ts AS ts, e.project AS project, e.host AS host, e.account AS account, e.account_uuid AS account_uuid,
     e.session_id AS session_id, e.prompt_id AS prompt_id, e.agent_id AS agent_id,
     multiIf(
         e.agent_id != '', if(a.agent = '', 'agent?', a.agent),
@@ -204,7 +207,7 @@ WHERE e.event = 'api_request';
 --    Worktrees <project>-<name>/ fold into the same relative path as the main folder.
 CREATE OR REPLACE VIEW cc.tool_calls AS
 SELECT
-    ts, project, host, account, session_id, prompt_id, agent_id,
+    ts, project, host, account, account_uuid, session_id, prompt_id, agent_id,
     if(agent_id = '', 'main', if(agent_label = '', 'agent?', agent_label)) AS actor,
     skill_label AS skill,
     tool_name, tool_use_id, success, duration_ms,
@@ -233,7 +236,7 @@ SELECT
 FROM
 (
     SELECT
-        e.ts AS ts, e.project AS project, e.host AS host, e.account AS account,
+        e.ts AS ts, e.project AS project, e.host AS host, e.account AS account, e.account_uuid AS account_uuid,
         e.session_id AS session_id, e.prompt_id AS prompt_id, e.agent_id AS agent_id,
         a.agent AS agent_label, r.skill AS skill_label,
         e.tool_name AS tool_name, e.tool_use_id AS tool_use_id,
@@ -252,6 +255,9 @@ FROM
 
 -- 9. One row per session.
 --    title, title_source, git_branch, cwd come from cc.session_meta ('' when the client sent none).
+--    account / account_uuid: of the latest event that has an account (a session may span accounts).
+--    last_prompt: time of the latest user_prompt; a session without a prompt gets `started`.
+--    model: the model with the highest api_request cost in the session ('' when there is no request).
 CREATE OR REPLACE VIEW cc.sessions AS
 SELECT
     s.*,
@@ -261,13 +267,19 @@ SELECT
     m.cwd                                          AS cwd
 FROM
 (
+  -- one join per query level: ClickHouse 22.3 cannot expand `s.*` over two joins
+  SELECT t.*, mm.model AS model
+  FROM
+  (
     SELECT
         session_id,
         any(project)                                   AS project,
         any(host)                                      AS host,
-        any(account)                                   AS account,
+        argMaxIf(account, ts, ev.account != '')        AS account,
+        argMaxIf(account_uuid, ts, ev.account != '')   AS account_uuid,
         min(ts)                                        AS started,
         max(ts)                                        AS last_event,
+        if(countIf(event = 'user_prompt') > 0, maxIf(ts, event = 'user_prompt'), min(ts)) AS last_prompt,
         argMinIf(prompt, ts, event = 'user_prompt')    AS first_prompt,
         countIf(event = 'user_prompt')                 AS prompts,
         sumIf(cost_usd, event = 'api_request')         AS cost_usd,
@@ -277,9 +289,22 @@ FROM
         countIf(event = 'subagent_completed')          AS agents_run,
         countIf(event = 'skill_activated')             AS skills_run,
         countIf(event = 'api_request')                 AS requests
-    FROM cc.events
+    FROM cc.events AS ev
     WHERE session_id != ''
     GROUP BY session_id
+  ) AS t
+  LEFT JOIN
+  (
+    SELECT session_id, argMax(mdl, mcost) AS model
+    FROM
+    (
+        SELECT session_id, model AS mdl, sum(cost_usd) AS mcost
+        FROM cc.events
+        WHERE event = 'api_request' AND session_id != '' AND model != ''
+        GROUP BY session_id, model
+    )
+    GROUP BY session_id
+  ) AS mm ON mm.session_id = t.session_id
 ) AS s
 LEFT JOIN cc.session_meta AS m ON m.session_id = s.session_id;
 
@@ -442,7 +467,8 @@ SELECT
     prompt_id,
     any(project)                                   AS project,
     any(host)                                      AS host,
-    any(account)                                   AS account,
+    argMaxIf(account, ts, ev.account != '')        AS account,
+    argMaxIf(account_uuid, ts, ev.account != '')   AS account_uuid,
     min(ts)                                        AS started,
     max(ts)                                        AS last_event,
     argMinIf(prompt, ts, event = 'user_prompt')    AS prompt,
@@ -458,7 +484,7 @@ SELECT
     countIf(event = 'tool_result')                 AS tool_calls,
     maxIf(result_bytes, event = 'tool_result')     AS max_result_bytes,
     countIf(event = 'subagent_completed')          AS agents_run
-FROM cc.events
+FROM cc.events AS ev
 WHERE session_id != '' AND prompt_id != ''
 GROUP BY session_id, prompt_id
 HAVING countIf(event IN ('user_prompt', 'api_request', 'tool_result')) > 0;
