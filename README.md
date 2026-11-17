@@ -20,7 +20,7 @@ Both are safe to re-run. Each comes in a Windows and a Linux variant:
 The server and the clients are independent: they only talk OTLP over TCP: port 4317 (gRPC, Claude Code telemetry) and port 4318 (HTTP, the session-meta hook).
 Any mix works, for example a Linux server with Windows clients.
 
-Contents: [1. Server](#1-server-one-pc) · [2. Clients](#2-clients-every-pc) · [3. Dashboard](#3-dashboard) ·
+Contents: [1. Server](#1-server-one-pc) · [2. Clients](#2-clients-every-pc) · [3. Dashboards](#3-dashboards) · [Tips](#tips) ·
 [4. Maintenance](#4-maintenance) · [5. Troubleshooting](#5-troubleshooting) · [What is sent](#what-is-sent)
 
 ## 1. Server (one PC)
@@ -193,7 +193,7 @@ nothing is pulled).
 ### 1c. Both
 
 Open `http://localhost:3000` (or your `GRAFANA_PORT`): user `admin`, password `GRAFANA_ADMIN_PASSWORD` from `.env`.
-The **Claude Code usage** dashboard is the home page.
+The **Overview** dashboard is the home page (see section 3 for all seven dashboards).
 
 The OTLP ports have no authentication: enable LAN access on a trusted network only.
 
@@ -341,28 +341,69 @@ Optional, only to label a project explicitly (otherwise it is inferred from file
 
 </details>
 
-## 3. Dashboard
+## 3. Dashboards
 
-The variables at the top are nested: **Project → Session → Actor → Skill** (`All` = no filter).
-Clicking a `session_id`, agent name or skill in the tables sets that filter. The Session dropdown shows `title (short id)`,
-or the full id while the session has no title.
+Grafana shows seven dashboards. A links bar at the top switches between them; it keeps the time range and the variables.
+The buttons are sorted by title.
 
-| Section | Shows |
+| Dashboard | Shows |
 | --- | --- |
-| Summary | cost, tokens, number of sessions and tool calls under the current filters |
-| Sessions | project sessions (session title, else the first prompt; git branch), prompts of the selected session |
-| Tokens and cost | main / agents / auxiliary requests (`aux:*`, e.g. the session title), cost over time |
-| Agents and skills | runs, tokens and tool calls per agent and per skill |
-| Tools | tools × actor × skill, Bash commands, rejections (permissions/hooks) |
-| Files | top files and directories, accesses by area (`claude-context`, `software`, …), re-reads within a session |
-| Hooks | time spent in your hooks |
+| **Overview** (home) | cost, tokens, sessions and turns; daily work and cache reads; cache hit rate; tokens by project and by actor; model share; top tools; recent and active sessions; coding rhythm by weekday and hour; the last 30 days against your plan; two tips tiles |
+| **Sessions** | sessions (title, else the first prompt; git branch), the prompts of the selected session, its timeline, cumulative cost and tokens |
+| **Agents & skills** | runs, tokens and tool calls per agent and per skill; main session against subagents by tool; subagent runs far above their average |
+| **Tools & files** | tool calls, Bash commands, rejected calls, top files and directories, accesses by area, files re-read within a session, largest tool results, error rate by tool |
+| **Health** | time spent in your hooks, API latency, time to first token, tool duration and errors, recent failed tool calls |
+| **Prompts** | the most expensive prompts; pick one to see its requests and tool calls |
+| **Tips** | hints about patterns that cost tokens or time (see "Tips") |
 
+**Variables.** The four at the top are shared and nested: **Project → Session → Actor → Skill** (`All` = no filter). The Session
+dropdown shows `title (short id)`, or the full id while the session has no title; it lists the newest 300 sessions that made
+a model request. Overview adds **Plan, USD/month** (0, 20, 100 or 200) and Prompts adds **Prompt**.
 **Actor**: `main` is the main session, an agent name (`developer`, `Explore`, …) is a subagent, `aux:*` are Claude Code's
 own service requests.
 **Skill**: a tool call is attributed to a skill through the `request_id` of the model request that carried `skill.name`.
 Claude Code does this attribution itself; the label lasts until the end of the prompt in which the skill was invoked.
 
-The refresh rate is picked at the top right (from 5 s), as in any Grafana dashboard.
+**Time range.** The quick ranges are 5 minutes, 1 hour, 24 hours, 7 days (the default), 30 days and `All` (10 years).
+The refresh rate is picked at the top right (10 s by default, from 5 s), as in any Grafana dashboard.
+Some panels ignore the time range and say so in their description: Active sessions (last 15 minutes), the 30-day plan tile
+and the tips (last 7 days).
+
+**Clicks.** In the tables a click on a `session_id` opens that session on **Sessions**; a project in Tokens by project opens
+**Overview** for it; an agent or a skill opens **Agents & skills** filtered by it; a `prompt_id` in Most expensive prompts opens
+the prompt on **Prompts**.
+
+**Sessions.** Cumulative cost, cumulative tokens, the prompts and the timeline show data only for one session: pick it in the
+Session variable (the cumulative graphs say "Select a session").
+
+**Plan tile.** "Last 30 days: API equivalent vs plan" sums `cost_usd` of the last 30 days and divides it by the **Plan,
+USD/month** you chose; with Plan = 0 the ratio is 0. `cost_usd` is computed by Claude Code from API prices, so the sum is
+not a bill: on a subscription you pay the flat fee. A ratio above 1 means the plan costs less than the same use at API prices.
+
+**Explanations.** The collapsed row **What do these numbers mean?** at the bottom of Overview explains tokens, cache, `cost_usd`,
+actors and LIVE / IDLE.
+
+### Tips
+
+A tip is a heuristic hint, not an error: something exceeded a threshold over the last 7 days. It is worth a look and may be
+fine for your work. The window is fixed to the last 7 days; the Tips dashboard ignores the time range and the variables, as
+do the two tips tiles on Overview. Click a tip's title to open one evidence panel full-screen, with the project (or session) preset.
+
+| Category | Fires when (grouped by) | What to do | Link opens |
+| --- | --- | --- | --- |
+| `cache` | cache hit rate below 40 % with at least 20 requests (project) | keep the prompt prefix (CLAUDE.md, tools) stable; fewer `/clear` and model switches | Overview, Cache hit rate by project |
+| `repeated-read` | one file read more than 10 times (project, file) | keep the key facts in CLAUDE.md or a note instead of rereading | Tools & files, Files re-read within one session |
+| `big-results` | at least 5 tool results over 200 KB (project) | narrow the search or limit the read range: big outputs fill the context | Tools & files, Largest tool results |
+| `short-opus` | Opus model: at least 20 answers under 500 output tokens, and they are at least half of its requests (project) | a smaller model may handle such turns; the shown cost is an upper bound of the saving | Prompts, Most expensive prompts |
+| `agent-outlier` | a subagent's biggest run is over 6 times its mean and over 50,000 tokens, at least 3 runs (agent type) | open the session of that run and check what it did | Sessions, timeline of that session |
+| `denials` | a tool rejected at least 5 times (project, tool) | add an allow or deny rule if the rejections are not intended; the text names the main source (config, hook, user) | Tools & files, Rejected tool calls |
+| `slow-hook` | a hook's mean duration over 500 ms, at least 10 runs (hook) | hooks run synchronously and delay every matching tool call: speed it up or make it async | Health, Hook time |
+| `slow-ttft` | mean time to first token over 3 s, at least 10 requests (project, model) | long contexts or a busy provider; compare days in the panel | Health, Time to first token by day |
+
+There is no rule for repeated Bash commands: the telemetry carries only the first word of a command (`git`, `cd`), so counting
+them would report noise. The thresholds are first guesses and there is no way to dismiss a tip: it disappears when the pattern
+leaves the 7-day window. The rules are the `cc.tips` view in `clickhouse/views.sql`; edit the numbers there and run
+`docker compose run --rm views-init` (see "4. Maintenance").
 
 ## 4. Maintenance
 
@@ -401,7 +442,8 @@ folder is relative to the `cc-telemetry` folder, not to the current directory. W
 
 With Docker in WSL the data lives inside the distro: `wsl --unregister` deletes it. Dump first.
 
-Data is kept indefinitely in the `clickhouse-data` volume. The `cc.*` views are plain (not materialized),
+Data is kept indefinitely in the `clickhouse-data` volume. Claude Code deletes its own local session files after about
+30 days, so the server keeps your history longer than the PC does. The `cc.*` views are plain (not materialized),
 so editing `views.sql` recomputes the whole history.
 
 ## 5. Troubleshooting
@@ -412,7 +454,7 @@ so editing `views.sql` recomputes the whole history.
 | "Unknown table cc.events" | `docker compose logs views-init`, then `docker compose run --rm views-init` |
 | Variable dropdowns are empty | Dashboard settings → Variables → open the variable → Run query → Save |
 | ClickHouse plugin does not load | no internet on first start; `docker compose restart grafana` |
-| `project = unknown` | the session touched no file with an absolute path and has no explicit label (`settings.local.json` with `OTEL_RESOURCE_ATTRIBUTES`, folder must be trusted); `OTEL_LOG_TOOL_DETAILS` must be `1` for paths to be sent |
+| `project = unknown` | the session has no explicit label (`settings.local.json` with `OTEL_RESOURCE_ATTRIBUTES`, folder must be trusted), no working directory from the session hook (see the session titles row below) and touched no file with an absolute path; `OTEL_LOG_TOOL_DETAILS` must be `1` for paths to be sent |
 | A project has an odd name (`data`, ...) | its folder sits in an unusual place; set the label with `-Project` / `--project` |
 | Session titles, git branch or `project` from the working directory do not appear | port 4318 is not reachable from the client (the client script prints `server <ip>:4318 (session titles) reachable: False`): re-run the server script (Windows: with `-EnableLan`, see 1a; Linux: `setup-server.sh` without `--local-only`), then re-run the client script. After a failed send the hook pauses for 10 minutes. A new session's title appears with the next prompt. The hook is missing if the client script ran with `-NoSessionMeta` / `--no-session-meta`; for sessions from before it, run `-ImportHistory` / `--import-history` |
 | `actor = agent?` | the subagent is still running and its name has not arrived yet, or Claude Code is older than 2.1.310 |
