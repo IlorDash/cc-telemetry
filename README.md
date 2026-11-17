@@ -258,7 +258,8 @@ The session hook is `~/.claude/cc-telemetry/session-meta.sh`. It needs bash 4+, 
    opened in Claude Code on this PC, run `claude` in it once and accept the trust dialog.
 3. **Restart running sessions**, settings are read at start: in VS Code *Developer: Reload Window*,
    in the terminal exit and continue with `claude -c`.
-4. Make any request. Within 5–10 s the session appears in Grafana; its project shows in the **Project** dropdown once the
+4. Make any request. Within 5–10 s the session reaches the server; Grafana shows it on the next dashboard refresh (every
+   5 minutes, or at once with the refresh button at the top right). Its project shows in the **Project** dropdown once the
    session has touched a file or its working directory has arrived through the hook (or at once with an explicit label).
 
 ### Session titles, git branch and working directory
@@ -362,7 +363,8 @@ own service requests.
 **Skill**: a tool call is attributed to a skill through the `request_id` of the model request that carried `skill.name`.
 Claude Code does this attribution itself; the label lasts until the end of the prompt in which the skill was invoked.
 
-The refresh rate is picked at the top right (from 5 s), as in any Grafana dashboard.
+The dashboards open on the last 24 hours and refresh every 5 minutes. Pick another range or refresh rate at the top right;
+Grafana accepts refresh rates from 1 minute.
 
 ## 4. Maintenance
 
@@ -403,6 +405,12 @@ With Docker in WSL the data lives inside the distro: `wsl --unregister` deletes 
 
 Data is kept indefinitely in the `clickhouse-data` volume. The `cc.*` views are plain (not materialized),
 so editing `views.sql` recomputes the whole history.
+
+ClickHouse runs with limits sized for a small server such as a Raspberry Pi 4, on every machine: 2 CPU cores, 3 GB of
+memory for the server and 1.5 GB per query, 3 threads per query, and no system logs except `query_log`, which is kept for
+3 days. The limits are in `clickhouse/config.d/low-resource.xml`, `clickhouse/users.d/low-resource.xml` and `cpus` in
+`docker-compose.yml`. After editing the XML files run `docker compose restart clickhouse`; the server script does not
+restart ClickHouse for them.
 
 ## 5. Troubleshooting
 

@@ -98,6 +98,8 @@ EXIT trap    failing exit once the dump folder is set → prints it (+ rollback 
   (restart by hand), continue; restart fails → fail (EXIT trap prints dump folder + rollback).
 - No reload needed: `clickhouse/` (views) — `compose up -d` starts the exited one-shot views-init
   again on every run; `grafana/dashboards/` — Grafana re-reads it every 30 s.
+- Not handled: `clickhouse/config.d/*`, `clickhouse/users.d/*` — `clickhouse` is not restarted
+  when they change (`pending-bugs.md`).
 - Nothing is removed (no `down -v`); earlier dumps stay. With `sudo docker` the dump files belong to root.
 
 ## Clients

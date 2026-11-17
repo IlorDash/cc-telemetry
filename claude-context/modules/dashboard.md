@@ -24,7 +24,7 @@ Home page: `GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH` in `docker-compose.yml` �
 | --- | --- |
 | `tags` | `cc`, `claude-code`, `otel` |
 | `schemaVersion` | 39 |
-| `refresh` / `time` | 10 s / `now-7d` → `now` |
+| `refresh` / `time` | 5 m / `now-24h` → `now` (Grafana refuses intervals below 1 m: `GF_DASHBOARDS_MIN_REFRESH_INTERVAL`) |
 | `templating` | the four shared variables below, identical in every file; Overview adds `plan_monthly`, Prompts adds `prompt` |
 | `timepicker.quick_ranges` | Last 5 minutes, 1 hour, 24 hours, 7 days, 30 days, All (`now-10y`) |
 | `links` | one `type: dashboards` link, `tags: ["cc"]`, `keepTime`, `includeVars`, not a dropdown |

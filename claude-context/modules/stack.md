@@ -12,15 +12,17 @@ The Docker services, how data moves between them, what is exposed and where it i
 | `grafana/provisioning/datasources/clickhouse.yaml` | datasource uid `clickhouse`, native `clickhouse:9000`, user `otel`, db `cc`, password from env |
 | `grafana/provisioning/dashboards/dashboards.yaml` | file provider, `updateIntervalSeconds: 30`, `allowUiUpdates: true` |
 | `clickhouse/init-views.sh`, `clickhouse/views.sql` | see `modules/telemetry-data.md` |
+| `clickhouse/config.d/low-resource.xml` | server config: system logs, memory, caches, merge pool thresholds (below) |
+| `clickhouse/users.d/low-resource.xml` | `default` profile: threads, per-query memory, profilers, background pool (below) |
 
 ## Services
 
 | Service | Image | Ports | Notes |
 | --- | --- | --- | --- |
-| `clickhouse` | `clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-25.8}` | none published | db `otel`, user `otel`; healthcheck `SELECT 1`; `ulimits nofile 262144` |
+| `clickhouse` | `clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-25.8}` | none published | db `otel`, user `otel`; healthcheck `SELECT 1`; `ulimits nofile 262144`; `cpus: 2` |
 | `otel-collector` | `otel/opentelemetry-collector-contrib:0.135.0` | `${OTLP_BIND:-0.0.0.0}:4317` gRPC (Claude Code), `${OTLP_BIND:-0.0.0.0}:4318` HTTP (session-meta hook) | starts after clickhouse is healthy |
 | `views-init` | `clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-25.8}` | — | one-shot, `restart: "no"`; `bash /init/init-views.sh`; `docker compose ps -a` shows `Exited (0)` when fine |
-| `grafana` | `grafana/grafana:12.1.0` | `${GRAFANA_BIND:-127.0.0.1}:${GRAFANA_PORT:-3000}:3000` | plugin via `GF_PLUGINS_PREINSTALL_SYNC=grafana-clickhouse-datasource` (4.23.5 at first install); home dashboard = `overview.json` via `GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH` |
+| `grafana` | `grafana/grafana:12.1.0` | `${GRAFANA_BIND:-127.0.0.1}:${GRAFANA_PORT:-3000}:3000` | plugin via `GF_PLUGINS_PREINSTALL_SYNC=grafana-clickhouse-datasource` (4.23.5 at first install); home dashboard = `overview.json` via `GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH`; `GF_DASHBOARDS_MIN_REFRESH_INTERVAL=1m` |
 
 Bind mounts (read-only) — `compose up -d` recreates a container only when its service
 definition changes, so an edited file is picked up as follows:
@@ -31,6 +33,7 @@ definition changes, so an edited file is picked up as follows:
 | `grafana/provisioning/` | `grafana` | restart (same, for any file under it) |
 | `grafana/dashboards/` | `grafana` | re-read every 30 s |
 | `clickhouse/` | `views-init` | next views-init run (`compose up -d` starts it again; or `compose run --rm views-init`) |
+| `clickhouse/config.d/low-resource.xml`, `clickhouse/users.d/low-resource.xml` (single files) | `clickhouse` | `compose restart clickhouse` by hand: `setup-server.sh --update` does not restart it |
 
 All services but `views-init` are `restart: unless-stopped`; in wsl mode they come up when the
 docker service starts with the distro; on Linux `setup-server.sh` checks (and offers to enable)
@@ -49,6 +52,24 @@ the docker service at boot.
 - A data volume written by a newer ClickHouse does not start with an older one: change the tag
   via `linux-server-tools/backup.sh dump` → empty volume (`down -v`: the user's "yes" only) →
   new tag → `restore`.
+
+## ClickHouse resource limits (every server, not only ARM)
+
+| File | Setting | Value |
+| --- | --- | --- |
+| `config.d` | `asynchronous_metric_log`, `metric_log`, `query_thread_log`, `part_log`, `session_log`, `trace_log`, `text_log` | `remove="1"` (not written) |
+| `config.d` | `query_log` TTL | `event_date + INTERVAL 3 DAY DELETE` |
+| `config.d` | `max_server_memory_usage` / `mark_cache_size` / `uncompressed_cache_size` | 3 GB / 256 MiB / 0 |
+| `config.d` | `max_concurrent_queries` | 8 |
+| `config.d` | `merge_tree`: `number_of_free_entries_in_pool_to_lower_max_size_of_merge`, `..._to_execute_mutation` | 2 (defaults 8 / 20 exceed the smaller pool) |
+| `users.d` | `max_threads` / `max_memory_usage` (per query) | 3 / 1.5 GB |
+| `users.d` | `query_profiler_real_time_period_ns`, `query_profiler_cpu_time_period_ns`, `log_query_threads` | 0 |
+| `users.d` | `background_pool_size` | 2 (profile-level: see `pending-bugs.md`) |
+
+- On 22.3.20.29 all `users.d` values and both `merge_tree` thresholds show as changed in
+  `system.settings` / `system.merge_tree_settings`, `query_log` carries the TTL, `trace_log`
+  stays as an empty table (observed 2026-11-17).
+- A dashboard query needing more than 1.5 GB fails instead of slowing the server down.
 
 ## Collector pipeline
 

@@ -26,6 +26,12 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
 - **M?** Unverified on a physical Linux host: the Docker install path (`install-docker.sh` on
   Ubuntu/Debian and derivatives) and the ufw / firewalld rule paths.
 
+- **M?** `reload_changed_config` restarts only `otel-collector` and `grafana`: a pulled change to
+  `clickhouse/config.d/low-resource.xml` or `clickhouse/users.d/low-resource.xml` leaves
+  `clickhouse` running on the old values (its service definition is unchanged, so `compose up -d`
+  does not recreate it). Both are single-file bind mounts: git replaces the file, the running
+  container likely keeps the old inode until a restart (unverified).
+
 ## setup-client.ps1
 
 - **L** `-PcName` defaults to `$env:COMPUTERNAME` (upper case); a PC configured by hand with a
@@ -45,6 +51,21 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
   A plain `setup-server.sh --update` (`compose up -d`) recreates only changed containers, so the
   collector restarts only when its service definition (image tag, environment, ports) changes,
   or when the pulled commits changed `otel-collector.yaml` (`reload_changed_config`).
+
+## ClickHouse config (`clickhouse/config.d/`, `clickhouse/users.d/`)
+
+- **M?** `background_pool_size` sits in the `default` profile (`users.d`). 22.3 still reads it there
+  (shows as changed in `system.settings`, observed 2026-11-17; the actual pool size was not
+  measured); in 25.8 it is a server-level setting, so in a profile it is likely ignored and the
+  2-thread merge limit does not apply on 25.8 servers. Unverified on 25.8.
+- **L** On 22.3 adding the `query_log` TTL renamed the old table to `system.query_log_0` (~78k rows
+  2026-11-14..16, observed 2026-11-17); it has no TTL and stays until dropped (`DROP`: user's "yes").
+
+## AI setup (`claude-context/settings.json`)
+
+- **?** The guard-secrets hook command is `if command -v py ...; then py -3 ...; else python3 ...; fi`:
+  POSIX shell syntax, run on Linux only so far. On Windows it works only if Claude Code runs hook
+  commands under Git Bash (not cmd/PowerShell); untested there — a broken hook means no secrets guard.
 
 ## views (`clickhouse/views.sql`)
 
