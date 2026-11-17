@@ -29,7 +29,8 @@ claude-context/                 .claude  ── directory junction ──> claud
   Code writes into `.claude/` (e.g. `settings.local.json`) physically land in `claude-context/`
   and are kept out of git by `claude-context/.gitignore`. `.claude` itself is in the root
   `.gitignore` (git would otherwise see the junction).
-- A fresh clone has no `.claude`: re-create the junction with the command above.
+- A fresh clone has no `.claude`: re-create the junction with the command above. On Linux use a
+  directory symlink instead: `ln -s claude-context .claude`.
 - **Never create `claude-context/rules/`**: through the junction it becomes `.claude/rules/`,
   which Claude Code loads into every session. On-demand rules go to `guides/`.
 - A new agent or skill needs no link step: add `claude-context/agents/<name>.md` or
@@ -52,5 +53,6 @@ claude-context/                 .claude  ── directory junction ──> claud
 `Read(...)` deny rules for `**/.env` and `**/backup/**`, `Edit` deny for `.env` and settings
 files, and the PreToolUse hook `hooks/guard-secrets.py` (Bash, PowerShell, Read, Grep, Glob):
 blocks a command or path naming `.env` (not `.env.example`) or the `backup/` folder; a lone
-`ls`, `Test-Path` or `git check-ignore` passes. Runs with `py -3` (the Python launcher; `python`
-on this PC is the Store stub).
+`ls`, `Test-Path` or `git check-ignore` passes. Runs with `py -3` when the Python launcher
+exists (Windows, where `python` is the Store stub), otherwise with `python3` (Linux, e.g. the
+Raspberry Pi). The choice is an `if`, not `||`: with `||`, a block (exit 2) would re-run the hook.
