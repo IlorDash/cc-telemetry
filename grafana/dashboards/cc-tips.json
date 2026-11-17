@@ -286,7 +286,7 @@
       "id": 202,
       "type": "table",
       "title": "Usage tips (click a title to open the related dashboard)",
-      "description": "Source: view cc.tips. It always covers the last 7 days and does NOT use the dashboard time range or the project / session / actor / skill variables. The title link opens the related dashboard (project or session already set) with the current time range. metric is the number behind the tip; its unit is in the unit column.",
+      "description": "Source: view cc.tips. It always covers the last 7 days and does NOT use the dashboard time range or the project / session / actor / skill variables. The title link opens one evidence panel full-screen (viewPanel) on the related dashboard, with the project / session / actor preset and the current time range. metric is the number behind the tip; its unit is in the unit column.",
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "clickhouse"
@@ -423,6 +423,36 @@
           }
         ]
       }
+    },
+    {
+      "id": 203,
+      "type": "row",
+      "title": "How tips are made",
+      "collapsed": true,
+      "gridPos": {
+        "x": 0,
+        "y": 19,
+        "w": 24,
+        "h": 1
+      },
+      "panels": [
+        {
+          "id": 204,
+          "type": "text",
+          "title": "How tips are made",
+          "description": "",
+          "gridPos": {
+            "x": 0,
+            "y": 20,
+            "w": 24,
+            "h": 14
+          },
+          "options": {
+            "mode": "markdown",
+            "content": "**What a tip is.** A heuristic hint computed by the view `cc.tips` over the last 7 days. The window is fixed: the dashboard time range and the variables do not apply. A tip says a value crossed a threshold: it is worth a look and may be perfectly fine. The thresholds are first guesses.\n\n| Category | Fires when (last 7 days) | What to look at / do | Link opens |\n| --- | --- | --- | --- |\n| cache | per project: at least 20 requests and cache hit rate below 40 % | keep the prompt prefix (CLAUDE.md, tools) stable; fewer /clear and model switches | Overview: Cache hit rate by project |\n| repeated-read | per project and file: read more than 10 times | keep key facts in CLAUDE.md or a note instead of rereading | Tools & files: Files re-read within one session |\n| big-results | per project: at least 5 tool results over 200 KB | narrow the search or limit the read range | Tools & files: Largest tool results |\n| short-opus | per project: at least 20 Opus requests under 500 output tokens, and they are at least half of all Opus requests | a smaller model may handle such turns; the cost shown is the upper bound of the saving | Prompts: Most expensive prompts |\n| agent-outlier | per subagent type: at least 3 runs, the biggest run over 6 times the mean and over 50k tokens | check what that run did | Sessions: Session timeline (session and actor preset) |\n| denials | per project and tool: at least 5 rejected permission decisions | if the rule is intended, ignore; otherwise review the permission rules | Tools & files: Rejected tool calls |\n| slow-hook | per hook: at least 10 runs and mean over 500 ms | hooks run synchronously and delay every matching tool call | Health: Hook time |\n| slow-ttft | per project and model: at least 10 requests and mean time to first token over 3 s | long contexts or a busy provider | Health: Time to first token by day |\n\nThere is no rule for repeated Bash commands: the telemetry carries only the first word of a command.\n\nThere is no dismiss button: a tip disappears when the 7-day window no longer meets its rule.\n\nThe rules live in `clickhouse/views.sql` (view `cc.tips`). After editing them, recreate the views: `docker compose run --rm views-init`."
+          }
+        }
+      ]
     }
   ]
 }
