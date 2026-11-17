@@ -37,10 +37,20 @@ server or connecting a PC. Never copy its content into tracked files.
 ---
 
 ## The user's tools
-Windows 10, VS Code (editing, diffs, **all git** — Source Control view or a command to paste
-into the VS Code terminal), PowerShell in the terminal. Your Bash tool is Git Bash; a PowerShell
-tool is available too. Docker runs inside WSL here (`wsl -d Ubuntu -- docker compose ...` from
-the repo root).
+VS Code everywhere (editing, diffs, **all git** — Source Control view or a command to paste into
+the VS Code terminal). The session runs on one of two kinds of machine; check which (`uname -s`,
+or the platform in your environment) before running stack commands:
+
+| | Windows PC | Linux PC (server or client) |
+| --- | --- | --- |
+| Terminal | PowerShell; your Bash tool is Git Bash, a PowerShell tool exists | bash; no PowerShell |
+| Docker | inside WSL: `wsl -d Ubuntu -- docker compose ...` | native: `docker compose ...` |
+| Python | `py -3` (`python` is the Store stub) | `python3` |
+| `.claude` | directory junction | directory symlink |
+
+The guides write stack commands in the Windows form. On Linux drop the `wsl -d Ubuntu --` prefix,
+pipe with `cat <file> |` instead of `Get-Content <file> |`, and skip PowerShell-only steps
+(`*.ps1` runs, UAC) — report them as not verified on this machine.
 
 ## Git
 - Read-only git only: `status`, `log`, `diff`, `show`, `blame`, `ls-files`, `grep`, `rev-parse`,
@@ -60,7 +70,8 @@ the repo root).
 ## Safety
 Never without the user's explicit "yes": anything that deletes data (`docker compose down -v`,
 `docker volume rm`, `wsl --unregister`, `DELETE`/`DROP` in ClickHouse — dump first with
-`linux-server-tools/backup.sh dump`); Windows system settings (network profile, firewall, services); commands
+`linux-server-tools/backup.sh dump`); system settings (Windows network profile, firewall,
+services; Linux firewall, systemd units, `/etc`); commands
 needing admin rights (hand them to the user). Never help bypass corporate controls (VPN,
 firewalls, IT policy); warn before corporate data would go to a personal server. Client setup is
 always per-user, never system-wide.

@@ -57,9 +57,18 @@ re-run and must keep existing data, `.env` and foreign settings keys).
   list too; restart the collector and check its log for `Everything is ready`.
 - Image tags pinned to exact versions.
 
-## Tooling traps (this PC)
+## Tooling traps
+Windows PC:
 - Git Bash rewrites `/mnt/c/...` arguments of `wsl` — run WSL-path commands from PowerShell.
 - Quoting PowerShell → `wsl` → bash breaks: put SQL in a scratchpad file and pipe it to
   `linux-server-tools/ch.sh`; put bash logic in a `.sh` file.
-- The Grep tool fails (no `rg`); use `grep` in Bash. No Python except `py -3`; Node is available.
+- The Grep tool fails (no `rg`); use `grep` in Bash. Python only as `py -3`; Node is available.
+
+Linux PC:
+- Python is `python3` (no `py`). Node may be missing (`command -v node`): without it
+  `check-dashboard.js` cannot run — see `verification.md`.
+- No PowerShell: `*.ps1` cannot be parsed or run here.
+- Docker may need `sudo` if the user is not in the `docker` group — hand such commands to the user.
+
+Both:
 - Grafana's API escapes `>` as `>` — parse the JSON before searching it.

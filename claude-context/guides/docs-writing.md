@@ -9,8 +9,8 @@ ASCII flow diagrams, short "do not do this" callouts; no narrative prose, no mar
 Claude Code actually sends, which service owns what, what is exposed, what happens on failure,
 what was verified and on which version — not what a name already says. Repo-root-relative paths
 in backticks. **Bugs and unverified behaviour only in `pending-bugs.md`**; a module may at most say
-"see pending-bugs.md". **Observed facts** (what a Claude Code version sent, how Windows/WSL
-behaved) are authoritative: write them with their source (`observed on Claude Code 2.1.323,
+"see pending-bugs.md". **Observed facts** (what a Claude Code version sent, how Windows/WSL or a
+Linux host behaved) are authoritative: write them with their source (`observed on Claude Code 2.1.323,
 <date>`), never invent them. English. **No personal data** in tracked files — PC names, IPs, user
 names, networks, the user's other projects go to `server-state.local.md` (git-ignored).
 
@@ -19,7 +19,8 @@ user's PCs (Windows edition they run, their virtualisation setup, their IPs or p
 Describe behaviour, not features. Every failure gets an outcome: what the reader does next.
 Second person, present tense, active voice; one fact per sentence; paragraphs of 1–4 sentences.
 No marketing words (simply, just, easily, powerful, seamless), no hedging, no meta text.
-Identifiers, paths, commands in backticks. Commands are copy-pasteable PowerShell from the repo
-root. Keep in step with the code: the scripts' steps and options, the troubleshooting table,
+Identifiers, paths, commands in backticks. Commands are copy-pasteable from the repo root:
+PowerShell in Windows sections, bash in Linux sections; where both apply, give both or say how
+they differ (e.g. the `wsl -d Ubuntu --` prefix). Keep in step with the code: the scripts' steps and options, the troubleshooting table,
 "What is sent" (any change to collected or dropped attributes), "Verified on first deployment"
 (generic facts only). Markdown tables use `| --- |` separators (the user's markdownlint).
