@@ -2,3 +2,5 @@
 backup/
 # junction to claude-context (see claude-context/guides/context-repo.md)
 /.claude
+# Playwright MCP screenshots and prototypes
+.playwright-mcp/
