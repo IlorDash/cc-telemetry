@@ -511,7 +511,7 @@ if [ "$lan_on" -eq 1 ]; then
   is_local_bind "$grafana_bind" || echo "     Grafana $grafana_port on $grafana_bind"
   echo '     Plain HTTP, OTLP without authentication. To keep them on this PC only: re-run with --local-only.'
 fi
-compose up -d || fail 'docker compose up failed, see the output above.'
+compose up -d || { compose logs --tail 50 views-init || true; fail 'docker compose up failed (cc-refresh waits for views-init: its log is above), see the output above.'; }
 state=''
 for _ in $(seq 1 90); do
   state="$(compose ps -a views-init --format '{{.State}} {{.ExitCode}}' | head -n 1)" || state=''

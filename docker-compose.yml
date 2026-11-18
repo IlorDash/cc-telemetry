@@ -44,7 +44,8 @@ services:
       clickhouse:
         condition: service_healthy
 
-  # One-shot: waits until the collector has created otel.otel_logs, then (re)creates the cc.* views.
+  # One-shot: waits until the collector has created otel.otel_logs, then creates the cc.* tables, the
+  # materialized view and the views and backfills cc.events_t (schema.sql, backfill.sql, views.sql).
   # Re-run after editing clickhouse/views.sql:  docker compose run --rm views-init
   views-init:
     image: clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-25.8}
@@ -59,6 +60,23 @@ services:
         condition: service_healthy
       otel-collector:
         condition: service_started
+
+  # Rebuilds the derived tables cc.session_project_t and cc.tips_t (clickhouse/refresh.sql) every 5 minutes.
+  # The only runner of refresh.sql; starts its first refresh as soon as views-init has finished.
+  # A failed run is logged and repeated. Logs: docker compose logs cc-refresh
+  cc-refresh:
+    image: clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-25.8}
+    restart: unless-stopped
+    entrypoint: ["bash", "/init/refresh-loop.sh"]
+    environment:
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
+    volumes:
+      - ./clickhouse:/init:ro
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      views-init:
+        condition: service_completed_successfully
 
   grafana:
     image: grafana/grafana:12.1.0

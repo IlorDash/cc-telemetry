@@ -156,7 +156,7 @@ The first time, run `git pull` yourself: older versions of the script have no `-
 3. runs `git pull --ff-only`. It never merges or rebases. If the branch has no upstream, it prints a warning and continues with
    the files as they are;
 4. runs `setup-server.sh` again from the updated file with your other options. This starts changed containers, recreates the
-   `cc.*` views and repeats the checks. Containers whose image and configuration did not change keep running, except that a
+   `cc.*` views (and copies events missing from `cc.events_t`) and repeats the checks. Containers whose image and configuration did not change keep running, except that a
    changed collector config (`otel-collector.yaml`) or Grafana provisioning (`grafana/provisioning/`) is reloaded by restarting
    that service (dashboard files are re-read by Grafana by itself). The data volumes are never removed;
 5. compares the row counts. Every table must have at least as many rows as before; the script prints `OK`, or a `FAIL` banner
@@ -375,7 +375,8 @@ On a Windows server with Docker in WSL, prefix the commands with `wsl -d Ubuntu 
 
 ```bash
 docker compose ps                         # all Up (views-init: Exited (0))
-docker compose run --rm views-init        # recreate the views after editing clickhouse/views.sql
+docker compose run --rm views-init        # apply clickhouse/schema.sql, backfill.sql and views.sql again (safe to repeat)
+docker compose logs --tail 20 cc-refresh  # the 5-minute refresh of the derived tables: "refresh ok"
 docker compose down                       # stop (data stays in the volume)
 ```
 
@@ -403,8 +404,22 @@ folder is relative to the `cc-telemetry` folder, not to the current directory. W
 
 With Docker in WSL the data lives inside the distro: `wsl --unregister` deletes it. Dump first.
 
-Data is kept indefinitely in the `clickhouse-data` volume. The `cc.*` views are plain (not materialized),
-so editing `views.sql` recomputes the whole history.
+Data is kept indefinitely in the `clickhouse-data` volume. The collector writes raw events to `otel.otel_logs`. A
+materialized view (`cc.events_mv`) flattens every new Claude Code event into the table `cc.events_t` as it arrives, and the
+`cc.*` views that the dashboards read are plain views over that table, so dashboards read a few columns instead of
+parsing the raw events. Two small tables, the inferred project of each session (`cc.session_project_t`) and the usage tips
+(`cc.tips_t`), are rebuilt every 5 minutes by the `cc-refresh` service from `clickhouse/refresh.sql`: the project of a new
+session can show `unknown` for up to 5 minutes, and the tips are as old as the last refresh.
+
+Editing a plain view in `views.sql` and running `docker compose run --rm views-init` changes it for the whole history.
+`views-init` is safe to repeat: it creates missing tables (`schema.sql`), copies events that `cc.events_t` does not have yet
+from `otel.otel_logs`, one month at a time (`backfill.sql`), and recreates the views (`views.sql`). It does not run
+`refresh.sql`: only `cc-refresh` does, right after `views-init` finishes, so never run that file by hand while `cc-refresh`
+is up. After a first install or an upgrade over existing data the first pass can take a while; when events from the last
+seconds are still missing it waits 35 s for a second pass. A materialized view cannot be replaced: if you change the
+expressions of `cc.events_mv` or the columns of `cc.events_t`, `CREATE ... IF NOT EXISTS` skips the change and the stored
+rows keep the old values, so the change needs a migration (dump first, then rebuild `cc.events_t` from `otel.otel_logs`).
+`cc.events_t` holds nothing that is not in `otel.otel_logs`, so `backup.sh` dumps only the `otel.*` tables.
 
 ClickHouse runs with limits sized for a small server such as a Raspberry Pi 4, on every machine: 2 CPU cores, 3 GB of
 memory for the server and 1.5 GB per query, 3 threads per query, and no system logs except `query_log`, which is kept for
@@ -418,6 +433,7 @@ restart ClickHouse for them.
 | --- | --- |
 | Dashboard is empty | `docker compose logs otel-collector` (ClickHouse errors?), the client's connection test (`Test-NetConnection <SERVER_IP> -Port 4317` on Windows, the last line of `setup-client.sh` on Linux), `CLAUDE_CODE_ENABLE_TELEMETRY` in `settings.json`, sessions restarted after the setup |
 | "Unknown table cc.events" | `docker compose logs views-init`, then `docker compose run --rm views-init` |
+| `project = unknown` for a session that should have a project, or the tips look stale | `docker compose logs cc-refresh`: each 5 minutes it prints `refresh ok` or `refresh FAILED` with the ClickHouse error; `docker compose up -d cc-refresh` starts it if it is not running |
 | Variable dropdowns are empty | Dashboard settings → Variables → open the variable → Run query → Save |
 | ClickHouse plugin does not load | no internet on first start; `docker compose restart grafana` |
 | `project = unknown` | the session touched no file with an absolute path and has no explicit label (`settings.local.json` with `OTEL_RESOURCE_ATTRIBUTES`, folder must be trusted); `OTEL_LOG_TOOL_DETAILS` must be `1` for paths to be sent |

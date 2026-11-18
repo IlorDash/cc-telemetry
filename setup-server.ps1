@@ -178,7 +178,12 @@ else {
 
 # ---------------------------------------------------------------- 3. stack
 Step 'Stack'
-Compose up -d
+# Not through Compose: it fails at once, and a failed views-init (cc-refresh waits for it) must show its log first.
+if ($script:Mode -eq 'wsl') { & wsl.exe -d $Distro --cd $root -- docker compose up -d } else { & docker compose up -d }
+if ($LASTEXITCODE -ne 0) {
+  Compose logs --tail 50 views-init
+  Fail 'docker compose up failed (cc-refresh waits for views-init: its log is above), see the output above.'
+}
 $state = $null
 for ($i = 0; $i -lt 90; $i++) {
   $state = (Compose ps -a views-init --format '{{.State}} {{.ExitCode}}' | Out-String).Trim()
