@@ -351,7 +351,7 @@ panels have a fixed height, so the space under them stays empty; they ignore the
 
 | Dashboard | Shows |
 | --- | --- |
-| **Overview** (home) | cost, tokens, sessions and turns; daily work and cache reads; cache hit rate; tokens by project and by actor; model share; top tools; recent and active sessions; coding rhythm by weekday and hour; the last 30 days against your plan; two tips tiles |
+| **Overview** (home) | four totals for the time range (`cost_usd`, cache hit rate, billable tokens, tool error rate with the p95 API latency); daily tokens with the cache hit rate; projects (`cost_usd`, tokens, hit rate, sessions); `cost_usd` by model; work rhythm by weekday and 3-hour block; top tools; the six most recent sessions |
 | **Sessions** | sessions (title, else the first prompt; git branch), the prompts of the selected session, its timeline, cumulative cost and tokens |
 | **Efficiency** | all tips (see "Tips"): token tips with the tokens they affect, then time and friction tips (fixed 7 days); below, where tokens and money are lost: `cost_usd` per day by work phase of a response (Explore, Edit, Run, Delegate, Talk, Other), pauses between requests against the 5-minute cache lifetime, cache hit rate and cache-creation tokens by project |
 | **Agents & skills** | runs, tokens and tool calls per agent and per skill; main session against subagents by tool; subagent runs far above their average |
@@ -363,7 +363,7 @@ panels have a fixed height, so the space under them stays empty; they ignore the
 **Account** is multi-select and shows the e-mail of the Claude account, or the first 8 characters of its id when there is no
 e-mail; events without an account show only under `All`. The Tips section of Efficiency ignores the variables. The Session
 dropdown shows `title (short id)`, or the full id while the session has no title; it lists the newest 300 sessions that made
-a model request. Overview adds **Plan, USD/month** (0, 20, 100 or 200) and Prompts adds **Prompt**.
+a model request. Prompts adds **Prompt**.
 **Actor**: `main` is the main session, an agent name (`developer`, `Explore`, …) is a subagent, `aux:*` are Claude Code's
 own service requests.
 **Skill**: a tool call is attributed to a skill through the `request_id` of the model request that carried `skill.name`.
@@ -371,19 +371,23 @@ Claude Code does this attribution itself; the label lasts until the end of the p
 
 **Time range.** The quick ranges are 5 minutes, 1 hour, 24 hours, 7 days (the default; 30 days on Overview), 30 days and `All` (10 years).
 The refresh rate is picked at the top right (10 s by default, from 5 s), as in any Grafana dashboard.
-Some panels ignore the time range and say so in their description: the rail panels, Active sessions (last 15 minutes), the
-30-day plan tile and the tips (last 7 days).
+Some panels ignore the time range and say so in their description: the rail panels and the tips (last 7 days).
 
-**Clicks.** In the tables a click on a `session_id` opens that session on **Sessions**; a project in Tokens by project opens
+**Clicks.** A session name in Recent sessions and a `session_id` in the other tables open that session on **Sessions**; the
+**all →** link next to the Recent sessions title opens **Sessions**; a project in Projects opens
 **Overview** for it; an agent or a skill opens **Agents & skills** filtered by it; a `prompt_id` in Most expensive prompts opens
 the prompt on **Prompts**.
 
 **Sessions.** Cumulative cost, cumulative tokens, the prompts and the timeline show data only for one session: pick it in the
 Session variable (the cumulative graphs say "Select a session").
 
-**Plan tile.** "Last 30 days: API equivalent vs plan" sums `cost_usd` of the last 30 days and divides it by the **Plan,
-USD/month** you chose; with Plan = 0 the ratio is 0. `cost_usd` is computed by Claude Code from API prices, so the sum is
-not a bill: on a subscription you pay the flat fee. A ratio above 1 means the plan costs less than the same use at API prices.
+**Overview.** All panels follow the time range (30 days by default) and the variables, except that **Recent sessions**
+ignores Actor and Skill and shows whole-session tokens and cost. `cost_usd` is computed by Claude Code
+from API prices, so the sum is not a bill: on a subscription you pay the flat fee. Billable tokens are input + output + cache
+create; cache reads are left out. Cache hit rate is cache read / (cache read + input + cache create): 90 % and above is green,
+75 % and above yellow, below red. In **Work rhythm** a cell is brighter the closer it is to the busiest weekday and 3-hour block
+(columns 00, 03, ... 21; server time zone, UTC in Docker); it is a table with coloured cells, because the Grafana heatmap
+cannot put the time of day on its X axis and a table column cannot be narrower than 50 px.
 
 **Efficiency.** The Tips section at the top (counts, affected tokens, the token tips table and the time tips table) reads
 the tips (last 7 days, no time range, no variables); the cost and cache sections below follow the time range and the variables. The work phase of a response comes from the tools it called: Edit (any
@@ -392,9 +396,6 @@ Edit / Write / MultiEdit / NotebookEdit), Delegate (Task / Agent), Run (Bash), E
 order. Pauses over 5 minutes are red: past the prompt-cache lifetime the next request writes the cache again. Gaps are
 between consecutive requests of a session, subagents included (filter Actor = main for the main conversation only); the
 first request in the time range has no predecessor and is not counted.
-
-**Explanations.** The text panel **What do these numbers mean?** at the bottom of Overview explains tokens, cache, `cost_usd`,
-actors and LIVE / IDLE.
 
 **Editing the rail.** Grafana loads every `.json` in `grafana/dashboards/` as a dashboard, so the rail is defined once in
 `grafana/rail/rail.json` and copied into every dashboard file by `node grafana/rail/sync-rail.js` (no dependencies; run it
@@ -405,7 +406,7 @@ from the repository root after editing `rail.json` or after adding a dashboard t
 
 A tip is a heuristic hint, not an error: something exceeded a threshold over the last 7 days. It is worth a look and may be
 fine for your work. The window is fixed to the last 7 days; the Tips section of Efficiency (the top of that dashboard) ignores the time range and the variables, as
-do the two tips tiles on Overview and in the rail. Click a tip's title to open one evidence panel full-screen, with the project (or session) preset.
+do the two tips tiles in the rail. Click a tip's title to open one evidence panel full-screen, with the project (or session) preset.
 
 | Category | Fires when (grouped by) | What to do | Link opens |
 | --- | --- | --- | --- |
