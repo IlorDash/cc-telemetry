@@ -1455,7 +1455,7 @@
       "id": 37,
       "type": "table",
       "title": "Recent sessions",
-      "description": "The six sessions with the latest prompt in the time range (account, project and session variables apply; sessions with a model request only). Name = title, else the first prompt. Model = the model with the highest cost in the session. Tokens = input + output + cache create over the whole session; cost_usd = the whole session. Click a name to open the session on Sessions; the link next to the title opens Sessions.",
+      "description": "The six sessions with the latest prompt in the time range (account, project and session variables apply; sessions with a model request only). Name = title, else the first prompt. Model = the model with the highest cost in the session. Tokens = input + output + cache create over the whole session; cost_usd = the whole session. Click a name to open the session on Sessions (the time range zooms to the session; Back or the time picker returns); the link next to the title opens Sessions.",
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "clickhouse"
@@ -1482,7 +1482,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT s.session_id AS session_id,\n       if(s.title != '', s.title, leftUTF8(replaceAll(s.first_prompt, '\\n', ' '), 100)) AS name,\n       s.last_prompt AS last_prompt, s.project AS project, s.git_branch AS branch,\n       multiIf(positionCaseInsensitive(s.model, 'opus') > 0, 'Opus', positionCaseInsensitive(s.model, 'sonnet') > 0, 'Sonnet', positionCaseInsensitive(s.model, 'haiku') > 0, 'Haiku', s.model) AS model,\n       r.tokens AS tokens, round(s.cost_usd, 3) AS cost_usd\nFROM\n(\n  SELECT * FROM cc.sessions\n  WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}')\n    AND requests > 0 AND last_prompt >= $__fromTime AND last_prompt <= $__toTime\n  ORDER BY last_prompt DESC LIMIT 6\n) AS s\nLEFT JOIN\n(\n  SELECT session_id, sum(input_tokens + output_tokens + cache_creation_tokens) AS tokens\n  FROM cc.api_requests\n  WHERE session_id IN (\n    SELECT session_id FROM cc.sessions\n    WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}')\n      AND requests > 0 AND last_prompt >= $__fromTime AND last_prompt <= $__toTime\n    ORDER BY last_prompt DESC LIMIT 6)\n  GROUP BY session_id\n) AS r ON r.session_id = s.session_id\nORDER BY s.last_prompt DESC"
+          "rawSql": "SELECT s.session_id AS session_id, if(w.t1 = 0, toUnixTimestamp64Milli(s.started), w.t0) - greatest(intDiv(3 * (if(w.t1 = 0, toUnixTimestamp64Milli(s.last_event), w.t1) - if(w.t1 = 0, toUnixTimestamp64Milli(s.started), w.t0)), 100), 5000) AS from_ms, if(w.t1 = 0, toUnixTimestamp64Milli(s.last_event), w.t1) + greatest(intDiv(3 * (if(w.t1 = 0, toUnixTimestamp64Milli(s.last_event), w.t1) - if(w.t1 = 0, toUnixTimestamp64Milli(s.started), w.t0)), 100), 5000) AS to_ms,\n       if(s.title != '', s.title, leftUTF8(replaceAll(s.first_prompt, '\\n', ' '), 100)) AS name,\n       s.last_prompt AS last_prompt, s.project AS project, s.git_branch AS branch,\n       multiIf(positionCaseInsensitive(s.model, 'opus') > 0, 'Opus', positionCaseInsensitive(s.model, 'sonnet') > 0, 'Sonnet', positionCaseInsensitive(s.model, 'haiku') > 0, 'Haiku', s.model) AS model,\n       r.tokens AS tokens, round(s.cost_usd, 3) AS cost_usd\nFROM\n(\n  SELECT * FROM cc.sessions\n  WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}')\n    AND requests > 0 AND last_prompt >= $__fromTime AND last_prompt <= $__toTime\n  ORDER BY last_prompt DESC LIMIT 6\n) AS s\nLEFT JOIN\n(\n  SELECT session_id, sum(input_tokens + output_tokens + cache_creation_tokens) AS tokens\n  FROM cc.api_requests\n  WHERE session_id IN (\n    SELECT session_id FROM cc.sessions\n    WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}')\n      AND requests > 0 AND last_prompt >= $__fromTime AND last_prompt <= $__toTime\n    ORDER BY last_prompt DESC LIMIT 6)\n  GROUP BY session_id\n) AS r ON r.session_id = s.session_id\nLEFT JOIN\n(\n  SELECT session_id, min(a_s) AS t0, max(a_e) AS t1\n  FROM\n  (\n    SELECT session_id, toUnixTimestamp64Milli(ts) - if(event = 'user_prompt', toInt64(0), toInt64(duration_ms)) AS a_s, toUnixTimestamp64Milli(ts) AS a_e\n    FROM cc.events_raw\n    WHERE event IN ('user_prompt', 'api_request', 'tool_result')\n      AND session_id IN (SELECT session_id FROM cc.events_raw WHERE event = 'user_prompt' AND ts >= $__fromTime AND ts <= $__toTime)\n  )\n  GROUP BY session_id\n) AS w ON w.session_id = s.session_id\nORDER BY s.last_prompt DESC"
         }
       ],
       "options": {
@@ -1513,6 +1513,30 @@
           {
             "matcher": {
               "id": "byName",
+              "options": "from_ms"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "to_ms"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
               "options": "name"
             },
             "properties": [
@@ -1525,7 +1549,7 @@
                 "value": [
                   {
                     "title": "Open session",
-                    "url": "/d/cc-sessions?${account:queryparam}&var-project=${__data.fields.project:percentencode}&var-session=${__data.fields.session_id:percentencode}&var-actor=$__all&var-skill=$__all&${__url_time_range}"
+                    "url": "/d/cc-sessions?from=${__data.fields.from_ms:raw}&to=${__data.fields.to_ms:raw}&${account:queryparam}&var-project=${__data.fields.project:percentencode}&var-session=${__data.fields.session_id:percentencode}&var-actor=$__all&var-skill=$__all"
                   }
                 ]
               }

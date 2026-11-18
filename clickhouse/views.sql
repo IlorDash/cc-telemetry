@@ -419,13 +419,17 @@ SELECT
     agent_type,
     toFloat64(biggest),
     concat('/d/cc-sessions?viewPanel=panel-100&var-session=', encodeURLComponent(session),
-           '&var-actor=', encodeURLComponent(agent_type)),
+           '&var-actor=', encodeURLComponent(agent_type),
+           -- zoom to the session: its activity span, padded by 3 % (at least 5 s), as the Sessions table does
+           if(t1 = 0, '', concat('&from=', toString(t0 - greatest(intDiv(3 * (t1 - t0), 100), 5000)),
+                                 '&to=', toString(t1 + greatest(intDiv(3 * (t1 - t0), 100), 5000))))),
     toNullable(biggest),
     if(matched_agent = '', CAST(NULL AS Nullable(Float64)), toNullable(run_cost))
 FROM
 (
     SELECT o.agent_type AS agent_type, o.n AS n, o.mean AS mean, o.biggest AS biggest,
-           o.session AS session, o.project AS project, c.agent_id AS matched_agent, c.run_cost AS run_cost
+           o.session AS session, o.project AS project, c.agent_id AS matched_agent, c.run_cost AS run_cost,
+           w.t0 AS t0, w.t1 AS t1
     FROM
     (
         SELECT agent_type, count() AS n, avg(agent_total_tokens) AS mean, max(agent_total_tokens) AS biggest,
@@ -444,6 +448,20 @@ FROM
         WHERE agent_id != ''
         GROUP BY agent_id
     ) AS c ON c.agent_id = o.run_agent
+    LEFT JOIN
+    (
+        -- activity span of the session in ms (0 when none): first start to last end of its prompts, requests and tool calls
+        SELECT session_id, min(a_s) AS t0, max(a_e) AS t1
+        FROM
+        (
+            SELECT session_id, toUnixTimestamp64Milli(ts) - if(event = 'user_prompt', toInt64(0), toInt64(duration_ms)) AS a_s,
+                   toUnixTimestamp64Milli(ts) AS a_e
+            FROM cc.events_raw
+            WHERE event IN ('user_prompt', 'api_request', 'tool_result')
+              AND session_id IN (SELECT session_id FROM cc.events_raw WHERE event = 'subagent_completed' AND ts >= now() - INTERVAL 7 DAY)
+        )
+        GROUP BY session_id
+    ) AS w ON w.session_id = o.session
 )
 UNION ALL
 -- Frequent permission denials for one tool: an allow-list or deny-list candidate.
