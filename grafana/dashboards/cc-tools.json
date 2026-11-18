@@ -190,12 +190,12 @@
         "x": 0,
         "y": 0,
         "w": 3,
-        "h": 11
+        "h": 12
       },
       "transparent": false,
       "options": {
         "mode": "html",
-        "content": "<a href=\"/d/cc-usage?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Overview</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">totals and status</span></a><a href=\"/d/cc-sessions?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Sessions</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">list · timeline</span></a><a href=\"/d/cc-prompts?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Prompts</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">costliest turns</span></a><a href=\"/d/cc-agents?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Agents &amp; skills</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">subagents, skills</span></a><a href=\"/d/cc-tools?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid #F46800;background:#22252b\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Tools &amp; files</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">calls, files, reads</span></a><a href=\"/d/cc-health?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Health</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">latency, hooks</span></a><a href=\"/d/cc-tips?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Tips</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">all rules, 7d</span></a>"
+        "content": "<a href=\"/d/cc-usage?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Overview</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">totals and status</span></a><a href=\"/d/cc-sessions?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Sessions</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">list · timeline</span></a><a href=\"/d/cc-prompts?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Prompts</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">costliest turns</span></a><a href=\"/d/cc-efficiency?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Efficiency</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">tips and cost breakdown</span></a><a href=\"/d/cc-agents?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Agents &amp; skills</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">subagents, skills</span></a><a href=\"/d/cc-tools?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid #F46800;background:#22252b\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Tools &amp; files</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">calls, files, reads</span></a><a href=\"/d/cc-health?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Health</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">latency, hooks</span></a>"
       }
     },
     {
@@ -209,7 +209,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 11,
+        "y": 12,
         "w": 3,
         "h": 4
       },
@@ -281,14 +281,14 @@
       "id": 353,
       "type": "stat",
       "title": "Tips · 7 d",
-      "description": "Number of tips (view cc.tips, last 7 days). Click the value to open the Tips dashboard. Ignores the dashboard time range and the variables.",
+      "description": "Number of tips (view cc.tips, last 7 days). Click the value to open the Tips section of the Efficiency dashboard. Ignores the dashboard time range and the variables.",
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "clickhouse"
       },
       "gridPos": {
         "x": 0,
-        "y": 15,
+        "y": 16,
         "w": 3,
         "h": 3
       },
@@ -369,7 +369,7 @@
                 "value": [
                   {
                     "title": "Open all tips",
-                    "url": "/d/cc-tips?${__url_time_range}",
+                    "url": "/d/cc-efficiency?${__url_time_range}",
                     "oneClick": true
                   }
                 ]
@@ -383,14 +383,14 @@
       "id": 352,
       "type": "stat",
       "title": "",
-      "description": "The most frequent tip category (view cc.tips, last 7 days) with its count in brackets (ties: alphabetical order). Click the value to open the Tips dashboard. Ignores the dashboard time range and the variables.",
+      "description": "The most frequent tip category (view cc.tips, last 7 days) with its count in brackets (ties: alphabetical order). Click the value to open the Tips section of the Efficiency dashboard. Ignores the dashboard time range and the variables.",
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "clickhouse"
       },
       "gridPos": {
         "x": 0,
-        "y": 18,
+        "y": 19,
         "w": 3,
         "h": 3
       },
@@ -452,7 +452,7 @@
                 "value": [
                   {
                     "title": "Open all tips",
-                    "url": "/d/cc-tips?${__url_time_range}",
+                    "url": "/d/cc-efficiency?${__url_time_range}",
                     "oneClick": true
                   }
                 ]

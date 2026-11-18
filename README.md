@@ -346,22 +346,22 @@ Optional, only to label a project explicitly (otherwise it is inferred from file
 Grafana shows seven dashboards. A side rail (the left 3 of 24 columns) on every dashboard switches between them (the current one is
 highlighted); the links keep the time range and the variables. Under the navigation the rail shows **Usage · last 5 h**
 (one bar per Claude account: the cost of the last 5 hours as a share of that account's highest 5-hour cost in the last
-30 days) and **Tips · 7 d** (the number of tips and the most frequent category; a click opens the Tips dashboard). The rail
+30 days) and **Tips · 7 d** (the number of tips and the most frequent category; a click opens the Tips section of Efficiency). The rail
 panels have a fixed height, so the space under them stays empty; they ignore the time range and the variables.
 
 | Dashboard | Shows |
 | --- | --- |
 | **Overview** (home) | cost, tokens, sessions and turns; daily work and cache reads; cache hit rate; tokens by project and by actor; model share; top tools; recent and active sessions; coding rhythm by weekday and hour; the last 30 days against your plan; two tips tiles |
 | **Sessions** | sessions (title, else the first prompt; git branch), the prompts of the selected session, its timeline, cumulative cost and tokens |
+| **Efficiency** | all tips (see "Tips"): token tips with the tokens they affect, then time and friction tips (fixed 7 days); below, where tokens and money are lost: `cost_usd` per day by work phase of a response (Explore, Edit, Run, Delegate, Talk, Other), pauses between requests against the 5-minute cache lifetime, cache hit rate and cache-creation tokens by project |
 | **Agents & skills** | runs, tokens and tool calls per agent and per skill; main session against subagents by tool; subagent runs far above their average |
 | **Tools & files** | tool calls, Bash commands, rejected calls, top files and directories, accesses by area, files re-read within a session, largest tool results, error rate by tool |
 | **Health** | time spent in your hooks, API latency, time to first token, tool duration and errors, recent failed tool calls |
 | **Prompts** | the most expensive prompts; pick one to see its requests and tool calls |
-| **Tips** | hints about patterns that cost tokens or time (see "Tips") |
 
 **Variables.** The five at the top are shared and nested: **Account → Project → Session → Actor → Skill** (`All` = no filter).
 **Account** is multi-select and shows the e-mail of the Claude account, or the first 8 characters of its id when there is no
-e-mail; events without an account show only under `All`. The Tips dashboard ignores the variables. The Session
+e-mail; events without an account show only under `All`. The Tips section of Efficiency ignores the variables. The Session
 dropdown shows `title (short id)`, or the full id while the session has no title; it lists the newest 300 sessions that made
 a model request. Overview adds **Plan, USD/month** (0, 20, 100 or 200) and Prompts adds **Prompt**.
 **Actor**: `main` is the main session, an agent name (`developer`, `Explore`, …) is a subagent, `aux:*` are Claude Code's
@@ -385,6 +385,14 @@ Session variable (the cumulative graphs say "Select a session").
 USD/month** you chose; with Plan = 0 the ratio is 0. `cost_usd` is computed by Claude Code from API prices, so the sum is
 not a bill: on a subscription you pay the flat fee. A ratio above 1 means the plan costs less than the same use at API prices.
 
+**Efficiency.** The Tips section at the top (counts, affected tokens, the token tips table and the time tips table) reads
+the tips (last 7 days, no time range, no variables); the cost and cache sections below follow the time range and the variables. The work phase of a response comes from the tools it called: Edit (any
+Edit / Write / MultiEdit / NotebookEdit), Delegate (Task / Agent), Run (Bash), Explore (only Read / Grep / Glob / LS), Talk
+(no tool result), Other (any other tools, e.g. MCP or web); a response with several kinds takes the first match in that
+order. Pauses over 5 minutes are red: past the prompt-cache lifetime the next request writes the cache again. Gaps are
+between consecutive requests of a session, subagents included (filter Actor = main for the main conversation only); the
+first request in the time range has no predecessor and is not counted.
+
 **Explanations.** The text panel **What do these numbers mean?** at the bottom of Overview explains tokens, cache, `cost_usd`,
 actors and LIVE / IDLE.
 
@@ -396,12 +404,12 @@ from the repository root after editing `rail.json` or after adding a dashboard t
 ### Tips
 
 A tip is a heuristic hint, not an error: something exceeded a threshold over the last 7 days. It is worth a look and may be
-fine for your work. The window is fixed to the last 7 days; the Tips dashboard ignores the time range and the variables, as
-do the two tips tiles on Overview. Click a tip's title to open one evidence panel full-screen, with the project (or session) preset.
+fine for your work. The window is fixed to the last 7 days; the Tips section of Efficiency (the top of that dashboard) ignores the time range and the variables, as
+do the two tips tiles on Overview and in the rail. Click a tip's title to open one evidence panel full-screen, with the project (or session) preset.
 
 | Category | Fires when (grouped by) | What to do | Link opens |
 | --- | --- | --- | --- |
-| `cache` | cache hit rate below 40 % with at least 20 requests (project) | keep the prompt prefix (CLAUDE.md, tools) stable; fewer `/clear` and model switches | Overview, Cache hit rate by project |
+| `cache` | cache hit rate below 40 % with at least 20 requests (project) | keep the prompt prefix (CLAUDE.md, tools) stable; fewer `/clear` and model switches | Efficiency, Cache hit rate by project |
 | `repeated-read` | one file read more than 10 times (project, file) | keep the key facts in CLAUDE.md or a note instead of rereading | Tools & files, Files re-read within one session |
 | `big-results` | at least 5 tool results over 200 KB (project) | narrow the search or limit the read range: big outputs fill the context | Tools & files, Largest tool results |
 | `short-opus` | Opus model: at least 20 answers under 500 output tokens, and they are at least half of its requests (project) | a smaller model may handle such turns; the shown cost is an upper bound of the saving | Prompts, Most expensive prompts |

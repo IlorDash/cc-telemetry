@@ -198,7 +198,8 @@ SELECT
     e.cache_creation_tokens AS cache_creation_tokens,
     e.input_tokens + e.output_tokens + e.cache_read_tokens + e.cache_creation_tokens AS total_tokens,
     e.cost_usd AS cost_usd,
-    e.duration_ms AS duration_ms
+    e.duration_ms AS duration_ms,
+    e.request_id AS request_id   -- one response; tool_result events carry the same id (work phase, Efficiency dashboard)
 FROM cc.events AS e
 LEFT JOIN cc.agents AS a ON a.agent_id = e.agent_id
 WHERE e.event = 'api_request';
@@ -334,7 +335,7 @@ SELECT
            ' requests in 7 days (below 40 %). A stable prefix (CLAUDE.md, tools) and fewer /clear or model switches keep the cache warm.') AS body,
     project AS scope,
     toFloat64(round(hit * 100, 1)) AS metric,
-    concat('/d/cc-usage?viewPanel=panel-57&var-project=', encodeURLComponent(project)) AS link,
+    concat('/d/cc-efficiency?viewPanel=panel-226&var-project=', encodeURLComponent(project)) AS link,
     toNullable(created) AS affected,
     toNullable(proj_cost) AS cost_usd
 FROM
