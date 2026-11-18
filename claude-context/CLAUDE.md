@@ -29,6 +29,7 @@ server or connecting a PC. Never copy its content into tracked files.
 | Task | Guide |
 | --- | --- |
 | Writing or reviewing SQL views, dashboard JSON, PowerShell, bash, compose/collector config | `claude-context/guides/conventions.md` |
+| Adding or changing a dashboard panel (sizes, fonts, titles, colours, layout) | `claude-context/guides/grafana-style.md` |
 | Checking a change on the live stack (SQL, dashboard queries, scripts) | `claude-context/guides/verification.md` |
 | Drafting a commit message | `claude-context/guides/commit-messages.md` |
 | Writing context docs or the README | `claude-context/guides/docs-writing.md` |
