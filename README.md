@@ -343,8 +343,11 @@ Optional, only to label a project explicitly (otherwise it is inferred from file
 
 ## 3. Dashboards
 
-Grafana shows seven dashboards. A links bar at the top switches between them; it keeps the time range and the variables.
-The buttons are sorted by title.
+Grafana shows seven dashboards. A side rail (the left 3 of 24 columns) on every dashboard switches between them (the current one is
+highlighted); the links keep the time range and the variables. Under the navigation the rail shows **Usage · last 5 h**
+(one bar per Claude account: the cost of the last 5 hours as a share of that account's highest 5-hour cost in the last
+30 days) and **Tips · 7 d** (the number of tips and the most frequent category; a click opens the Tips dashboard). The rail
+panels have a fixed height, so the space under them stays empty; they ignore the time range and the variables.
 
 | Dashboard | Shows |
 | --- | --- |
@@ -368,8 +371,8 @@ Claude Code does this attribution itself; the label lasts until the end of the p
 
 **Time range.** The quick ranges are 5 minutes, 1 hour, 24 hours, 7 days (the default; 30 days on Overview), 30 days and `All` (10 years).
 The refresh rate is picked at the top right (10 s by default, from 5 s), as in any Grafana dashboard.
-Some panels ignore the time range and say so in their description: Active sessions (last 15 minutes), the 30-day plan tile
-and the tips (last 7 days).
+Some panels ignore the time range and say so in their description: the rail panels, Active sessions (last 15 minutes), the
+30-day plan tile and the tips (last 7 days).
 
 **Clicks.** In the tables a click on a `session_id` opens that session on **Sessions**; a project in Tokens by project opens
 **Overview** for it; an agent or a skill opens **Agents & skills** filtered by it; a `prompt_id` in Most expensive prompts opens
@@ -382,8 +385,13 @@ Session variable (the cumulative graphs say "Select a session").
 USD/month** you chose; with Plan = 0 the ratio is 0. `cost_usd` is computed by Claude Code from API prices, so the sum is
 not a bill: on a subscription you pay the flat fee. A ratio above 1 means the plan costs less than the same use at API prices.
 
-**Explanations.** The collapsed row **What do these numbers mean?** at the bottom of Overview explains tokens, cache, `cost_usd`,
+**Explanations.** The text panel **What do these numbers mean?** at the bottom of Overview explains tokens, cache, `cost_usd`,
 actors and LIVE / IDLE.
+
+**Editing the rail.** Grafana loads every `.json` in `grafana/dashboards/` as a dashboard, so the rail is defined once in
+`grafana/rail/rail.json` and copied into every dashboard file by `node grafana/rail/sync-rail.js` (no dependencies; run it
+from the repository root after editing `rail.json` or after adding a dashboard to its navigation list). The same command with
+`--check` changes nothing and exits with 1 when a dashboard differs from the source.
 
 ### Tips
 

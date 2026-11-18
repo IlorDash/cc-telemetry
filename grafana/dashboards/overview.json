@@ -58,22 +58,7 @@
       "1h"
     ]
   },
-  "links": [
-    {
-      "type": "dashboards",
-      "title": "Dashboards",
-      "tags": [
-        "cc"
-      ],
-      "asDropdown": false,
-      "icon": "external link",
-      "includeVars": true,
-      "keepTime": true,
-      "targetBlank": false,
-      "tooltip": "",
-      "url": ""
-    }
-  ],
+  "links": [],
   "templating": {
     "list": [
       {
@@ -232,17 +217,302 @@
   },
   "panels": [
     {
-      "id": 1,
-      "type": "row",
-      "title": "Summary (filtered by all variables)",
-      "collapsed": false,
+      "id": 300,
+      "type": "text",
+      "title": "Dashboards",
+      "description": "Navigation. Links keep the time range and the variables.",
       "gridPos": {
         "x": 0,
         "y": 0,
-        "w": 24,
+        "w": 3,
+        "h": 11
+      },
+      "transparent": false,
+      "options": {
+        "mode": "html",
+        "content": "<a href=\"/d/cc-usage?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid #F46800;background:#22252b\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Overview</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">totals and status</span></a><a href=\"/d/cc-sessions?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Sessions</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">list · timeline</span></a><a href=\"/d/cc-prompts?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Prompts</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">costliest turns</span></a><a href=\"/d/cc-agents?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Agents &amp; skills</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">subagents, skills</span></a><a href=\"/d/cc-tools?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Tools &amp; files</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">calls, files, reads</span></a><a href=\"/d/cc-health?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Health</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">latency, hooks</span></a><a href=\"/d/cc-tips?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Tips</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">all rules, 7d</span></a>"
+      }
+    },
+    {
+      "id": 301,
+      "type": "bargauge",
+      "title": "Usage · last 5 h",
+      "description": "Cost (cost_usd) per Claude account over the last 5 hours. Bar = that cost as % of the account's peak: its highest rolling 5-hour cost over the last 30 days (10-minute steps). Green below 60 %, yellow from 60 %, red from 80 %. Fixed windows: ignores the dashboard time range and the variables. Accounts with no cost in 7 days are not listed.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 11,
+        "w": 3,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT\n    concat(if(t.label = '', '(no account)', t.label), '  ·  $', toString(round(t.h5, 2))) AS name,\n    round(100 * t.h5 / greatest(p.peak, t.h5, 0.000001)) AS pct\nFROM\n(\n    SELECT account_uuid,\n           argMax(account, ts) AS label,\n           sumIf(cost_usd, ts >= now() - INTERVAL 5 HOUR) AS h5,\n           sumIf(cost_usd, ts >= now() - INTERVAL 7 DAY) AS d7\n    FROM cc.api_requests\n    WHERE ts >= now() - INTERVAL 30 DAY\n    GROUP BY account_uuid\n) AS t\nLEFT JOIN\n(\n    SELECT account_uuid, max(w) AS peak\n    FROM\n    (\n        SELECT account_uuid,\n               sum(c) OVER (PARTITION BY account_uuid ORDER BY b RANGE BETWEEN 17999 PRECEDING AND CURRENT ROW) AS w\n        FROM\n        (\n            SELECT account_uuid, toUInt32(toStartOfInterval(ts, INTERVAL 10 MINUTE)) AS b, sum(cost_usd) AS c\n            FROM cc.api_requests\n            WHERE ts >= now() - INTERVAL 30 DAY\n            GROUP BY account_uuid, b\n        )\n    )\n    GROUP BY account_uuid\n) AS p ON p.account_uuid = t.account_uuid\nWHERE t.d7 > 0\nORDER BY t.h5 DESC, t.d7 DESC"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": true,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "valueMode": "color",
+        "namePlacement": "top",
+        "showUnfilled": true,
+        "sizing": "manual",
+        "minVizHeight": 36,
+        "maxVizHeight": 36,
+        "text": {
+          "titleSize": 15,
+          "valueSize": 15
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#73BF69",
+                "value": null
+              },
+              {
+                "color": "#FADE2A",
+                "value": 60
+              },
+              {
+                "color": "#F2495C",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 303,
+      "type": "stat",
+      "title": "Tips · 7 d",
+      "description": "Number of tips (view cc.tips, last 7 days). Click the value to open the Tips dashboard. Ignores the dashboard time range and the variables.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 15,
+        "w": 3,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT count() AS tips\nFROM cc.tips"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/.*/",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value_and_name",
+        "text": {
+          "titleSize": 30,
+          "valueSize": 30
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "0"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "tips"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Tips"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 1
+                    },
+                    {
+                      "color": "orange",
+                      "value": 5
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open all tips",
+                    "url": "/d/cc-tips?${__url_time_range}",
+                    "oneClick": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 302,
+      "type": "stat",
+      "title": "",
+      "description": "The most frequent tip category (view cc.tips, last 7 days) with its count in brackets (ties: alphabetical order). Click the value to open the Tips dashboard. Ignores the dashboard time range and the variables.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 3,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT if(tips = 0, 'none', concat(multiIf(top = 'cache', 'Cache rebuilds', top = 'repeated-read', 'Repeated reads', top = 'big-results', 'Big tool results', top = 'short-opus', 'Short Opus answers', top = 'agent-outlier', 'Costly agent run', top = 'denials', 'Denied tool calls', top = 'slow-hook', 'Slow hooks', top = 'slow-ttft', 'Slow first token', top), ' (', toString(n), ')')) AS most_frequent\nFROM\n(\n    SELECT sum(c) AS tips,\n           argMin(category, (-toInt64(c), category)) AS top,\n           max(c) AS n\n    FROM (SELECT category, count() AS c FROM cc.tips GROUP BY category)\n)"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/.*/",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value_and_name",
+        "text": {
+          "titleSize": 20,
+          "valueSize": 20
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "none"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "most_frequent"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Most frequent"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open all tips",
+                    "url": "/d/cc-tips?${__url_time_range}",
+                    "oneClick": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 401,
+      "type": "text",
+      "title": "Summary",
+      "description": "filtered by all variables",
+      "transparent": true,
+      "gridPos": {
+        "x": 3,
+        "y": 0,
+        "w": 21,
         "h": 1
       },
-      "panels": []
+      "options": {
+        "mode": "html",
+        "content": ""
+      }
     },
     {
       "id": 30,
@@ -254,10 +524,10 @@
         "uid": "clickhouse"
       },
       "gridPos": {
-        "x": 0,
+        "x": 3,
         "y": 1,
-        "w": 3,
-        "h": 4
+        "w": 5,
+        "h": 3
       },
       "targets": [
         {
@@ -306,10 +576,10 @@
         "uid": "clickhouse"
       },
       "gridPos": {
-        "x": 3,
+        "x": 8,
         "y": 1,
-        "w": 3,
-        "h": 4
+        "w": 5,
+        "h": 3
       },
       "targets": [
         {
@@ -358,10 +628,10 @@
         "uid": "clickhouse"
       },
       "gridPos": {
-        "x": 6,
+        "x": 13,
         "y": 1,
-        "w": 3,
-        "h": 4
+        "w": 5,
+        "h": 3
       },
       "targets": [
         {
@@ -410,10 +680,10 @@
         "uid": "clickhouse"
       },
       "gridPos": {
-        "x": 9,
+        "x": 18,
         "y": 1,
-        "w": 3,
-        "h": 4
+        "w": 6,
+        "h": 3
       },
       "targets": [
         {
@@ -462,10 +732,10 @@
         "uid": "clickhouse"
       },
       "gridPos": {
-        "x": 12,
-        "y": 1,
-        "w": 4,
-        "h": 4
+        "x": 3,
+        "y": 4,
+        "w": 7,
+        "h": 3
       },
       "targets": [
         {
@@ -514,10 +784,10 @@
         "uid": "clickhouse"
       },
       "gridPos": {
-        "x": 16,
-        "y": 1,
-        "w": 4,
-        "h": 4
+        "x": 10,
+        "y": 4,
+        "w": 7,
+        "h": 3
       },
       "targets": [
         {
@@ -566,10 +836,10 @@
         "uid": "clickhouse"
       },
       "gridPos": {
-        "x": 20,
-        "y": 1,
-        "w": 4,
-        "h": 4
+        "x": 17,
+        "y": 4,
+        "w": 7,
+        "h": 3
       },
       "targets": [
         {
@@ -619,9 +889,9 @@
         "uid": "clickhouse"
       },
       "gridPos": {
-        "x": 0,
-        "y": 5,
-        "w": 12,
+        "x": 3,
+        "y": 7,
+        "w": 10,
         "h": 9
       },
       "targets": [
@@ -668,9 +938,9 @@
         "uid": "clickhouse"
       },
       "gridPos": {
-        "x": 12,
-        "y": 5,
-        "w": 12,
+        "x": 13,
+        "y": 7,
+        "w": 11,
         "h": 9
       },
       "targets": [
@@ -718,9 +988,9 @@
         "uid": "clickhouse"
       },
       "gridPos": {
-        "x": 0,
-        "y": 14,
-        "w": 4,
+        "x": 3,
+        "y": 16,
+        "w": 3,
         "h": 10
       },
       "targets": [
@@ -789,9 +1059,9 @@
         "uid": "clickhouse"
       },
       "gridPos": {
-        "x": 4,
-        "y": 14,
-        "w": 8,
+        "x": 6,
+        "y": 16,
+        "w": 7,
         "h": 10
       },
       "targets": [
@@ -857,9 +1127,9 @@
         "uid": "clickhouse"
       },
       "gridPos": {
-        "x": 12,
-        "y": 14,
-        "w": 12,
+        "x": 13,
+        "y": 16,
+        "w": 11,
         "h": 10
       },
       "targets": [
@@ -902,7 +1172,7 @@
                 "value": [
                   {
                     "title": "Filter by this project",
-                    "url": "/d/cc-usage?${account:queryparam}&var-project=${__value.raw}&var-session=$__all&var-actor=$__all&var-skill=$__all&${__url_time_range}"
+                    "url": "/d/cc-usage?${account:queryparam}&var-project=${__value.raw:percentencode}&var-session=$__all&var-actor=$__all&var-skill=$__all&${__url_time_range}"
                   }
                 ]
               }
@@ -963,9 +1233,9 @@
         "uid": "clickhouse"
       },
       "gridPos": {
-        "x": 0,
-        "y": 24,
-        "w": 8,
+        "x": 3,
+        "y": 26,
+        "w": 7,
         "h": 9
       },
       "targets": [
@@ -1017,9 +1287,9 @@
         "uid": "clickhouse"
       },
       "gridPos": {
-        "x": 8,
-        "y": 24,
-        "w": 16,
+        "x": 10,
+        "y": 26,
+        "w": 14,
         "h": 9
       },
       "targets": [
@@ -1067,9 +1337,9 @@
         "uid": "clickhouse"
       },
       "gridPos": {
-        "x": 0,
-        "y": 33,
-        "w": 24,
+        "x": 3,
+        "y": 35,
+        "w": 21,
         "h": 9
       },
       "targets": [
@@ -1170,17 +1440,20 @@
       }
     },
     {
-      "id": 9,
-      "type": "row",
+      "id": 402,
+      "type": "text",
       "title": "Tokens and cost",
-      "collapsed": false,
+      "transparent": true,
       "gridPos": {
-        "x": 0,
-        "y": 42,
-        "w": 24,
+        "x": 3,
+        "y": 44,
+        "w": 21,
         "h": 1
       },
-      "panels": []
+      "options": {
+        "mode": "html",
+        "content": ""
+      }
     },
     {
       "id": 10,
@@ -1192,9 +1465,9 @@
         "uid": "clickhouse"
       },
       "gridPos": {
-        "x": 0,
-        "y": 43,
-        "w": 8,
+        "x": 3,
+        "y": 45,
+        "w": 7,
         "h": 9
       },
       "targets": [
@@ -1237,9 +1510,9 @@
         "uid": "clickhouse"
       },
       "gridPos": {
-        "x": 8,
-        "y": 43,
-        "w": 16,
+        "x": 10,
+        "y": 45,
+        "w": 14,
         "h": 9
       },
       "targets": [
@@ -1289,9 +1562,9 @@
         "uid": "clickhouse"
       },
       "gridPos": {
-        "x": 0,
-        "y": 52,
-        "w": 12,
+        "x": 3,
+        "y": 54,
+        "w": 10,
         "h": 7
       },
       "targets": [
@@ -1384,9 +1657,9 @@
         "uid": "clickhouse"
       },
       "gridPos": {
-        "x": 12,
-        "y": 52,
-        "w": 12,
+        "x": 13,
+        "y": 54,
+        "w": 11,
         "h": 7
       },
       "targets": [
@@ -1472,9 +1745,9 @@
         "uid": "clickhouse"
       },
       "gridPos": {
-        "x": 0,
-        "y": 59,
-        "w": 12,
+        "x": 3,
+        "y": 61,
+        "w": 10,
         "h": 6
       },
       "targets": [
@@ -1604,9 +1877,9 @@
         "uid": "clickhouse"
       },
       "gridPos": {
-        "x": 12,
-        "y": 59,
-        "w": 6,
+        "x": 13,
+        "y": 61,
+        "w": 5,
         "h": 6
       },
       "targets": [
@@ -1707,7 +1980,7 @@
       },
       "gridPos": {
         "x": 18,
-        "y": 59,
+        "y": 61,
         "w": 6,
         "h": 6
       },
@@ -1780,34 +2053,20 @@
       }
     },
     {
-      "id": 42,
-      "type": "row",
+      "id": 43,
+      "type": "text",
       "title": "What do these numbers mean?",
-      "collapsed": true,
+      "description": "",
       "gridPos": {
-        "x": 0,
-        "y": 65,
-        "w": 24,
-        "h": 1
+        "x": 3,
+        "y": 67,
+        "w": 21,
+        "h": 8
       },
-      "panels": [
-        {
-          "id": 43,
-          "type": "text",
-          "title": "What do these numbers mean?",
-          "description": "",
-          "gridPos": {
-            "x": 0,
-            "y": 66,
-            "w": 24,
-            "h": 8
-          },
-          "options": {
-            "mode": "markdown",
-            "content": "**Tokens** (one model request = one row)\n\n- **input**: new, uncached prompt tokens sent to the model.\n- **output**: tokens the model generated.\n- **cache read**: prompt tokens served from the prompt cache (cheap). Cache hit rate = cache read / (input + cache read + cache create).\n- **cache create**: prompt tokens written to the cache (more expensive than input, paid once, then re-read cheaply).\n- **Tokens** on the cards = input + output + cache read + cache create.\n\n**cost_usd**: calculated by Claude Code itself from its price table: an API-price equivalent, not a bill. On a subscription plan you pay the flat fee instead; the \"Last 30 days: API equivalent vs plan\" panel compares the two.\n\n**actor**: who made the request: `main` (the main conversation), an agent name (a subagent), or `aux:<query_source>` (background helper calls of Claude Code, for example title generation or compaction).\n\n**aux**: such helper requests; they are not tied to a prompt you typed, but they cost tokens too.\n\n**LIVE / IDLE**: a session with an event in the last 2 minutes / in the last 15 minutes."
-          }
-        }
-      ]
+      "options": {
+        "mode": "markdown",
+        "content": "**Tokens** (one model request = one row)\n\n- **input**: new, uncached prompt tokens sent to the model.\n- **output**: tokens the model generated.\n- **cache read**: prompt tokens served from the prompt cache (cheap). Cache hit rate = cache read / (input + cache read + cache create).\n- **cache create**: prompt tokens written to the cache (more expensive than input, paid once, then re-read cheaply).\n- **Tokens** on the cards = input + output + cache read + cache create.\n\n**cost_usd**: calculated by Claude Code itself from its price table: an API-price equivalent, not a bill. On a subscription plan you pay the flat fee instead; the \"Last 30 days: API equivalent vs plan\" panel compares the two.\n\n**actor**: who made the request: `main` (the main conversation), an agent name (a subagent), or `aux:<query_source>` (background helper calls of Claude Code, for example title generation or compaction).\n\n**aux**: such helper requests; they are not tied to a prompt you typed, but they cost tokens too.\n\n**LIVE / IDLE**: a session with an event in the last 2 minutes / in the last 15 minutes."
+      }
     }
   ]
 }
