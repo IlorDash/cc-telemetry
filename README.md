@@ -356,7 +356,9 @@ The buttons are sorted by title.
 | **Prompts** | the most expensive prompts; pick one to see its requests and tool calls |
 | **Tips** | hints about patterns that cost tokens or time (see "Tips") |
 
-**Variables.** The four at the top are shared and nested: **Project → Session → Actor → Skill** (`All` = no filter). The Session
+**Variables.** The five at the top are shared and nested: **Account → Project → Session → Actor → Skill** (`All` = no filter).
+**Account** is multi-select and shows the e-mail of the Claude account, or the first 8 characters of its id when there is no
+e-mail; events without an account show only under `All`. The Tips dashboard ignores the variables. The Session
 dropdown shows `title (short id)`, or the full id while the session has no title; it lists the newest 300 sessions that made
 a model request. Overview adds **Plan, USD/month** (0, 20, 100 or 200) and Prompts adds **Prompt**.
 **Actor**: `main` is the main session, an agent name (`developer`, `Explore`, …) is a subagent, `aux:*` are Claude Code's
@@ -364,7 +366,7 @@ own service requests.
 **Skill**: a tool call is attributed to a skill through the `request_id` of the model request that carried `skill.name`.
 Claude Code does this attribution itself; the label lasts until the end of the prompt in which the skill was invoked.
 
-**Time range.** The quick ranges are 5 minutes, 1 hour, 24 hours, 7 days (the default), 30 days and `All` (10 years).
+**Time range.** The quick ranges are 5 minutes, 1 hour, 24 hours, 7 days (the default; 30 days on Overview), 30 days and `All` (10 years).
 The refresh rate is picked at the top right (10 s by default, from 5 s), as in any Grafana dashboard.
 Some panels ignore the time range and say so in their description: Active sessions (last 15 minutes), the 30-day plan tile
 and the tips (last 7 days).

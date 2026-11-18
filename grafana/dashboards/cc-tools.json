@@ -77,6 +77,32 @@
   "templating": {
     "list": [
       {
+        "name": "account",
+        "label": "Account",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "clickhouse"
+        },
+        "query": "SELECT account_uuid, argMax(account, ts) AS name FROM cc.events WHERE account_uuid != '' GROUP BY account_uuid ORDER BY name",
+        "definition": "SELECT account_uuid, argMax(account, ts) AS name FROM cc.events WHERE account_uuid != '' GROUP BY account_uuid ORDER BY name",
+        "includeAll": true,
+        "allValue": "'__all'",
+        "multi": true,
+        "refresh": 2,
+        "sort": 0,
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": []
+      },
+      {
         "name": "project",
         "label": "Project",
         "type": "query",
@@ -84,8 +110,8 @@
           "type": "grafana-clickhouse-datasource",
           "uid": "clickhouse"
         },
-        "query": "SELECT DISTINCT project FROM cc.events ORDER BY project",
-        "definition": "SELECT DISTINCT project FROM cc.events ORDER BY project",
+        "query": "SELECT DISTINCT project FROM cc.events WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) ORDER BY project",
+        "definition": "SELECT DISTINCT project FROM cc.events WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) ORDER BY project",
         "includeAll": true,
         "allValue": "__all",
         "multi": false,
@@ -106,8 +132,8 @@
           "type": "grafana-clickhouse-datasource",
           "uid": "clickhouse"
         },
-        "query": "SELECT session_id, if(title != '', concat(leftUTF8(title, 60), ' (', left(session_id, 8), ')'), session_id) AS name FROM cc.sessions WHERE ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
-        "definition": "SELECT session_id, if(title != '', concat(leftUTF8(title, 60), ' (', left(session_id, 8), ')'), session_id) AS name FROM cc.sessions WHERE ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
+        "query": "SELECT session_id, if(title != '', concat(leftUTF8(title, 60), ' (', left(session_id, 8), ')'), session_id) AS name FROM cc.sessions WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
+        "definition": "SELECT session_id, if(title != '', concat(leftUTF8(title, 60), ' (', left(session_id, 8), ')'), session_id) AS name FROM cc.sessions WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
         "includeAll": true,
         "allValue": "__all",
         "multi": false,
@@ -128,8 +154,8 @@
           "type": "grafana-clickhouse-datasource",
           "uid": "clickhouse"
         },
-        "query": "SELECT DISTINCT actor FROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') ORDER BY actor",
-        "definition": "SELECT DISTINCT actor FROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') ORDER BY actor",
+        "query": "SELECT DISTINCT actor FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') ORDER BY actor",
+        "definition": "SELECT DISTINCT actor FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') ORDER BY actor",
         "includeAll": true,
         "allValue": "__all",
         "multi": false,
@@ -150,8 +176,8 @@
           "type": "grafana-clickhouse-datasource",
           "uid": "clickhouse"
         },
-        "query": "SELECT DISTINCT skill FROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND skill != '' ORDER BY skill",
-        "definition": "SELECT DISTINCT skill FROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND skill != '' ORDER BY skill",
+        "query": "SELECT DISTINCT skill FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND skill != '' ORDER BY skill",
+        "definition": "SELECT DISTINCT skill FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND skill != '' ORDER BY skill",
         "includeAll": true,
         "allValue": "__all",
         "multi": false,
@@ -208,7 +234,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT tool_name, count() AS calls\nFROM cc.tool_calls WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nGROUP BY tool_name ORDER BY calls DESC LIMIT 25"
+          "rawSql": "SELECT tool_name, count() AS calls\nFROM cc.tool_calls WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nGROUP BY tool_name ORDER BY calls DESC LIMIT 25"
         }
       ],
       "options": {
@@ -253,7 +279,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT actor, if(skill = '', '-', skill) AS skill, tool_name,\n       count() AS calls, countIf(NOT success) AS errors, round(avg(duration_ms)) AS avg_ms\nFROM cc.tool_calls WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nGROUP BY actor, skill, tool_name\nORDER BY calls DESC"
+          "rawSql": "SELECT actor, if(skill = '', '-', skill) AS skill, tool_name,\n       count() AS calls, countIf(NOT success) AS errors, round(avg(duration_ms)) AS avg_ms\nFROM cc.tool_calls WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nGROUP BY actor, skill, tool_name\nORDER BY calls DESC"
         }
       ],
       "options": {
@@ -294,7 +320,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT bash_cmd AS command, actor, count() AS calls, countIf(NOT success) AS errors\nFROM cc.tool_calls WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts) AND tool_name = 'Bash'\nGROUP BY command, actor ORDER BY calls DESC LIMIT 50"
+          "rawSql": "SELECT bash_cmd AS command, actor, count() AS calls, countIf(NOT success) AS errors\nFROM cc.tool_calls WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts) AND tool_name = 'Bash'\nGROUP BY command, actor ORDER BY calls DESC LIMIT 50"
         }
       ],
       "options": {
@@ -335,7 +361,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT tool_name, decision_source AS source, count() AS rejected\nFROM cc.events\nWHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND $__timeFilter(ts) AND event = 'tool_decision' AND decision = 'reject'\nGROUP BY tool_name, source ORDER BY rejected DESC"
+          "rawSql": "SELECT tool_name, decision_source AS source, count() AS rejected\nFROM cc.events\nWHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND $__timeFilter(ts) AND event = 'tool_decision' AND decision = 'reject'\nGROUP BY tool_name, source ORDER BY rejected DESC"
         }
       ],
       "options": {
@@ -389,7 +415,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT path, area,\n       countIf(op = 'read') AS reads, countIf(op = 'write') AS writes, countIf(op = 'search') AS searches,\n       count() AS total, uniqExact(session_id) AS sessions,\n       arrayStringConcat(groupUniqArray(actor), ', ') AS actors,\n       arrayStringConcat(groupUniqArrayIf(skill, skill != ''), ', ') AS skills\nFROM cc.tool_calls WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts) AND path != ''\nGROUP BY path, area ORDER BY total DESC LIMIT 200"
+          "rawSql": "SELECT path, area,\n       countIf(op = 'read') AS reads, countIf(op = 'write') AS writes, countIf(op = 'search') AS searches,\n       count() AS total, uniqExact(session_id) AS sessions,\n       arrayStringConcat(groupUniqArray(actor), ', ') AS actors,\n       arrayStringConcat(groupUniqArrayIf(skill, skill != ''), ', ') AS skills\nFROM cc.tool_calls WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts) AND path != ''\nGROUP BY path, area ORDER BY total DESC LIMIT 200"
         }
       ],
       "options": {
@@ -430,7 +456,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT area, count() AS accesses\nFROM cc.tool_calls WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts) AND area != ''\nGROUP BY area ORDER BY accesses DESC LIMIT 20"
+          "rawSql": "SELECT area, count() AS accesses\nFROM cc.tool_calls WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts) AND area != ''\nGROUP BY area ORDER BY accesses DESC LIMIT 20"
         }
       ],
       "options": {
@@ -475,7 +501,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT dir, countIf(op = 'read') AS reads, countIf(op = 'write') AS writes,\n       countIf(op = 'search') AS searches, count() AS total\nFROM cc.tool_calls WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts) AND dir != ''\nGROUP BY dir ORDER BY total DESC LIMIT 100"
+          "rawSql": "SELECT dir, countIf(op = 'read') AS reads, countIf(op = 'write') AS writes,\n       countIf(op = 'search') AS searches, count() AS total\nFROM cc.tool_calls WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts) AND dir != ''\nGROUP BY dir ORDER BY total DESC LIMIT 100"
         }
       ],
       "options": {
@@ -516,7 +542,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT session_id, path, count() AS reads\nFROM cc.tool_calls WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts) AND op = 'read' AND path != ''\nGROUP BY session_id, path HAVING reads > 2\nORDER BY reads DESC LIMIT 100"
+          "rawSql": "SELECT session_id, path, count() AS reads\nFROM cc.tool_calls WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts) AND op = 'read' AND path != ''\nGROUP BY session_id, path HAVING reads > 2\nORDER BY reads DESC LIMIT 100"
         }
       ],
       "options": {
@@ -570,7 +596,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT r.ts AS ts, r.session_id AS session_id, r.tool_name AS tool_name, c.actor AS actor, if(c.skill = '', '-', c.skill) AS skill,\n       if(c.bash_cmd != '', c.bash_cmd, c.path) AS target, r.result_bytes AS result_bytes\nFROM cc.events AS r\nINNER JOIN (SELECT tool_use_id, actor, skill, path, bash_cmd FROM cc.tool_calls WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)) AS c ON c.tool_use_id = r.tool_use_id\nWHERE ('${project}' = '__all' OR r.project = '${project}') AND ('${session}' = '__all' OR r.session_id = '${session}') AND $__timeFilter(r.ts) AND r.event = 'tool_result' AND r.result_bytes > 0\nORDER BY result_bytes DESC LIMIT 50"
+          "rawSql": "SELECT r.ts AS ts, r.session_id AS session_id, r.tool_name AS tool_name, c.actor AS actor, if(c.skill = '', '-', c.skill) AS skill,\n       if(c.bash_cmd != '', c.bash_cmd, c.path) AS target, r.result_bytes AS result_bytes\nFROM cc.events AS r\nINNER JOIN (SELECT tool_use_id, actor, skill, path, bash_cmd FROM cc.tool_calls WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)) AS c ON c.tool_use_id = r.tool_use_id\nWHERE ('${project}' = '__all' OR r.project = '${project}') AND ('${session}' = '__all' OR r.session_id = '${session}') AND $__timeFilter(r.ts) AND r.event = 'tool_result' AND r.result_bytes > 0\nORDER BY result_bytes DESC LIMIT 50"
         }
       ],
       "options": {
@@ -624,7 +650,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT tool_name, count() AS calls, countIf(NOT success) AS errors, round(100 * errors / calls, 1) AS error_pct\nFROM cc.tool_calls WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nGROUP BY tool_name HAVING errors > 0 ORDER BY error_pct DESC, errors DESC LIMIT 50"
+          "rawSql": "SELECT tool_name, count() AS calls, countIf(NOT success) AS errors, round(100 * errors / calls, 1) AS error_pct\nFROM cc.tool_calls WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nGROUP BY tool_name HAVING errors > 0 ORDER BY error_pct DESC, errors DESC LIMIT 50"
         }
       ],
       "options": {
@@ -678,7 +704,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT r.tool_name AS tool_name, count() AS results, round(avg(r.result_bytes)) AS avg_bytes, max(r.result_bytes) AS max_bytes, sum(r.result_bytes) AS total_bytes\nFROM cc.events AS r\nINNER JOIN (SELECT tool_use_id FROM cc.tool_calls WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)) AS c ON c.tool_use_id = r.tool_use_id\nWHERE ('${project}' = '__all' OR r.project = '${project}') AND ('${session}' = '__all' OR r.session_id = '${session}') AND $__timeFilter(r.ts) AND r.event = 'tool_result' AND r.result_bytes > 0\nGROUP BY tool_name ORDER BY total_bytes DESC LIMIT 50"
+          "rawSql": "SELECT r.tool_name AS tool_name, count() AS results, round(avg(r.result_bytes)) AS avg_bytes, max(r.result_bytes) AS max_bytes, sum(r.result_bytes) AS total_bytes\nFROM cc.events AS r\nINNER JOIN (SELECT tool_use_id FROM cc.tool_calls WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)) AS c ON c.tool_use_id = r.tool_use_id\nWHERE ('${project}' = '__all' OR r.project = '${project}') AND ('${session}' = '__all' OR r.session_id = '${session}') AND $__timeFilter(r.ts) AND r.event = 'tool_result' AND r.result_bytes > 0\nGROUP BY tool_name ORDER BY total_bytes DESC LIMIT 50"
         }
       ],
       "options": {

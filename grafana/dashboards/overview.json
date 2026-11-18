@@ -12,7 +12,7 @@
   "version": 1,
   "refresh": "10s",
   "time": {
-    "from": "now-7d",
+    "from": "now-30d",
     "to": "now"
   },
   "timepicker": {
@@ -77,6 +77,32 @@
   "templating": {
     "list": [
       {
+        "name": "account",
+        "label": "Account",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "clickhouse"
+        },
+        "query": "SELECT account_uuid, argMax(account, ts) AS name FROM cc.events WHERE account_uuid != '' GROUP BY account_uuid ORDER BY name",
+        "definition": "SELECT account_uuid, argMax(account, ts) AS name FROM cc.events WHERE account_uuid != '' GROUP BY account_uuid ORDER BY name",
+        "includeAll": true,
+        "allValue": "'__all'",
+        "multi": true,
+        "refresh": 2,
+        "sort": 0,
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": []
+      },
+      {
         "name": "project",
         "label": "Project",
         "type": "query",
@@ -84,8 +110,8 @@
           "type": "grafana-clickhouse-datasource",
           "uid": "clickhouse"
         },
-        "query": "SELECT DISTINCT project FROM cc.events ORDER BY project",
-        "definition": "SELECT DISTINCT project FROM cc.events ORDER BY project",
+        "query": "SELECT DISTINCT project FROM cc.events WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) ORDER BY project",
+        "definition": "SELECT DISTINCT project FROM cc.events WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) ORDER BY project",
         "includeAll": true,
         "allValue": "__all",
         "multi": false,
@@ -106,8 +132,8 @@
           "type": "grafana-clickhouse-datasource",
           "uid": "clickhouse"
         },
-        "query": "SELECT session_id, if(title != '', concat(leftUTF8(title, 60), ' (', left(session_id, 8), ')'), session_id) AS name FROM cc.sessions WHERE ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
-        "definition": "SELECT session_id, if(title != '', concat(leftUTF8(title, 60), ' (', left(session_id, 8), ')'), session_id) AS name FROM cc.sessions WHERE ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
+        "query": "SELECT session_id, if(title != '', concat(leftUTF8(title, 60), ' (', left(session_id, 8), ')'), session_id) AS name FROM cc.sessions WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
+        "definition": "SELECT session_id, if(title != '', concat(leftUTF8(title, 60), ' (', left(session_id, 8), ')'), session_id) AS name FROM cc.sessions WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
         "includeAll": true,
         "allValue": "__all",
         "multi": false,
@@ -128,8 +154,8 @@
           "type": "grafana-clickhouse-datasource",
           "uid": "clickhouse"
         },
-        "query": "SELECT DISTINCT actor FROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') ORDER BY actor",
-        "definition": "SELECT DISTINCT actor FROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') ORDER BY actor",
+        "query": "SELECT DISTINCT actor FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') ORDER BY actor",
+        "definition": "SELECT DISTINCT actor FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') ORDER BY actor",
         "includeAll": true,
         "allValue": "__all",
         "multi": false,
@@ -150,8 +176,8 @@
           "type": "grafana-clickhouse-datasource",
           "uid": "clickhouse"
         },
-        "query": "SELECT DISTINCT skill FROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND skill != '' ORDER BY skill",
-        "definition": "SELECT DISTINCT skill FROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND skill != '' ORDER BY skill",
+        "query": "SELECT DISTINCT skill FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND skill != '' ORDER BY skill",
+        "definition": "SELECT DISTINCT skill FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND skill != '' ORDER BY skill",
         "includeAll": true,
         "allValue": "__all",
         "multi": false,
@@ -243,7 +269,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT uniqExact(session_id) AS sessions FROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)"
+          "rawSql": "SELECT uniqExact(session_id) AS sessions FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)"
         }
       ],
       "options": {
@@ -295,7 +321,7 @@
           "editorType": "sql",
           "format": 0,
           "queryType": "timeseries",
-          "rawSql": "SELECT $__timeInterval(ts) AS time, count() AS turns FROM cc.api_requests WHERE actor = 'main' AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts) GROUP BY time ORDER BY time"
+          "rawSql": "SELECT $__timeInterval(ts) AS time, count() AS turns FROM cc.api_requests WHERE actor = 'main' AND ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts) GROUP BY time ORDER BY time"
         }
       ],
       "options": {
@@ -347,7 +373,7 @@
           "editorType": "sql",
           "format": 0,
           "queryType": "timeseries",
-          "rawSql": "SELECT $__timeInterval(ts) AS time, sum(input_tokens) AS input FROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts) GROUP BY time ORDER BY time"
+          "rawSql": "SELECT $__timeInterval(ts) AS time, sum(input_tokens) AS input FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts) GROUP BY time ORDER BY time"
         }
       ],
       "options": {
@@ -399,7 +425,7 @@
           "editorType": "sql",
           "format": 0,
           "queryType": "timeseries",
-          "rawSql": "SELECT $__timeInterval(ts) AS time, sum(output_tokens) AS output FROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts) GROUP BY time ORDER BY time"
+          "rawSql": "SELECT $__timeInterval(ts) AS time, sum(output_tokens) AS output FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts) GROUP BY time ORDER BY time"
         }
       ],
       "options": {
@@ -451,7 +477,7 @@
           "editorType": "sql",
           "format": 0,
           "queryType": "timeseries",
-          "rawSql": "SELECT $__timeInterval(ts) AS time, sum(cache_read_tokens) AS cache_read FROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts) GROUP BY time ORDER BY time"
+          "rawSql": "SELECT $__timeInterval(ts) AS time, sum(cache_read_tokens) AS cache_read FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts) GROUP BY time ORDER BY time"
         }
       ],
       "options": {
@@ -503,7 +529,7 @@
           "editorType": "sql",
           "format": 0,
           "queryType": "timeseries",
-          "rawSql": "SELECT $__timeInterval(ts) AS time, sum(cache_creation_tokens) AS cache_create FROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts) GROUP BY time ORDER BY time"
+          "rawSql": "SELECT $__timeInterval(ts) AS time, sum(cache_creation_tokens) AS cache_create FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts) GROUP BY time ORDER BY time"
         }
       ],
       "options": {
@@ -555,7 +581,7 @@
           "editorType": "sql",
           "format": 0,
           "queryType": "timeseries",
-          "rawSql": "SELECT $__timeInterval(ts) AS time, sum(cost_usd) AS cost FROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts) GROUP BY time ORDER BY time"
+          "rawSql": "SELECT $__timeInterval(ts) AS time, sum(cost_usd) AS cost FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts) GROUP BY time ORDER BY time"
         }
       ],
       "options": {
@@ -608,7 +634,7 @@
           "editorType": "sql",
           "format": 0,
           "queryType": "timeseries",
-          "rawSql": "SELECT toStartOfDay(ts) AS time, sum(input_tokens) AS input, sum(output_tokens) AS output, sum(cache_creation_tokens) AS cache_create\nFROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nGROUP BY time ORDER BY time"
+          "rawSql": "SELECT toStartOfDay(ts) AS time, sum(input_tokens) AS input, sum(output_tokens) AS output, sum(cache_creation_tokens) AS cache_create\nFROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nGROUP BY time ORDER BY time"
         }
       ],
       "options": {
@@ -657,7 +683,7 @@
           "editorType": "sql",
           "format": 0,
           "queryType": "timeseries",
-          "rawSql": "SELECT toStartOfDay(ts) AS time, sum(cache_read_tokens) AS cache_read\nFROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nGROUP BY time ORDER BY time"
+          "rawSql": "SELECT toStartOfDay(ts) AS time, sum(cache_read_tokens) AS cache_read\nFROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nGROUP BY time ORDER BY time"
         }
       ],
       "options": {
@@ -707,7 +733,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT 100 * sum(cache_read_tokens) / greatest(sum(cache_read_tokens + input_tokens + cache_creation_tokens), 1) AS hit_rate FROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)"
+          "rawSql": "SELECT 100 * sum(cache_read_tokens) / greatest(sum(cache_read_tokens + input_tokens + cache_creation_tokens), 1) AS hit_rate FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)"
         }
       ],
       "options": {
@@ -778,7 +804,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT project, 100 * sum(cache_read_tokens) / greatest(sum(cache_read_tokens + input_tokens + cache_creation_tokens), 1) AS hit_rate\nFROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nGROUP BY project ORDER BY hit_rate DESC LIMIT 30"
+          "rawSql": "SELECT project, 100 * sum(cache_read_tokens) / greatest(sum(cache_read_tokens + input_tokens + cache_creation_tokens), 1) AS hit_rate\nFROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nGROUP BY project ORDER BY hit_rate DESC LIMIT 30"
         }
       ],
       "options": {
@@ -846,7 +872,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT project, sum(total_tokens) AS tokens, sum(cost_usd) AS cost\nFROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nGROUP BY project ORDER BY tokens DESC LIMIT 50"
+          "rawSql": "SELECT project, sum(total_tokens) AS tokens, sum(cost_usd) AS cost\nFROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nGROUP BY project ORDER BY tokens DESC LIMIT 50"
         }
       ],
       "options": {
@@ -876,7 +902,7 @@
                 "value": [
                   {
                     "title": "Filter by this project",
-                    "url": "/d/cc-usage?var-project=${__value.raw}&var-session=$__all&var-actor=$__all&var-skill=$__all&${__url_time_range}"
+                    "url": "/d/cc-usage?${account:queryparam}&var-project=${__value.raw}&var-session=$__all&var-actor=$__all&var-skill=$__all&${__url_time_range}"
                   }
                 ]
               }
@@ -952,7 +978,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT concat(model, ' ($', toString(round(sum(cost_usd), 2)), ')') AS model_cost, sum(total_tokens) AS tokens\nFROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nGROUP BY model ORDER BY tokens DESC"
+          "rawSql": "SELECT concat(model, ' ($', toString(round(sum(cost_usd), 2)), ')') AS model_cost, sum(total_tokens) AS tokens\nFROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nGROUP BY model ORDER BY tokens DESC"
         }
       ],
       "options": {
@@ -1006,7 +1032,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT tool_name, count() AS calls\nFROM cc.tool_calls WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nGROUP BY tool_name ORDER BY calls DESC LIMIT 10"
+          "rawSql": "SELECT tool_name, count() AS calls\nFROM cc.tool_calls WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nGROUP BY tool_name ORDER BY calls DESC LIMIT 10"
         }
       ],
       "options": {
@@ -1056,7 +1082,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT s.session_id AS session_id, s.started AS started, s.project AS project,\n       if(s.title != '', s.title, leftUTF8(replaceAll(s.first_prompt, '\\n', ' '), 100)) AS name, s.git_branch AS git_branch,\n       round(s.cost_usd, 3) AS cost_usd, s.tokens AS tokens,\n       round(r.hit * 100, 1) AS cache_hit_pct,\n       dateDiff('minute', s.started, s.last_event) AS minutes\nFROM cc.sessions AS s\nLEFT JOIN (\n  SELECT session_id, sum(cache_read_tokens) / greatest(sum(cache_read_tokens) + sum(input_tokens) + sum(cache_creation_tokens), 1) AS hit\n  FROM cc.api_requests\n  WHERE session_id IN (\n    SELECT session_id FROM cc.sessions\n    WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}')\n      AND requests > 0 AND started >= $__fromTime AND started <= $__toTime\n    ORDER BY started DESC LIMIT 10)\n  GROUP BY session_id\n) AS r ON r.session_id = s.session_id\nWHERE ('${project}' = '__all' OR s.project = '${project}') AND ('${session}' = '__all' OR s.session_id = '${session}')\n  AND s.requests > 0\n  AND s.started >= $__fromTime AND s.started <= $__toTime\nORDER BY s.started DESC\nLIMIT 10"
+          "rawSql": "SELECT s.session_id AS session_id, s.started AS started, s.project AS project,\n       if(s.title != '', s.title, leftUTF8(replaceAll(s.first_prompt, '\\n', ' '), 100)) AS name, s.git_branch AS git_branch,\n       round(s.cost_usd, 3) AS cost_usd, s.tokens AS tokens,\n       round(r.hit * 100, 1) AS cache_hit_pct,\n       dateDiff('minute', s.started, s.last_event) AS minutes\nFROM cc.sessions AS s\nLEFT JOIN (\n  SELECT session_id, sum(cache_read_tokens) / greatest(sum(cache_read_tokens) + sum(input_tokens) + sum(cache_creation_tokens), 1) AS hit\n  FROM cc.api_requests\n  WHERE session_id IN (\n    SELECT session_id FROM cc.sessions\n    WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}')\n      AND requests > 0 AND started >= $__fromTime AND started <= $__toTime\n    ORDER BY started DESC LIMIT 10)\n  GROUP BY session_id\n) AS r ON r.session_id = s.session_id\nWHERE ('__all' IN (${account:singlequote}) OR s.account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR s.project = '${project}') AND ('${session}' = '__all' OR s.session_id = '${session}')\n  AND s.requests > 0\n  AND s.started >= $__fromTime AND s.started <= $__toTime\nORDER BY s.started DESC\nLIMIT 10"
         }
       ],
       "options": {
@@ -1077,7 +1103,7 @@
                 "value": [
                   {
                     "title": "Open session",
-                    "url": "/d/cc-sessions?var-project=${__data.fields.project:percentencode}&var-session=${__value.raw:percentencode}&var-actor=$__all&var-skill=$__all&${__url_time_range}"
+                    "url": "/d/cc-sessions?${account:queryparam}&var-project=${__data.fields.project:percentencode}&var-session=${__value.raw:percentencode}&var-actor=$__all&var-skill=$__all&${__url_time_range}"
                   }
                 ]
               }
@@ -1181,7 +1207,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT actor, sum(total_tokens) AS tokens\nFROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nGROUP BY actor ORDER BY tokens DESC"
+          "rawSql": "SELECT actor, sum(total_tokens) AS tokens\nFROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nGROUP BY actor ORDER BY tokens DESC"
         }
       ],
       "options": {
@@ -1226,7 +1252,7 @@
           "editorType": "sql",
           "format": 0,
           "queryType": "timeseries",
-          "rawSql": "SELECT $__timeInterval(ts) AS time, actor, sum(cost_usd) AS cost\nFROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nGROUP BY time, actor ORDER BY time"
+          "rawSql": "SELECT $__timeInterval(ts) AS time, actor, sum(cost_usd) AS cost\nFROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nGROUP BY time, actor ORDER BY time"
         }
       ],
       "options": {
@@ -1278,7 +1304,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT session_id, project, host,\n       if(last_event >= now() - INTERVAL 2 MINUTE, 'LIVE', 'IDLE') AS status,\n       round(cost_usd, 3) AS cost_usd,\n       dateDiff('second', last_event, now()) AS seconds_ago\nFROM cc.sessions\nWHERE last_event >= now() - INTERVAL 15 MINUTE AND requests > 0\n  AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}')\nORDER BY last_event DESC\nLIMIT 20"
+          "rawSql": "SELECT session_id, project, host,\n       if(last_event >= now() - INTERVAL 2 MINUTE, 'LIVE', 'IDLE') AS status,\n       round(cost_usd, 3) AS cost_usd,\n       dateDiff('second', last_event, now()) AS seconds_ago\nFROM cc.sessions\nWHERE last_event >= now() - INTERVAL 15 MINUTE AND requests > 0\n  AND ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}')\nORDER BY last_event DESC\nLIMIT 20"
         }
       ],
       "options": {
@@ -1373,7 +1399,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][toDayOfWeek(ts)] AS day,\n       countIf(toHour(ts) = 0) AS `00`, countIf(toHour(ts) = 1) AS `01`, countIf(toHour(ts) = 2) AS `02`, countIf(toHour(ts) = 3) AS `03`,\n       countIf(toHour(ts) = 4) AS `04`, countIf(toHour(ts) = 5) AS `05`, countIf(toHour(ts) = 6) AS `06`, countIf(toHour(ts) = 7) AS `07`,\n       countIf(toHour(ts) = 8) AS `08`, countIf(toHour(ts) = 9) AS `09`, countIf(toHour(ts) = 10) AS `10`, countIf(toHour(ts) = 11) AS `11`,\n       countIf(toHour(ts) = 12) AS `12`, countIf(toHour(ts) = 13) AS `13`, countIf(toHour(ts) = 14) AS `14`, countIf(toHour(ts) = 15) AS `15`,\n       countIf(toHour(ts) = 16) AS `16`, countIf(toHour(ts) = 17) AS `17`, countIf(toHour(ts) = 18) AS `18`, countIf(toHour(ts) = 19) AS `19`,\n       countIf(toHour(ts) = 20) AS `20`, countIf(toHour(ts) = 21) AS `21`, countIf(toHour(ts) = 22) AS `22`, countIf(toHour(ts) = 23) AS `23`\nFROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nGROUP BY day ORDER BY min(toDayOfWeek(ts))"
+          "rawSql": "SELECT ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][toDayOfWeek(ts)] AS day,\n       countIf(toHour(ts) = 0) AS `00`, countIf(toHour(ts) = 1) AS `01`, countIf(toHour(ts) = 2) AS `02`, countIf(toHour(ts) = 3) AS `03`,\n       countIf(toHour(ts) = 4) AS `04`, countIf(toHour(ts) = 5) AS `05`, countIf(toHour(ts) = 6) AS `06`, countIf(toHour(ts) = 7) AS `07`,\n       countIf(toHour(ts) = 8) AS `08`, countIf(toHour(ts) = 9) AS `09`, countIf(toHour(ts) = 10) AS `10`, countIf(toHour(ts) = 11) AS `11`,\n       countIf(toHour(ts) = 12) AS `12`, countIf(toHour(ts) = 13) AS `13`, countIf(toHour(ts) = 14) AS `14`, countIf(toHour(ts) = 15) AS `15`,\n       countIf(toHour(ts) = 16) AS `16`, countIf(toHour(ts) = 17) AS `17`, countIf(toHour(ts) = 18) AS `18`, countIf(toHour(ts) = 19) AS `19`,\n       countIf(toHour(ts) = 20) AS `20`, countIf(toHour(ts) = 21) AS `21`, countIf(toHour(ts) = 22) AS `22`, countIf(toHour(ts) = 23) AS `23`\nFROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nGROUP BY day ORDER BY min(toDayOfWeek(ts))"
         }
       ],
       "options": {
@@ -1461,7 +1487,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT sum(cost_usd) AS api_equivalent, if(${plan_monthly} > 0, sum(cost_usd) / ${plan_monthly}, 0) AS payback_x\nFROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND ts >= now() - INTERVAL 30 DAY"
+          "rawSql": "SELECT sum(cost_usd) AS api_equivalent, if(${plan_monthly} > 0, sum(cost_usd) / ${plan_monthly}, 0) AS payback_x\nFROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND ts >= now() - INTERVAL 30 DAY"
         }
       ],
       "options": {

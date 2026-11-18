@@ -77,6 +77,32 @@
   "templating": {
     "list": [
       {
+        "name": "account",
+        "label": "Account",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "clickhouse"
+        },
+        "query": "SELECT account_uuid, argMax(account, ts) AS name FROM cc.events WHERE account_uuid != '' GROUP BY account_uuid ORDER BY name",
+        "definition": "SELECT account_uuid, argMax(account, ts) AS name FROM cc.events WHERE account_uuid != '' GROUP BY account_uuid ORDER BY name",
+        "includeAll": true,
+        "allValue": "'__all'",
+        "multi": true,
+        "refresh": 2,
+        "sort": 0,
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": []
+      },
+      {
         "name": "project",
         "label": "Project",
         "type": "query",
@@ -84,8 +110,8 @@
           "type": "grafana-clickhouse-datasource",
           "uid": "clickhouse"
         },
-        "query": "SELECT DISTINCT project FROM cc.events ORDER BY project",
-        "definition": "SELECT DISTINCT project FROM cc.events ORDER BY project",
+        "query": "SELECT DISTINCT project FROM cc.events WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) ORDER BY project",
+        "definition": "SELECT DISTINCT project FROM cc.events WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) ORDER BY project",
         "includeAll": true,
         "allValue": "__all",
         "multi": false,
@@ -106,8 +132,8 @@
           "type": "grafana-clickhouse-datasource",
           "uid": "clickhouse"
         },
-        "query": "SELECT session_id, if(title != '', concat(leftUTF8(title, 60), ' (', left(session_id, 8), ')'), session_id) AS name FROM cc.sessions WHERE ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
-        "definition": "SELECT session_id, if(title != '', concat(leftUTF8(title, 60), ' (', left(session_id, 8), ')'), session_id) AS name FROM cc.sessions WHERE ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
+        "query": "SELECT session_id, if(title != '', concat(leftUTF8(title, 60), ' (', left(session_id, 8), ')'), session_id) AS name FROM cc.sessions WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
+        "definition": "SELECT session_id, if(title != '', concat(leftUTF8(title, 60), ' (', left(session_id, 8), ')'), session_id) AS name FROM cc.sessions WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
         "includeAll": true,
         "allValue": "__all",
         "multi": false,
@@ -128,8 +154,8 @@
           "type": "grafana-clickhouse-datasource",
           "uid": "clickhouse"
         },
-        "query": "SELECT DISTINCT actor FROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') ORDER BY actor",
-        "definition": "SELECT DISTINCT actor FROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') ORDER BY actor",
+        "query": "SELECT DISTINCT actor FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') ORDER BY actor",
+        "definition": "SELECT DISTINCT actor FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') ORDER BY actor",
         "includeAll": true,
         "allValue": "__all",
         "multi": false,
@@ -150,8 +176,8 @@
           "type": "grafana-clickhouse-datasource",
           "uid": "clickhouse"
         },
-        "query": "SELECT DISTINCT skill FROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND skill != '' ORDER BY skill",
-        "definition": "SELECT DISTINCT skill FROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND skill != '' ORDER BY skill",
+        "query": "SELECT DISTINCT skill FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND skill != '' ORDER BY skill",
+        "definition": "SELECT DISTINCT skill FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND skill != '' ORDER BY skill",
         "includeAll": true,
         "allValue": "__all",
         "multi": false,
@@ -172,8 +198,8 @@
           "type": "grafana-clickhouse-datasource",
           "uid": "clickhouse"
         },
-        "query": "SELECT concat(toString(round(sum(cost_usd), 2)), ' USD  ', if(max(prompt) IN ('', '<REDACTED>'), concat('prompt ', left(prompt_id, 8)), leftUTF8(replaceAll(max(prompt), '\\n', ' '), 70))) AS __text, prompt_id AS __value FROM cc.prompts WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') GROUP BY prompt_id ORDER BY sum(cost_usd) DESC LIMIT 300",
-        "definition": "SELECT concat(toString(round(sum(cost_usd), 2)), ' USD  ', if(max(prompt) IN ('', '<REDACTED>'), concat('prompt ', left(prompt_id, 8)), leftUTF8(replaceAll(max(prompt), '\\n', ' '), 70))) AS __text, prompt_id AS __value FROM cc.prompts WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') GROUP BY prompt_id ORDER BY sum(cost_usd) DESC LIMIT 300",
+        "query": "SELECT concat(toString(round(sum(cost_usd), 2)), ' USD  ', if(max(prompt) IN ('', '<REDACTED>'), concat('prompt ', left(prompt_id, 8)), leftUTF8(replaceAll(max(prompt), '\\n', ' '), 70))) AS __text, prompt_id AS __value FROM cc.prompts WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') GROUP BY prompt_id ORDER BY sum(cost_usd) DESC LIMIT 300",
+        "definition": "SELECT concat(toString(round(sum(cost_usd), 2)), ' USD  ', if(max(prompt) IN ('', '<REDACTED>'), concat('prompt ', left(prompt_id, 8)), leftUTF8(replaceAll(max(prompt), '\\n', ' '), 70))) AS __text, prompt_id AS __value FROM cc.prompts WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') GROUP BY prompt_id ORDER BY sum(cost_usd) DESC LIMIT 300",
         "includeAll": true,
         "allValue": "__all",
         "multi": false,
@@ -217,7 +243,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT started, prompt_id, session_id, project,\n       if(prompt IN ('', '<REDACTED>'), '(text not logged)', leftUTF8(replaceAll(prompt, '\\n', ' '), 200)) AS prompt,\n       cost_usd, tokens, requests, tool_calls, agents_run,\n       round(max_result_bytes / 1048576, 2) AS max_result_mb,\n       input, output, cache_read, cache_creation,\n       dateDiff('second', started, last_event) AS seconds\nFROM cc.prompts\nWHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}')\n  AND started >= $__fromTime AND started <= $__toTime\n  AND (('${actor}' = '__all' AND '${skill}' = '__all') OR (session_id, prompt_id) IN (SELECT session_id, prompt_id FROM cc.api_requests WHERE ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}')))\nORDER BY cost_usd DESC\nLIMIT 200"
+          "rawSql": "SELECT started, prompt_id, session_id, project,\n       if(prompt IN ('', '<REDACTED>'), '(text not logged)', leftUTF8(replaceAll(prompt, '\\n', ' '), 200)) AS prompt,\n       cost_usd, tokens, requests, tool_calls, agents_run,\n       round(max_result_bytes / 1048576, 2) AS max_result_mb,\n       input, output, cache_read, cache_creation,\n       dateDiff('second', started, last_event) AS seconds\nFROM cc.prompts\nWHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}')\n  AND started >= $__fromTime AND started <= $__toTime\n  AND (('${actor}' = '__all' AND '${skill}' = '__all') OR (session_id, prompt_id) IN (SELECT session_id, prompt_id FROM cc.api_requests WHERE ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}')))\nORDER BY cost_usd DESC\nLIMIT 200"
         }
       ],
       "options": {
@@ -248,7 +274,7 @@
                 "value": [
                   {
                     "title": "Inspect prompt",
-                    "url": "/d/cc-prompts?var-project=${__data.fields.project}&var-session=$__all&var-actor=$__all&var-skill=$__all&var-prompt=${__value.raw}&${__url_time_range}"
+                    "url": "/d/cc-prompts?${account:queryparam}&var-project=${__data.fields.project}&var-session=$__all&var-actor=$__all&var-skill=$__all&var-prompt=${__value.raw}&${__url_time_range}"
                   }
                 ]
               }
@@ -265,7 +291,7 @@
                 "value": [
                   {
                     "title": "Open session",
-                    "url": "/d/cc-sessions?var-project=${__data.fields.project}&var-session=${__value.raw}&var-actor=$__all&var-skill=$__all&${__url_time_range}"
+                    "url": "/d/cc-sessions?${account:queryparam}&var-project=${__data.fields.project}&var-session=${__value.raw}&var-actor=$__all&var-skill=$__all&${__url_time_range}"
                   }
                 ]
               }
@@ -341,7 +367,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT started AS time, session_id, project, round(cost_usd, 3) AS cost_usd, tokens, requests, tool_calls,\n       if(prompt IN ('', '<REDACTED>'), '(text not logged)', prompt) AS prompt\nFROM cc.prompts\nWHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}')\n  AND prompt_id = '${prompt}' AND '${prompt}' != '__all' AND started >= $__fromTime AND started <= $__toTime\nLIMIT 20"
+          "rawSql": "SELECT started AS time, session_id, project, round(cost_usd, 3) AS cost_usd, tokens, requests, tool_calls,\n       if(prompt IN ('', '<REDACTED>'), '(text not logged)', prompt) AS prompt\nFROM cc.prompts\nWHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}')\n  AND prompt_id = '${prompt}' AND '${prompt}' != '__all' AND started >= $__fromTime AND started <= $__toTime\nLIMIT 20"
         }
       ],
       "options": {
@@ -369,7 +395,7 @@
                 "value": [
                   {
                     "title": "Open session",
-                    "url": "/d/cc-sessions?var-project=${__data.fields.project}&var-session=${__value.raw}&var-actor=$__all&var-skill=$__all&${__url_time_range}"
+                    "url": "/d/cc-sessions?${account:queryparam}&var-project=${__data.fields.project}&var-session=${__value.raw}&var-actor=$__all&var-skill=$__all&${__url_time_range}"
                   }
                 ]
               }
@@ -415,7 +441,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT ts AS time, actor, skill, model, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens,\n       round(cost_usd, 4) AS cost_usd, duration_ms\nFROM cc.api_requests\nWHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}')\n  AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}')\n  AND prompt_id = '${prompt}' AND '${prompt}' != '__all'\nORDER BY ts\nLIMIT 500"
+          "rawSql": "SELECT ts AS time, actor, skill, model, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens,\n       round(cost_usd, 4) AS cost_usd, duration_ms\nFROM cc.api_requests\nWHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}')\n  AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}')\n  AND prompt_id = '${prompt}' AND '${prompt}' != '__all'\nORDER BY ts\nLIMIT 500"
         }
       ],
       "options": {
@@ -469,7 +495,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT ts AS time, actor, skill, tool_name, success, duration_ms,\n       if(path != '', path, bash_cmd) AS target\nFROM cc.tool_calls\nWHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}')\n  AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}')\n  AND prompt_id = '${prompt}' AND '${prompt}' != '__all'\nORDER BY ts\nLIMIT 500"
+          "rawSql": "SELECT ts AS time, actor, skill, tool_name, success, duration_ms,\n       if(path != '', path, bash_cmd) AS target\nFROM cc.tool_calls\nWHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}')\n  AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}')\n  AND prompt_id = '${prompt}' AND '${prompt}' != '__all'\nORDER BY ts\nLIMIT 500"
         }
       ],
       "options": {
