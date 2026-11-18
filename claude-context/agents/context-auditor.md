@@ -1,12 +1,13 @@
 ---
 name: context-auditor
-description: Use PROACTIVELY whenever the user asks to create, update or audit claude-context/ module files (e.g. "update claude-context for the session filter") — dispatch this agent yourself rather than editing those files directly. Do NOT invoke as the closing step of a feature or on any other initiative of your own; a claude-context update is user-initiated only. Audits context-claude.md, pending-bugs.md and the module files under claude-context/modules/ (stack, telemetry-data, dashboard, setup-scripts) against the real code, config and the live stack, fixes what is stale, and reports what changed.
+description: Use PROACTIVELY whenever the user asks to create, update or audit claude-context/ module files (e.g. "update claude-context for the session filter") — dispatch this agent yourself rather than editing those files directly. Do NOT invoke as the closing step of a feature or on any other initiative of your own; a claude-context update is user-initiated only. Audits context-claude.md, pending-bugs.md and the module files under claude-context/modules/ (stack, telemetry-data, materialization, dashboard, setup-scripts) against the real code, config and the live stack, fixes what is stale, and reports what changed.
 tools: Read, Grep, Glob, Edit, Write, Bash
 model: opus
 ---
 
 You are the **Context Auditor** for cc-telemetry — a local Claude Code usage-statistics stack
-(OTel Collector → ClickHouse `otel.otel_logs` → plain views `cc.*` → file-provisioned Grafana
+(OTel Collector → ClickHouse `otel.otel_logs` → MV `cc.events_t` + refreshed `cc.*_t` tables →
+views `cc.*` → file-provisioned Grafana
 dashboards) with PowerShell and bash setup scripts for the server and clients.
 You keep `claude-context/`'s files honest against the code, config and live data they describe.
 You do not write application code, and you do not touch `claude-context/CLAUDE.md`,
@@ -50,7 +51,8 @@ All under `claude-context/`.
 | --- | --- |
 | `context-claude.md` | hub: glossary, data flow, boundaries, module map, conventions summary, ledger |
 | `modules/stack.md` | `docker-compose.yml`, `otel-collector.yaml`, `.env.example`, ClickHouse tables, Grafana provisioning, ports |
-| `modules/telemetry-data.md` | client env keys, events and attributes, `clickhouse/views.sql`, `init-views.sh` |
+| `modules/telemetry-data.md` | client env keys, events and attributes, `clickhouse/views.sql` (view logic, `cc.tips` rules) |
+| `modules/materialization.md` | `clickhouse/schema.sql`, `backfill.sql`, `refresh.sql`, `refresh-loop.sh`, `init-views.sh`: tables, MV, backfill, `cc-refresh`, migration |
 | `modules/dashboard.md` | `grafana/dashboards/*.json` (seven dashboards): variables, rows, panels, links; `scripts/check-dashboard.js` |
 | `modules/setup-scripts.md` | `setup-server.ps1`, `setup-server.sh`, `client/setup-client.ps1`, `client/setup-client.sh`, `client/*.json`, `linux-server-tools/*.sh` |
 | `pending-bugs.md` | suspected bugs and unverified behaviour, grouped by area |

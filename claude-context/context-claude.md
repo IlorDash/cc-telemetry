@@ -19,6 +19,8 @@ ClickHouse and shows them in Grafana. Everything stays on the LAN. Single branch
 | keepalive | hidden `wsl.exe --exec sleep infinity` that keeps the WSL distro (and Docker) running |
 | empty session | startup-only `session.id` from a VS Code extension process: no prompt, no request; hidden on the dashboard |
 | update | `setup-server.sh --update`: safety dump + row counts, `git pull --ff-only`, re-run, restart of collector/Grafana when their config changed, row-count check |
+| backfill | `clickhouse/backfill.sql`: copies `otel.otel_logs` rows missing from `cc.events_t` (not a backfill from transcripts) |
+| refresh | `cc-refresh` service rebuilding `cc.session_project_t` and `cc.tips_t` every 300 s; the inferred project of a new session and the tips lag ≤ 5 min |
 | old ARM | `aarch64` without `lrcpc` (Raspberry Pi 4): only ClickHouse ≤ 22.3 runs → `CLICKHOUSE_VERSION=22.3.20.29` |
 
 ## Data flow
@@ -35,12 +37,17 @@ otel-collector  memory_limiter → attributes/drop_response → batch
    │ clickhouse exporter, create_schema: true
    ▼
 ClickHouse  otel.otel_logs (events), otel.otel_metrics_* (metrics, unused by the dashboard)
-   │ plain views (recomputed on every query), created by the one-shot views-init
+   │ cc.events_mv (materialized view, on insert, ServiceName claude-code) → cc.events_t (MergeTree)
+   │ one-shot views-init: schema.sql → backfill.sql (month by month) → views.sql
+   │ cc-refresh (every 300 s): refresh.sql → cc.session_project_t, cc.tips_t (EXCHANGE TABLES)
    ▼
-cc.events_raw + cc.session_meta → cc.path_roots → cc.session_project → cc.events (effective project)
-cc.events_raw → cc.agents, cc.requests;   cc.events → cc.api_requests, cc.tool_calls, cc.prompts,
+cc.events_t → cc.events_raw;  otel_logs (cc-session-meta) → cc.session_meta (plain view)
+cc.events_t + cc.session_meta → cc.path_roots ⇢ [refresh] cc.session_project_t → cc.session_project
+cc.events_raw + cc.session_project → cc.events (effective project)
+cc.events_raw → cc.agents, cc.requests;   cc.events → cc.api_requests, cc.prompts,
                                           cc.sessions (+ cc.session_meta: title, branch, cwd)
-cc.tips (usage tips, last 7 days; Tips dashboard + Overview tiles) ← the views above
+cc.events_t + session_project + agents + requests → cc.tool_calls
+cc.tips (usage tips, last 7 days; Tips dashboard + Overview tiles) ← [refresh] cc.tips_t
    │ grafana-clickhouse-datasource (uid clickhouse, native :9000, user otel)
    ▼
 Grafana :3000 (host port GRAFANA_PORT)  7 dashboards, shared variables + links bar:
@@ -69,14 +76,18 @@ Grafana :3000 (host port GRAFANA_PORT)  7 dashboards, shared variables + links b
 | Module file | Covers |
 | --- | --- |
 | `modules/stack.md` | `docker-compose.yml`, `otel-collector.yaml`, `.env`, ClickHouse tables, versions and resource limits (`clickhouse/{config,users}.d/`), Grafana provisioning, ports |
-| `modules/telemetry-data.md` | events and attributes Claude Code sends, session-meta records of the client hook, `clickhouse/views.sql` (incl. `cc.tips` rules), `clickhouse/init-views.sh` |
+| `modules/telemetry-data.md` | events and attributes Claude Code sends, session-meta records of the client hook, the `cc.*` views (`clickhouse/views.sql`) and `cc.tips` rules (`clickhouse/refresh.sql`) |
+| `modules/materialization.md` | `cc.events_t` + `cc.events_mv` (`clickhouse/schema.sql`), backfill (`backfill.sql`, `init-views.sh`), `cc-refresh` (`refresh.sql`, `refresh-loop.sh`), migration rule, health checks |
 | `modules/dashboard.md` | `grafana/dashboards/*.json` (7 dashboards): uids, shared variables and links bar, panels, fixed panel ids, drill-down links, `check-dashboard.js` |
 | `modules/setup-scripts.md` | `setup-server.ps1`, `setup-server.sh` (incl. `--update`), `client/setup-client.{ps1,sh}` (incl. the session-meta hook), `client/*.json`, `linux-server-tools/*.sh`, keepalive, LAN access |
 
 ## Key conventions (details in `guides/`, index in CLAUDE.md)
 
-- Views are plain, not materialized: editing `views.sql` and re-running
-  `docker compose run --rm views-init` recomputes all history; no migrations.
+- `cc.*` views are plain views over `cc.events_t` and two refreshed tables: editing `views.sql` and
+  re-running `docker compose run --rm views-init` applies to all history; no migration.
+  **Exception:** the expressions of `cc.events_mv` / columns of `cc.events_t` (`schema.sql`, written
+  again in `backfill.sql`) are stored at insert time — changing them needs an explicit migration
+  (`IF NOT EXISTS` skips it). `refresh.sql` changes apply on the next `cc-refresh` run.
 - Dashboards are file-provisioned: Grafana re-reads `grafana/dashboards/` every 30 s; edit the files, not the UI.
 - Views and dashboard queries must run on ClickHouse 22.3 through 25.8: no multiple `USING` joins.
 - Scripts run on stock Windows PowerShell 5.1: ASCII only, `setup-server.ps1` uses

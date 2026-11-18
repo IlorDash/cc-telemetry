@@ -6,12 +6,12 @@ The Docker services, how data moves between them, what is exposed and where it i
 
 | Path | Role |
 | --- | --- |
-| `docker-compose.yml` | services `clickhouse`, `otel-collector`, `views-init`, `grafana`; volumes `clickhouse-data`, `grafana-data` |
+| `docker-compose.yml` | services `clickhouse`, `otel-collector`, `views-init`, `cc-refresh`, `grafana`; volumes `clickhouse-data`, `grafana-data` |
 | `otel-collector.yaml` | OTLP receivers, processors, clickhouse exporter, pipelines |
 | `.env.example` → `.env` | `CLICKHOUSE_PASSWORD`, `GRAFANA_ADMIN_PASSWORD`; optional `OTLP_BIND`, `GRAFANA_BIND`, `GRAFANA_PORT`, `CLICKHOUSE_VERSION` (`.env` git-ignored, created by `setup-server.ps1` / `setup-server.sh`; only the `.sh` writes the optional keys) |
 | `grafana/provisioning/datasources/clickhouse.yaml` | datasource uid `clickhouse`, native `clickhouse:9000`, user `otel`, db `cc`, password from env |
 | `grafana/provisioning/dashboards/dashboards.yaml` | file provider, `updateIntervalSeconds: 30`, `allowUiUpdates: true` |
-| `clickhouse/init-views.sh`, `clickhouse/views.sql` | see `modules/telemetry-data.md` |
+| `clickhouse/init-views.sh`, `clickhouse/refresh-loop.sh`, `clickhouse/{schema,backfill,views,refresh}.sql` | see `modules/telemetry-data.md` |
 | `clickhouse/config.d/low-resource.xml` | server config: system logs, memory, caches, merge pool thresholds (below) |
 | `clickhouse/users.d/low-resource.xml` | `default` profile: threads, per-query memory, profilers, background pool (below) |
 
@@ -22,6 +22,7 @@ The Docker services, how data moves between them, what is exposed and where it i
 | `clickhouse` | `clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-25.8}` | none published | db `otel`, user `otel`; healthcheck `SELECT 1`; `ulimits nofile 262144`; `cpus: 2` |
 | `otel-collector` | `otel/opentelemetry-collector-contrib:0.135.0` | `${OTLP_BIND:-0.0.0.0}:4317` gRPC (Claude Code), `${OTLP_BIND:-0.0.0.0}:4318` HTTP (session-meta hook) | starts after clickhouse is healthy |
 | `views-init` | `clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-25.8}` | — | one-shot, `restart: "no"`; `bash /init/init-views.sh`; `docker compose ps -a` shows `Exited (0)` when fine |
+| `cc-refresh` | `clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-25.8}` | — | `bash /init/refresh-loop.sh`: `refresh.sql` every 300 s, client `--max_threads 1`; logs `refresh ok` / `refresh FAILED` and keeps looping; `depends_on` clickhouse healthy + views-init `service_completed_successfully` (a failed views-init fails `compose up -d`); after a reboot views-init does not run again, the loop waits for its tables |
 | `grafana` | `grafana/grafana:12.1.0` | `${GRAFANA_BIND:-127.0.0.1}:${GRAFANA_PORT:-3000}:3000` | plugin via `GF_PLUGINS_PREINSTALL_SYNC=grafana-clickhouse-datasource` (4.23.5 at first install); home dashboard = `overview.json` via `GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH`; `GF_DASHBOARDS_MIN_REFRESH_INTERVAL=1m` |
 
 Bind mounts (read-only) — `compose up -d` recreates a container only when its service
@@ -33,6 +34,7 @@ definition changes, so an edited file is picked up as follows:
 | `grafana/provisioning/` | `grafana` | restart (same, for any file under it) |
 | `grafana/dashboards/` | `grafana` | re-read every 30 s |
 | `clickhouse/` | `views-init` | next views-init run (`compose up -d` starts it again; or `compose run --rm views-init`) |
+| `clickhouse/` | `cc-refresh` | `refresh.sql`: next run (re-read each loop); `refresh-loop.sh`: only on a restart of `cc-refresh` — `--update` does not restart it |
 | `clickhouse/config.d/low-resource.xml`, `clickhouse/users.d/low-resource.xml` (single files) | `clickhouse` | `compose restart clickhouse` by hand: `setup-server.sh --update` does not restart it |
 
 All services but `views-init` are `restart: unless-stopped`; in wsl mode they come up when the
@@ -46,8 +48,9 @@ the docker service at boot.
 | `25.8` | compose default |
 | `22.3.20.29` | old ARM (`aarch64` without `lrcpc`, Raspberry Pi 4): ClickHouse needs ARMv8.2 since 22.10; 23.3 and 25.8 die there with `Illegal instruction` |
 
-- The stack (collector schema, views, all dashboard queries) runs on 22.3.20.29, 23.3 and 25.8.
-  22.3.20.29 is the tag picked for ARMv8.0 CPUs such as the Raspberry Pi 4. Verify on the
+- The stack (collector schema, views, all dashboard queries) runs on 22.3.20.29, 23.3 and 25.8;
+  the materialized layer (`schema.sql`, `backfill.sql`, `refresh.sql`, 2026-11-18) only on
+  22.3.20.29 so far (`pending-bugs.md`). 22.3.20.29 is the tag picked for ARMv8.0 CPUs such as the Raspberry Pi 4. Verify on the
   version the servers in use run (`server-state.local.md`).
 - A data volume written by a newer ClickHouse does not start with an older one: change the tag
   via `linux-server-tools/backup.sh dump` → empty volume (`down -v`: the user's "yes" only) →
@@ -69,7 +72,8 @@ the docker service at boot.
 - On 22.3.20.29 all `users.d` values and both `merge_tree` thresholds show as changed in
   `system.settings` / `system.merge_tree_settings`, `query_log` carries the TTL, `trace_log`
   stays as an empty table (observed 2026-11-17).
-- A dashboard query needing more than 1.5 GB fails instead of slowing the server down.
+- A dashboard query needing more than 1.5 GB fails instead of slowing the server down; the
+  backfill runs per month of data for the same reason.
 
 ## Collector pipeline
 
@@ -91,6 +95,12 @@ metrics: otlp → memory_limiter → batch → clickhouse
   `ResourceAttributes` / `LogAttributes Map(LowCardinality(String), String)`, `Body`, `ScopeName`, …
   No TTL: kept indefinitely in volume `clickhouse-data`. `ServiceName` = `claude-code` (Claude
   Code events) or `cc-session-meta` (client hook); the views filter it.
+- `cc.events_t` (MergeTree, `PARTITION BY toYYYYMM(ts)`, `ORDER BY (event, ts)`): the `claude-code`
+  rows again, flattened — data is stored twice. `cc.session_project_t`, `cc.tips_t`: small, rebuilt
+  by `cc-refresh`. Columns and rules: `modules/telemetry-data.md`.
+- `backup.sh` dumps only `otel.*`; `cc.events_t` holds nothing extra. A `restore` into
+  `otel.otel_logs` after setup refills it through `cc.events_mv`, otherwise the next views-init
+  backfill does (`pending-bugs.md`). `--update` row counts cover `otel.*` only.
 - In wsl mode the volumes live inside the distro: `wsl --unregister` deletes all data — dump first
   (`linux-server-tools/backup.sh dump`, `modules/setup-scripts.md`).
 - `grafana-data` holds only Grafana's own DB; datasource and dashboard come from files.
@@ -101,7 +111,7 @@ metrics: otlp → memory_limiter → batch → clickhouse
 | --- | --- | --- |
 | Grafana (`GRAFANA_PORT`, 3000) | `GRAFANA_BIND` (unset → `127.0.0.1`); `setup-server.sh` writes `0.0.0.0` unless `--local-only` | Windows: the server PC only; Linux: the LAN by default |
 | 4317, 4318 | both follow `OTLP_BIND` (unset → `0.0.0.0`). wsl mode: Windows `localhost`, LAN via one firewall rule + portproxy per port; Linux: `setup-server.sh` writes `0.0.0.0` or `127.0.0.1` (`--local-only`) | clients: 4317 Claude Code (gRPC), 4318 the session-meta hook (OTLP/JSON `POST /v1/logs`) |
-| 9000/8123 | container network only | collector, grafana, views-init |
+| 9000/8123 | container network only | collector, grafana, views-init, cc-refresh |
 
 On Linux Docker's own iptables rules bypass ufw/firewalld: the bind address, not a firewall rule,
 limits who connects. Do not publish ClickHouse ports, or change a bind in `.env`, without the

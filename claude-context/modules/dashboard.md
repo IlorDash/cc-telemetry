@@ -123,3 +123,6 @@ node claude-context/scripts/check-dashboard.js [--project p] [--session id] [--a
 - Summary "Sessions" counts sessions with a model request; panels 7/37 and the Session variable
   use the same rule (`requests > 0`).
 - Prompt text exists only when the client sets `OTEL_LOG_USER_PROMPTS`; otherwise `<REDACTED>`.
+- Tips (58, 59, 200–202) and the inferred project of unlabelled sessions (`project` variable and
+  every per-project panel) come from tables `cc-refresh` rebuilds every 300 s: up to 5 min behind
+  the other panels (`modules/materialization.md`).

@@ -16,7 +16,7 @@ for each OS: server `setup-server.ps1` / `setup-server.sh` (also `--update` on L
 1. `claude-context/context-claude.md` — hub (glossary, data flow, module map, conventions,
    ledger). Always read first.
 2. The module file of your area in `claude-context/modules/`: `stack`, `telemetry-data`,
-   `dashboard`, `setup-scripts`.
+   `materialization`, `dashboard`, `setup-scripts`.
 3. Source last.
 
 Ledger: `claude-context/pending-bugs.md` (suspected bugs and unverified behaviour).
@@ -103,7 +103,7 @@ it as `model` on the Agent call.
 **Feature chain** — always sequential: developer → reviewer (BLOCKED → back to developer with the
 blocker list). **Trivial change** (comment or text, a typo, README wording, a constant the user
 named with its new value, a rename inside one function) → no reviewer; end the reply with the bold
-line **РЕВЬЮЕР НЕ ЗАПУСКАЛСЯ (ТРИВИАЛЬНАЯ ПРАВКА)**. Never trivial: SQL view logic, dashboard
+line **РЕВЬЮЕР НЕ ЗАПУСКАЛСЯ (ТРИВИАЛЬНАЯ ПРАВКА)**. Never trivial: SQL view logic, the MV / `events_t` schema / backfill / refresh, dashboard
 queries or variables, collector pipeline, anything in the setup scripts touching the network,
 firewall, WSL, `.env` or user settings files, or more than ~10 lines. In doubt → not trivial.
 

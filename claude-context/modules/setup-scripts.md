@@ -23,7 +23,8 @@ update flow and the LAN path.
            wsl: no docker → check PID 1 = systemd → ask (or -Yes) → wsl -u root install-docker.sh
                 → wsl --terminate (docker group)
 2 .env     created with two random 32-hex passwords (UTF-8 no BOM, LF); existing file kept
-3 stack    docker compose up -d; poll views-init until Exited, must be 0
+3 stack    docker compose up -d (direct wsl.exe / docker call, not the Compose wrapper); fails →
+           Compose logs --tail 50 views-init, then Fail; poll views-init until Exited, must be 0
 4 checks   GET localhost:3000/api/health; TCP localhost:4317 and :4318
 5 wsl      write <Startup>/cc-telemetry-keepalive.vbs (hidden wsl --exec sleep infinity), start it if not running
 6 -EnableLan  not admin → relaunch itself elevated (UAC) with -LanOnly, transcript in %TEMP%\cc-telemetry-lan.log
@@ -58,7 +59,8 @@ args       --local-only | --lan (= --enable-lan), --lan-ip <IPv4>, --grafana-por
            CLICKHOUSE_VERSION flag > old ARM: missing → 22.3.20.29, 23.3.22.3 → 22.3.20.29 (warn) > kept
            4317/4318 busy by another program → warn only
            warn: tag ≥ 22.10 on old ARM; tag < 24 = out of support
-3 stack    LAN note when a bind is not local; compose up -d; poll views-init until exited, must be 0
+3 stack    LAN note when a bind is not local; compose up -d (fails → logs --tail 50 views-init, fail);
+           poll views-init until exited (90 × 2 s), must be 0
 4 checks   http <bind|127.0.0.1>:<GRAFANA_PORT>/api/health; TCP 4317, 4318; docker enabled at boot (ask → enable)
 5 LAN      only if OTLP_BIND or GRAFANA_BIND is not 127.0.0.1/localhost
            lan_ports = 4317 4318 (OTLP_BIND not local) + GRAFANA_PORT (GRAFANA_BIND not local)
@@ -97,7 +99,13 @@ EXIT trap    failing exit once the dump folder is set → prints it (+ rollback 
   `compose restart grafana`; ok line per service, else "nothing to restart". git fails → warn
   (restart by hand), continue; restart fails → fail (EXIT trap prints dump folder + rollback).
 - No reload needed: `clickhouse/` (views) — `compose up -d` starts the exited one-shot views-init
-  again on every run; `grafana/dashboards/` — Grafana re-reads it every 30 s.
+  again on every run (schema, backfill of missing rows, views); `grafana/dashboards/` — Grafana
+  re-reads it every 30 s. `cc-refresh` re-reads `refresh.sql` on each run, but a changed
+  `refresh-loop.sh` is not picked up until `cc-refresh` is restarted (not done by `--update`).
+- Why the views-init log on a `compose up -d` failure: `cc-refresh` depends on views-init
+  `service_completed_successfully`, so a failed views-init fails `compose up -d` itself.
+- Dump and row-count check cover `otel.*` only; `cc.events_t` is refilled from `otel.otel_logs`
+  (`modules/materialization.md`).
 - Not handled: `clickhouse/config.d/*`, `clickhouse/users.d/*` — `clickhouse` is not restarted
   when they change (`pending-bugs.md`).
 - Nothing is removed (no `down -v`); earlier dumps stay. With `sudo docker` the dump files belong to root.

@@ -18,6 +18,11 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
   `-Distro` other than the one already kept alive, the new keepalive is not started this time
   (the Startup file is correct, so it starts after the next logon).
 
+- **?** The new `compose up -d` failure path (print views-init log, then `Fail`) never ran: the
+  `.ps1` was not executed after the change (Linux test machine only).
+- **L** Step 3 calls `wsl.exe ... docker compose up -d` / `docker compose up -d` directly,
+  duplicating the `Compose` wrapper's mode switch: a change to the wrapper must be repeated there.
+
 - **L** The final summary prints `.\setup-client.ps1` for other PCs, while in the repo the file is
   `client\setup-client.ps1` (right only for a copied file).
 
@@ -80,10 +85,29 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
   project in an unusual layout (`/data/x/y/`) is named after its first folder (`data`).
 - **L** `cc.tips` `repeated-read` puts `cc.tool_calls.path` in the title: a file outside the
   project keeps its absolute path there.
-- **?** `cc.tips` verified only on ClickHouse 22.3 (`count()` ~0.5 s on ~4.9k events); 25.8
-  untested. It reads `otel.otel_logs` once per rule through the views — watch the cost as data grows.
+- **?** `cc.tips` rules (now in `refresh.sql`) verified only on ClickHouse 22.3; 25.8 untested.
 - **?** `cc.tips` rules `cache`, `big-results`, `agent-outlier`, `denials`, `slow-ttft` have not
   fired on real data yet: SQL and thresholds unconfirmed.
+
+## materialization (`clickhouse/schema.sql`, `backfill.sql`, `refresh.sql`, `cc-refresh`)
+
+- **?** Run only on ClickHouse 22.3.20.29 (2026-11-18): `schema.sql`, the backfill, `refresh.sql`
+  (`EXCHANGE TABLES`) and the new views never ran on 23.3 or 25.8.
+- **?** The `throwIf` abort path of `refresh.sql` (duplicate `session_id` → no swap, old table
+  kept, next run drops the leftover `_new`) was never triggered.
+- **?** A very large first backfill (upgrade over a big history) was not timed against the setup
+  scripts' views-init wait (90 × 2 s after `compose up -d`).
+- **?** `backup.sh restore` refilling `cc.events_t` (through `cc.events_mv`, or the next views-init
+  backfill) follows from the code but was not run.
+- **L?** A row from a client whose clock is more than 30 s ahead, arriving while a month pass
+  runs, may be inserted by both the MV and the backfill (duplicate in `cc.events_t`); rare, not
+  observed.
+- **L** A changed `clickhouse/refresh-loop.sh` is not picked up by `setup-server.sh --update`
+  (`cc-refresh`'s service definition is unchanged, `reload_changed_config` does not restart it)
+  until `cc-refresh` is restarted by hand.
+- **L** Path rules are written three times (`cc.events_mv`, `backfill.sql`, `cwd` part of
+  `cc.path_roots`) and the project rule twice (`cc.events`, `cc.tool_calls`): an edit to one copy
+  silently diverges.
 
 ## dashboards (`grafana/dashboards/*.json`)
 

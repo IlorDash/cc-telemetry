@@ -9,10 +9,12 @@ and what did not; never claim a check that did not run.
 
 | Changed | Check |
 | --- | --- |
-| `clickhouse/views.sql` | `wsl -d Ubuntu -- docker compose run --rm views-init` (must print `cc.* views are ready`); then a `SELECT count()` per touched view and a sample of the changed columns through `linux-server-tools/ch.sh`; then the dashboard check |
+| `clickhouse/views.sql`, `schema.sql`, `backfill.sql`, `init-views.sh` | `wsl -d Ubuntu -- docker compose run --rm views-init` (must print `cc.* views are ready`); then a `SELECT count()` per touched view and a sample of the changed columns through `linux-server-tools/ch.sh`; the materialization health checks (below); then the dashboard check. A change to the MV or `events_t` columns needs a migration first (`conventions.md`) |
+| `clickhouse/refresh.sql` | picked up by `cc-refresh` on its next run (≤ 5 min): `docker compose logs --tail 5 cc-refresh` shows `refresh ok`; sample `cc.session_project_t` / `cc.tips_t`; then the dashboard check. Never run `refresh.sql` by hand while `cc-refresh` is up |
+| `clickhouse/refresh-loop.sh` | `bash -n`; `wsl -d Ubuntu -- docker compose up -d --force-recreate cc-refresh` (only that service); `refresh ok` in its log |
 | `grafana/dashboards/*.json` | `JSON.parse` every changed file with `node -e`; wait ≤ 30 s for Grafana to reload; dashboard check (`check-dashboard.js` runs every file's queries and checks that each uid is provisioned and home = `cc-usage`) |
 | `otel-collector.yaml` | `wsl -d Ubuntu -- docker compose restart otel-collector`; log shows `Everything is ready`; a fresh event arrives (`SELECT max(Timestamp) FROM otel.otel_logs`) |
-| `docker-compose.yml` | `wsl -d Ubuntu -- docker compose up -d`; `docker compose ps -a` all Up, `views-init` Exited (0) |
+| `docker-compose.yml` | `wsl -d Ubuntu -- docker compose up -d --dry-run` first: `clickhouse` / `otel-collector` must not be recreated unless intended (a recreate risks telemetry loss); then `up -d`; `docker compose ps -a` all Up incl. `cc-refresh`, `views-init` Exited (0) |
 | `clickhouse/config.d/*.xml`, `clickhouse/users.d/*.xml` | `wsl -d Ubuntu -- docker compose restart clickhouse` (neither compose nor `--update` restarts it for these); healthy again; the changed value in `system.server_settings` (25.x) / `system.settings` (profile keys) through `ch.sh`; then the dashboard check |
 | `*.ps1` | parse: `[System.Management.Automation.Language.Parser]::ParseFile(...)` with 0 errors; no bytes > 127; run it (below) |
 | `setup-server.ps1` | `powershell -NoProfile -ExecutionPolicy Bypass -File .\setup-server.ps1` — must exit 0 and keep `.env` (compare `Get-FileHash` before/after). `-EnableLan` needs the user (UAC) |
@@ -28,6 +30,11 @@ every supported tag.
 **SQL:** write the query into a scratchpad file, then
 `Get-Content <file> | wsl -d Ubuntu -- bash linux-server-tools/ch.sh` on Windows or
 `cat <file> | bash linux-server-tools/ch.sh` on Linux (password stays inside the script).
+
+**Materialization health** (read-only, through `ch.sh`; full table in `modules/materialization.md`):
+`count()` of `otel.otel_logs WHERE ServiceName = 'claude-code'` = `count()` of `cc.events_t`;
+`SELECT count() - uniqExact(session_id, seq, ts) FROM cc.events_t` = 0;
+`cc.session_project_t` has one row per `session_id`; `cc-refresh` logs `refresh ok` every ~5 min.
 
 **Dashboard check:** `node claude-context/scripts/check-dashboard.js` — runs every variable and
 panel query through Grafana's `/api/ds/query` with all variables = All (or

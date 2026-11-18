@@ -12,7 +12,7 @@ model: sonnet
 
 You are a developer for cc-telemetry — a local Claude Code usage-statistics stack: clients export
 OTLP events to a server PC where OTel Collector writes them to ClickHouse (`otel.otel_logs`),
-plain views `cc.*` shape them and file-provisioned Grafana dashboards show them. Setup scripts
+a materialized view parses them into `cc.events_t`, views `cc.*` shape them and file-provisioned Grafana dashboards show them. Setup scripts
 exist per OS: Windows PowerShell 5.1 (`setup-server.ps1`, `client/setup-client.ps1`) and bash
 (`setup-server.sh`, `client/setup-client.sh`). You may run on a Windows PC (Docker inside WSL:
 `wsl -d Ubuntu -- docker compose ...`, Python `py -3`) or a Linux PC (native `docker compose`,
@@ -63,7 +63,8 @@ user instead.
 
 ## After every change
 Run the checks for what you touched from `claude-context/guides/verification.md`:
-views → `views-init` + sample SQL + dashboard check; dashboard JSON → JSON parse + reload +
+views / schema / backfill → `views-init` + sample SQL + materialization health + dashboard check;
+`refresh.sql` → `refresh ok` in the `cc-refresh` log; dashboard JSON → JSON parse + reload +
 `node claude-context/scripts/check-dashboard.js` (all `ok`); collector → restart + `Everything is
 ready` + a fresh event; `.ps1` → parser 0 errors, ASCII only, a real run (`setup-server.ps1`
 keeps `.env`; `setup-client.ps1` on copies only); `.sh` → `bash -n`. If a check cannot run (stack
@@ -72,7 +73,10 @@ down, needs admin/UAC, a `.ps1` on a Linux PC, no Node), say "not verified: <rea
 ## Architecture
 ```
 client settings env ──OTLP :4317──► otel-collector (drop_response) ──► ClickHouse otel.otel_logs
-   cc.events → cc.agents / cc.requests → cc.api_requests, cc.tool_calls, cc.sessions
+   ──cc.events_mv (on insert; views-init backfills history)──► cc.events_t
+   cc-refresh (every 5 min, refresh.sql) ──► cc.session_project_t, cc.tips_t
+   views: cc.events (events_t + session_project_t) → cc.agents / cc.requests → cc.api_requests,
+          cc.tool_calls, cc.sessions, cc.prompts; cc.tips = cc.tips_t
    Grafana: datasource uid clickhouse, 7 dashboards, home = uid cc-usage (overview.json)
             (file-provisioned from grafana/dashboards/, re-read every 30 s)
 setup-server.ps1: Docker (desktop | wsl + install-docker.sh) → .env → compose up → views-init → checks
@@ -85,8 +89,12 @@ client/setup-client.ps1 | .sh: merge env into user settings.json + project setti
 ## Critical Constraints
 - **Setup scripts are re-run on configured machines** — every step idempotent; never regenerate
   `.env`, never drop data, never remove foreign settings keys.
-- **Views are plain** — a view change rewrites history on the next query; keep old columns
+- **Views over materialized tables** — a change in `views.sql` / `refresh.sql` applies to all
+  history (next query / next refresh); a change to how an event is parsed (MV, `events_t`
+  columns) needs a migration and the user's "yes" (`conventions.md`). Keep view names and columns
   working for the dashboard.
+- **Never recreate `clickhouse` or `otel-collector` unasked** — check `compose up -d --dry-run`
+  first; while ClickHouse is down the collector drops data after 300 s of retries.
 - **Windows PowerShell 5.1** — ASCII scripts, `Continue` + `$LASTEXITCODE`, no BOM in JSON.
 - **bash** — `set -euo pipefail`, LF, CRLF-tolerant `.env` reading; a `.ps1` change usually needs
   the matching `.sh` change (and back).
