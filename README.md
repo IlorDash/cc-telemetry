@@ -391,7 +391,7 @@ cannot put the time of day on its X axis and a table column cannot be narrower t
 
 **Efficiency.** The Tips section at the top (counts, affected tokens, the token tips table and the time tips table) reads
 the tips (last 7 days, no time range, no variables); the cost and cache sections below follow the time range and the variables. The work phase of a response comes from the tools it called: Edit (any
-Edit / Write / MultiEdit / NotebookEdit), Delegate (Task / Agent), Run (Bash), Explore (only Read / Grep / Glob / LS), Talk
+Edit / Write / MultiEdit / NotebookEdit), Delegate (Task / Agent / SendMessage / SubagentHandback / TaskStop), Run (Bash), Explore (only Read / Grep / Glob / LS), Talk
 (no tool result), Other (any other tools, e.g. MCP or web); a response with several kinds takes the first match in that
 order. Pauses over 5 minutes are red: past the prompt-cache lifetime the next request writes the cache again. Gaps are
 between consecutive requests of a session, subagents included (filter Actor = main for the main conversation only); the
