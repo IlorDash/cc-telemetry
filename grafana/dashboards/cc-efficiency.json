@@ -494,7 +494,7 @@
         "x": 3,
         "y": 1,
         "w": 3,
-        "h": 7
+        "h": 8
       },
       "targets": [
         {
@@ -554,7 +554,7 @@
         "x": 6,
         "y": 1,
         "w": 4,
-        "h": 7
+        "h": 8
       },
       "targets": [
         {
@@ -638,7 +638,7 @@
         "x": 10,
         "y": 1,
         "w": 14,
-        "h": 7
+        "h": 8
       },
       "targets": [
         {
@@ -766,8 +766,8 @@
     {
       "id": 222,
       "type": "table",
-      "title": "Token tips · sorted by affected · click a title to open its evidence panel",
-      "description": "Tips from cc.tips that are about tokens (affected is not null), biggest first. Fixed 7-day window: the dashboard time range and the variables do not apply. The title link opens one evidence panel full-screen on the related dashboard, with the project / session / actor preset and the current time range. affected is about this many tokens (read results and big results: result bytes / 4; cache: cache-creation tokens). cost_usd is the cost of the requests the tip is about; empty where it cannot be measured. How the tips are made: the text panel at the bottom.",
+      "title": "Token tips · click a title to open its evidence",
+      "description": "Tips from cc.tips that are about tokens (affected is not null), sorted by affected, biggest first. Fixed 7-day window: the dashboard time range and the variables do not apply. The title link opens one evidence panel full-screen on the related dashboard, with the project / session / actor preset and the current time range. affected is about this many tokens (read results and big results: result bytes / 4; cache: cache-creation tokens). cost_usd is the cost of the requests the tip is about; empty where it cannot be measured. How the tips are made: the text panel at the bottom.",
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "clickhouse"
@@ -775,7 +775,7 @@
       "timeFrom": "7d",
       "gridPos": {
         "x": 3,
-        "y": 8,
+        "y": 9,
         "w": 21,
         "h": 10
       },
@@ -805,7 +805,8 @@
       "fieldConfig": {
         "defaults": {
           "custom": {
-            "filterable": true
+            "filterable": false,
+            "minWidth": 50
           }
         },
         "overrides": [
@@ -1068,7 +1069,7 @@
     {
       "id": 228,
       "type": "table",
-      "title": "Time and friction tips · not about tokens, so not ranked by affected",
+      "title": "Time and friction tips · click a title to open its evidence",
       "description": "Not about tokens, so not ranked by affected. Tips from cc.tips with no affected value (denials, slow hooks, slow first token). Fixed 7-day window: the dashboard time range and the variables do not apply. The title link opens one evidence panel full-screen on the related dashboard, with the project / session / actor preset and the current time range. metric is the number behind the tip (count or mean ms).",
       "datasource": {
         "type": "grafana-clickhouse-datasource",
@@ -1077,7 +1078,7 @@
       "timeFrom": "7d",
       "gridPos": {
         "x": 3,
-        "y": 18,
+        "y": 19,
         "w": 21,
         "h": 7
       },
@@ -1101,7 +1102,8 @@
       "fieldConfig": {
         "defaults": {
           "custom": {
-            "filterable": true
+            "filterable": false,
+            "minWidth": 50
           }
         },
         "overrides": [
@@ -1261,12 +1263,12 @@
     {
       "id": 411,
       "type": "text",
-      "title": "Where cost goes · sum(cost_usd) by work phase of the turn · follows the time range and variables",
+      "title": "Where cost goes · follows the time range and variables",
       "description": "sum(cost_usd) by work phase of the turn. Filtered by the time range and all variables.",
       "transparent": true,
       "gridPos": {
         "x": 3,
-        "y": 25,
+        "y": 26,
         "w": 21,
         "h": 1
       },
@@ -1286,8 +1288,8 @@
       },
       "gridPos": {
         "x": 3,
-        "y": 26,
-        "w": 13,
+        "y": 27,
+        "w": 12,
         "h": 9
       },
       "targets": [
@@ -1426,9 +1428,9 @@
         "uid": "clickhouse"
       },
       "gridPos": {
-        "x": 16,
-        "y": 26,
-        "w": 8,
+        "x": 15,
+        "y": 27,
+        "w": 9,
         "h": 9
       },
       "targets": [
@@ -1451,7 +1453,8 @@
       "fieldConfig": {
         "defaults": {
           "custom": {
-            "filterable": false
+            "filterable": false,
+            "minWidth": 50
           }
         },
         "overrides": [
@@ -1473,7 +1476,7 @@
               },
               {
                 "id": "custom.width",
-                "value": 90
+                "value": 80
               },
               {
                 "id": "color",
@@ -1636,7 +1639,7 @@
       "transparent": true,
       "gridPos": {
         "x": 3,
-        "y": 35,
+        "y": 36,
         "w": 21,
         "h": 1
       },
@@ -1656,8 +1659,8 @@
       },
       "gridPos": {
         "x": 3,
-        "y": 36,
-        "w": 8,
+        "y": 37,
+        "w": 9,
         "h": 7
       },
       "targets": [
@@ -1670,7 +1673,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT multiIf(gap < 60, '< 1 min', gap < 300, '1-5 min', gap < 900, '5-15 min', gap < 3600, '15-60 min', '> 1 h') AS bucket,\n       count() AS requests,\n       max(gap >= 300) AS over_ttl\nFROM\n(\n  SELECT cur - prev AS gap\n  FROM\n  (\n    SELECT toUnixTimestamp(ts) AS cur,\n           lagInFrame(toUnixTimestamp(ts), 1, 0) OVER (PARTITION BY session_id ORDER BY ts ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS prev\n    FROM cc.api_requests\n    WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\n  )\n  WHERE prev > 0\n)\nGROUP BY bucket\nORDER BY min(gap)"
+          "rawSql": "SELECT multiIf(gap < 60, '<1m', gap < 300, '1–5m', gap < 900, '5–15m', gap < 3600, '15–60m', '>1h') AS bucket,\n       count() AS requests,\n       max(gap >= 300) AS over_ttl\nFROM\n(\n  SELECT cur - prev AS gap\n  FROM\n  (\n    SELECT toUnixTimestamp(ts) AS cur,\n           lagInFrame(toUnixTimestamp(ts), 1, 0) OVER (PARTITION BY session_id ORDER BY ts ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS prev\n    FROM cc.api_requests\n    WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\n  )\n  WHERE prev > 0\n)\nGROUP BY bucket\nORDER BY min(gap)"
         }
       ],
       "options": {
@@ -1761,9 +1764,9 @@
         "uid": "clickhouse"
       },
       "gridPos": {
-        "x": 11,
-        "y": 36,
-        "w": 13,
+        "x": 12,
+        "y": 37,
+        "w": 12,
         "h": 7
       },
       "targets": [
@@ -1786,7 +1789,8 @@
       "fieldConfig": {
         "defaults": {
           "custom": {
-            "filterable": true
+            "filterable": false,
+            "minWidth": 50
           }
         },
         "overrides": [
@@ -1799,6 +1803,10 @@
               {
                 "id": "displayName",
                 "value": "Project"
+              },
+              {
+                "id": "custom.minWidth",
+                "value": 110
               }
             ]
           },
@@ -1822,7 +1830,7 @@
               },
               {
                 "id": "custom.width",
-                "value": 90
+                "value": 80
               }
             ]
           },
@@ -1850,7 +1858,7 @@
               },
               {
                 "id": "custom.width",
-                "value": 90
+                "value": 75
               },
               {
                 "id": "custom.cellOptions",
@@ -1894,7 +1902,7 @@
             "properties": [
               {
                 "id": "displayName",
-                "value": "Cache create tokens"
+                "value": "Cache create"
               },
               {
                 "id": "unit",
@@ -1940,7 +1948,7 @@
               },
               {
                 "id": "custom.width",
-                "value": 90
+                "value": 85
               }
             ]
           }
@@ -1954,9 +1962,9 @@
       "description": "",
       "gridPos": {
         "x": 3,
-        "y": 43,
+        "y": 44,
         "w": 21,
-        "h": 15
+        "h": 18
       },
       "options": {
         "mode": "markdown",

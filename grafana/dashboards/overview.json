@@ -482,7 +482,7 @@
     {
       "id": 30,
       "type": "stat",
-      "title": "cost_usd · time range",
+      "title": "cost_usd",
       "description": "Sum of cost_usd of the api_request events in the dashboard time range (30 days by default). cost_usd is computed by Claude Code from API prices: on a subscription it is not a bill.",
       "datasource": {
         "type": "grafana-clickhouse-datasource",
@@ -578,7 +578,7 @@
         "orientation": "vertical",
         "justifyMode": "auto",
         "wideLayout": false,
-        "colorMode": "background",
+        "colorMode": "value",
         "graphMode": "none",
         "textMode": "value_and_name",
         "text": {
@@ -604,11 +604,11 @@
                 "value": null
               },
               {
-                "color": "yellow",
+                "color": "#FADE2A",
                 "value": 75
               },
               {
-                "color": "#37872D",
+                "color": "#73BF69",
                 "value": 90
               }
             ]
@@ -967,7 +967,9 @@
       "fieldConfig": {
         "defaults": {
           "custom": {
-            "align": "auto"
+            "align": "auto",
+            "filterable": false,
+            "minWidth": 50
           }
         },
         "overrides": [
@@ -1025,7 +1027,7 @@
                 "id": "custom.cellOptions",
                 "value": {
                   "type": "gauge",
-                  "mode": "basic"
+                  "mode": "gradient"
                 }
               }
             ]
@@ -1284,7 +1286,7 @@
     {
       "id": 39,
       "type": "table",
-      "title": "Work rhythm · requests by weekday and 3-hour block",
+      "title": "Work rhythm",
       "description": "Model requests by weekday (rows) and 3-hour block (columns 00, 03, ... 21 = hours 00-02, 03-05, ...; server time zone, UTC in Docker) in the time range. Brighter = more requests: a cell is coloured by its share of the busiest weekday-block cell (below 8 % empty, then steps at 8, 30, 60 and 85 %); the cell text is hidden. A table with cell colours, because the Grafana heatmap has only a time X axis and cannot put the time of day on it, and a Grafana table cannot be narrower than 50 px per column, so 24 hour columns do not fit. All variables apply.",
       "datasource": {
         "type": "grafana-clickhouse-datasource",
@@ -1429,8 +1431,17 @@
       ],
       "options": {
         "orientation": "horizontal",
-        "displayMode": "basic",
+        "displayMode": "gradient",
+        "valueMode": "text",
         "showUnfilled": true,
+        "namePlacement": "top",
+        "sizing": "manual",
+        "minVizHeight": 16,
+        "maxVizHeight": 34,
+        "text": {
+          "titleSize": 15,
+          "valueSize": 14
+        },
         "reduceOptions": {
           "values": true,
           "calcs": [
@@ -1496,7 +1507,12 @@
         ]
       },
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "custom": {
+            "filterable": false,
+            "minWidth": 50
+          }
+        },
         "overrides": [
           {
             "matcher": {
@@ -1572,6 +1588,19 @@
               {
                 "id": "custom.width",
                 "value": 130
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#8e8e9e"
+                }
               }
             ]
           },

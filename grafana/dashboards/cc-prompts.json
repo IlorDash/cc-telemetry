@@ -721,8 +721,8 @@
     {
       "id": 180,
       "type": "table",
-      "title": "Most expensive prompts · a prompt = a user message and every API request until the next one",
-      "description": "The 8 prompts with the highest cost_usd in the time range. Model = the model family with the highest cost within the prompt. Requests = all its API requests (main, subagent, auxiliary); Tokens = input + output + cache create; Tools = its tool calls. Click a prompt to open its session on Sessions (the time range zooms to the session; Back or the time picker returns); click a project to filter this dashboard by it. Prompt text is logged only when the client sets OTEL_LOG_USER_PROMPTS=1.",
+      "title": "Most expensive prompts · click a prompt to open its session",
+      "description": "The 8 prompts with the highest cost_usd in the time range. A prompt = a user message and every API request until the next one. Model = the model family with the highest cost within the prompt. Requests = all its API requests (main, subagent, auxiliary); Tokens = input + output + cache create; Tools = its tool calls. Click a prompt to open its session on Sessions (the time range zooms to the session; Back or the time picker returns); click a project to filter this dashboard by it. Prompt text is logged only when the client sets OTEL_LOG_USER_PROMPTS=1.",
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "clickhouse"
@@ -759,6 +759,7 @@
       "fieldConfig": {
         "defaults": {
           "custom": {
+            "filterable": false,
             "minWidth": 50
           }
         },
@@ -1046,7 +1047,7 @@
         "x": 3,
         "y": 16,
         "w": 10,
-        "h": 7
+        "h": 8
       },
       "targets": [
         {
@@ -1101,7 +1102,7 @@
         "x": 13,
         "y": 16,
         "w": 11,
-        "h": 7
+        "h": 8
       },
       "targets": [
         {
@@ -1149,10 +1150,10 @@
         "orientation": "horizontal",
         "displayMode": "gradient",
         "valueMode": "text",
-        "namePlacement": "left",
+        "namePlacement": "top",
         "sizing": "manual",
-        "maxVizHeight": 40,
-        "minVizHeight": 20,
+        "maxVizHeight": 34,
+        "minVizHeight": 16,
         "minVizWidth": 8,
         "showUnfilled": true,
         "text": {
