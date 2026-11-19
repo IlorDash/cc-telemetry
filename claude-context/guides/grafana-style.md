@@ -84,7 +84,7 @@ query (display name), sits above the number; Grafana centres the content vertica
 - Time series: legend at the bottom as a list; money on a `currencyUSD` axis; a second
   metric goes on the right axis.
 - Vertical bar charts: `barWidth 0.8`, `showValue always`, legend off when there is one series.
-  Axis labels must not overlap: short labels from the query, or a wider panel.
+  With values on the bars, hide the y axis (`axisPlacement hidden`). Axis labels must not overlap: short labels from the query, or a wider panel.
 - State timeline: `rowHeight 0.8`, `showValue never`, legend off.
 - Pie / donut: legend on the right with values.
 

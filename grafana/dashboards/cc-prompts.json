@@ -1083,7 +1083,8 @@
           },
           "custom": {
             "fillOpacity": 100,
-            "gradientMode": "none"
+            "gradientMode": "none",
+            "axisPlacement": "hidden"
           }
         },
         "overrides": []

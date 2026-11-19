@@ -47,7 +47,10 @@ SELECT
     LogAttributes['hook_name']                                  AS hook_name,
     toUInt64OrZero(LogAttributes['total_duration_ms'])          AS hook_duration_ms,
     toUInt64OrZero(LogAttributes['tool_result_size_bytes'])     AS result_bytes,
-    toUInt64OrZero(LogAttributes['ttft_ms'])                    AS ttft_ms
+    toUInt64OrZero(LogAttributes['ttft_ms'])                    AS ttft_ms,
+    -- api_error events: HTTP status (0 when there is none, e.g. a network error) and the error text
+    toUInt32OrZero(LogAttributes['status_code'])                AS status_code,
+    LogAttributes['error']                                      AS error
 FROM otel.otel_logs
 WHERE ServiceName = 'claude-code';
 
@@ -199,6 +202,7 @@ SELECT
     e.input_tokens + e.output_tokens + e.cache_read_tokens + e.cache_creation_tokens AS total_tokens,
     e.cost_usd AS cost_usd,
     e.duration_ms AS duration_ms,
+    e.ttft_ms AS ttft_ms,        -- time to first token, 0 when not streamed
     e.request_id AS request_id   -- one response; tool_result events carry the same id (work phase, Efficiency dashboard)
 FROM cc.events AS e
 LEFT JOIN cc.agents AS a ON a.agent_id = e.agent_id

@@ -354,9 +354,9 @@ panels have a fixed height, so the space under them stays empty; they ignore the
 | **Overview** (home) | four totals for the time range (`cost_usd`, cache hit rate, billable tokens, tool error rate with the p95 API latency); daily tokens with the cache hit rate; projects (`cost_usd`, tokens, hit rate, sessions); `cost_usd` by model; work rhythm by weekday and 3-hour block; top tools; the six most recent sessions |
 | **Sessions** | four totals (sessions, median length as activity time, median `cost_usd`, sessions with errors); the sessions table (name, last prompt, project, git branch, model, turns, tokens, `cost_usd`, cache hit rate, tool errors); for the selected session: a header, five totals, a timeline (prompts, main requests, subagents, tools), cumulative `cost_usd` and tokens, and its prompts |
 | **Efficiency** | all tips (see "Tips"): token tips with the tokens they affect, then time and friction tips (fixed 7 days); below, where tokens and money are lost: `cost_usd` per day by work phase of a response (Explore, Edit, Run, Delegate, Talk, Other), pauses between requests against the 5-minute cache lifetime, cache hit rate and cache-creation tokens by project |
-| **Agents & skills** | runs, tokens and tool calls per agent and per skill; main session against subagents by tool; subagent runs far above their average |
-| **Tools & files** | tool calls, Bash commands, rejected calls, top files and directories, accesses by area, files re-read within a session, largest tool results, error rate by tool |
-| **Health** | time spent in your hooks, API latency, time to first token, tool duration and errors, recent failed tool calls |
+| **Agents & skills** | four totals (subagent share of `cost_usd`, subagent runs, skills used, outlier runs); subagent types (runs, mean and max tokens, max against mean, `cost_usd`); `cost_usd` per day, main against subagents; skills (uses, sessions, projects, `cost_usd` of their turns); the biggest subagent runs |
+| **Tools & files** | four totals (tool calls, error rate, rejected calls split by config / hook / user, median result size); calls by tool with the error rate; rejected tool calls; files re-read within a session; largest tool results; Bash by first word; most edited files |
+| **Health** | four totals (mean time to first token, p95 API latency, API errors, hook time); time to first token by day per model against the 3 s line; time per hook; API errors by status; API request duration by bucket |
 | **Prompts** | four totals (prompts, median and p95 `cost_usd`, requests per prompt); the most expensive prompts; prompts by `cost_usd` bucket; mean `cost_usd` per prompt by model |
 
 **Variables.** The five at the top are shared and nested: **Account → Project → Session → Actor → Skill** (`All` = no filter).
@@ -373,16 +373,17 @@ Claude Code does this attribution itself; the label lasts until the end of the p
 The refresh rate is picked at the top right (10 s by default, from 5 s), as in any Grafana dashboard.
 Some panels ignore the time range and say so in their description: the rail panels and the tips (last 7 days).
 
-**Clicks.** A session name in Recent sessions and a `session_id` in the other tables open that session on **Sessions**; the
+**Clicks.** A session name in Recent sessions opens that session on **Sessions**; the
 **all →** link next to the Recent sessions title opens **Sessions**; a project in Projects opens
-**Overview** for it; an agent or a skill opens **Agents & skills** filtered by it. A session name in the Sessions table
+**Overview** for it; an agent type in Subagent types or a skill in Skills filters **Agents & skills** by it; a session in
+Biggest subagent runs opens that session on **Sessions** and zooms the range to it. A session name in the Sessions table
 selects that session. A prompt in Most expensive prompts opens its session on **Sessions**; a project there filters
 **Prompts** by it; a prompt in Prompts in this session opens **Prompts** filtered by that session. A session name in
 Recent sessions, in the Sessions table and a prompt in Most expensive prompts also zoom the time range to that session
 (from its first prompt, request or tool call to the end of its last one, plus 3 %, at least 5 seconds), so the timeline and the cumulative graph fill their width. The
 Sessions table and its four totals then list the sessions active in that window. The browser Back button or the time
 picker returns to the earlier range. Picking a session in the Session variable keeps the time range; the links from the
-tips (`cc.tips`) keep the range of the dashboard they start from.
+tips (`cc.tips`) keep the range of the dashboard they start from, except the `agent-outlier` tip, which zooms to its session.
 
 **Sessions.** The four totals and the table list the sessions whose last prompt falls into the time range; they follow
 Account, Project, Actor and Skill but not Session, so the selected row (marked with ▶ before its name) stays among the others. Click a name to
@@ -418,6 +419,15 @@ Edit / Write / MultiEdit / NotebookEdit), Delegate (Task / Agent / SendMessage /
 order. Pauses over 5 minutes are red: past the prompt-cache lifetime the next request writes the cache again. Gaps are
 between consecutive requests of a session, subagents included (filter Actor = main for the main conversation only); the
 first request in the time range has no predecessor and is not counted.
+
+**Agents & skills, Tools & files, Health.** All panels follow the time range and the five variables, with these exceptions:
+the hook panels on Health ignore Skill (hook events carry no skill); skill activations are reported by the main session
+only, so Skills used and the Skills table are empty when an agent is picked as Actor. Outlier runs use the rule of the
+`agent-outlier` tip (a run above 6 times the mean of its type and above 50k tokens) over the time range. Sizes of tool results
+are bytes: the telemetry has no token count, so Repeat tokens in Files re-read is about size / 4 × (reads − 1), the same
+rule of thumb as the tips. Bash by first word counts only the first word of a command, which is all Claude Code sends. API
+errors come from `api_error` events: a request that failed and was retried counts each time, and the panels stay empty until
+the first one arrives.
 
 **Editing the rail.** Grafana loads every `.json` in `grafana/dashboards/` as a dashboard, so the rail is defined once in
 `grafana/rail/rail.json` and copied into every dashboard file by `node grafana/rail/sync-rail.js` (no dependencies; run it
@@ -551,7 +561,7 @@ Observed with Claude Code 2.1.323 and the client settings above:
 - **Tool arguments** (`OTEL_LOG_TOOL_DETAILS=1`): file paths, search patterns, Bash commands. Not file contents and not tool
   output: only their size (`tool_result_size_bytes`).
 - **Usage**: model, tokens (incl. cache), cost, durations, time to first token, effort, subagent and skill names, permission
-  decisions, hook timings; plus metrics (tokens, cost, lines of code changed, active time).
+  decisions, hook timings, API errors (HTTP status and the error message); plus metrics (tokens, cost, lines of code changed, active time).
 - **Identity**: account email, account/organization IDs, plan (`pro`, …), session and prompt IDs, OS version,
   and the `host` (and optionally `project`) you set. The project guess sends nothing of its own: the server derives it from the
   tool-call paths above and the hook's working directory below.

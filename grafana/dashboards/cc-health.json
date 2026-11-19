@@ -463,19 +463,36 @@
       }
     },
     {
-      "id": 26,
-      "type": "table",
-      "title": "Hook time",
-      "description": "",
+      "id": 490,
+      "type": "text",
+      "title": "Latency, errors and hooks. Not about tokens, but they slow every turn.",
+      "description": "Every panel follows the time range and the Account, Project, Session, Actor and Skill variables, except the hook panels, which ignore Skill (hook events carry no skill). The rail on the left ignores them.",
+      "transparent": true,
+      "gridPos": {
+        "x": 3,
+        "y": 0,
+        "w": 21,
+        "h": 1
+      },
+      "options": {
+        "mode": "html",
+        "content": ""
+      }
+    },
+    {
+      "id": 491,
+      "type": "stat",
+      "title": "TTFT mean",
+      "description": "Mean time to first token (ttft_ms of the model requests that streamed; requests without it are skipped); the second line is the 95th percentile. Red above 3 s, the threshold of the slow-ttft tip.",
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "clickhouse"
       },
       "gridPos": {
         "x": 3,
-        "y": 0,
-        "w": 21,
-        "h": 7
+        "y": 1,
+        "w": 5,
+        "h": 4
       },
       "targets": [
         {
@@ -487,36 +504,67 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT hook_name, count() AS runs, round(sum(hook_duration_ms) / 1000, 1) AS total_s,\n       round(avg(hook_duration_ms)) AS avg_ms\nFROM cc.events WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND $__timeFilter(ts) AND event = 'hook_execution_complete'\nGROUP BY hook_name ORDER BY total_s DESC"
+          "rawSql": "SELECT avg(ttft_ms) AS mean_ms, concat('p95 ', toString(round(quantile(0.95)(ttft_ms) / 1000, 1)), ' s') AS name\nFROM cc.api_requests WHERE ttft_ms > 0 AND ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nHAVING count() > 0"
         }
       ],
       "options": {
-        "showHeader": true,
-        "cellHeight": "sm"
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "orientation": "vertical",
+        "justifyMode": "auto",
+        "wideLayout": false,
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "text": {
+          "titleSize": 13,
+          "valueSize": 42
+        }
       },
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "filterable": true
+          "unit": "ms",
+          "decimals": 1,
+          "noValue": "—",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#ccccdc",
+                "value": null
+              },
+              {
+                "color": "#F2495C",
+                "value": 3000
+              }
+            ]
           }
         },
         "overrides": []
       }
     },
     {
-      "id": 160,
-      "type": "table",
-      "title": "API latency by model",
-      "description": "Per model: time to first token (ttft_ms, streaming requests only) and total request time (duration_ms), median and 95th percentile.",
+      "id": 492,
+      "type": "stat",
+      "title": "API latency p95",
+      "description": "95th percentile of the total duration of a model request (duration_ms of api_request), all models together.",
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "clickhouse"
       },
       "gridPos": {
-        "x": 3,
-        "y": 7,
-        "w": 21,
-        "h": 7
+        "x": 8,
+        "y": 1,
+        "w": 5,
+        "h": 4
       },
       "targets": [
         {
@@ -528,17 +576,156 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT model, count() AS requests,\n       round(quantileIf(0.5)(ttft_ms, ttft_ms > 0)) AS ttft_p50_ms, round(quantileIf(0.95)(ttft_ms, ttft_ms > 0)) AS ttft_p95_ms,\n       round(quantile(0.5)(duration_ms)) AS duration_p50_ms, round(quantile(0.95)(duration_ms)) AS duration_p95_ms\nFROM (\n  SELECT e.ts AS ts, e.account_uuid AS account_uuid, e.project AS project, e.session_id AS session_id, e.skill_name AS skill, e.model AS model, e.ttft_ms AS ttft_ms, e.duration_ms AS duration_ms,\n         multiIf(e.agent_id != '', if(a.agent = '', 'agent?', a.agent), e.query_source IN ('sdk', 'main') OR startsWith(e.query_source, 'repl_main'), 'main', concat('aux:', e.query_source)) AS actor\n  FROM cc.events AS e LEFT JOIN cc.agents AS a ON a.agent_id = e.agent_id\n  WHERE e.event = 'api_request'\n)\nWHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nGROUP BY model ORDER BY requests DESC"
+          "rawSql": "SELECT quantile(0.95)(duration_ms) AS p95_ms, 'all models' AS name\nFROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nHAVING count() > 0"
         }
       ],
       "options": {
-        "showHeader": true,
-        "cellHeight": "sm"
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "orientation": "vertical",
+        "justifyMode": "auto",
+        "wideLayout": false,
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "text": {
+          "titleSize": 13,
+          "valueSize": 42
+        }
       },
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "filterable": true
+          "unit": "ms",
+          "decimals": 1,
+          "noValue": "—",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#ccccdc"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 493,
+      "type": "stat",
+      "title": "API errors",
+      "description": "api_error events (every failed attempt of a model request, retries included) as a share of the model requests (api_request events) in the time range. The Actor and Skill variables are matched through the agent and the skill of the failed request.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 13,
+        "y": 1,
+        "w": 5,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT 100 * errs / greatest(reqs, 1) AS error_rate, concat(toString(errs), ' of ', toString(reqs), ' requests') AS name\nFROM\n(\n    SELECT\n        (SELECT count() FROM\n            (\n                SELECT e.ts AS ts, e.account_uuid AS account_uuid, e.project AS project, e.session_id AS session_id, e.skill_name AS skill,\n                       multiIf(e.agent_id != '', if(a.agent = '', 'agent?', a.agent), e.query_source IN ('sdk', 'main') OR startsWith(e.query_source, 'repl_main'), 'main', concat('aux:', e.query_source)) AS actor\n                FROM cc.events AS e LEFT JOIN cc.agents AS a ON a.agent_id = e.agent_id\n                WHERE e.event = 'api_error' AND $__timeFilter(e.ts)\n            )\n            WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}')) AS errs,\n        (SELECT count() FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)) AS reqs\n)"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "orientation": "vertical",
+        "justifyMode": "auto",
+        "wideLayout": false,
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "text": {
+          "titleSize": 13,
+          "valueSize": 42
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "noValue": "0",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#ccccdc"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 494,
+      "type": "stat",
+      "title": "Hook time",
+      "description": "Total time spent in your hooks (hook_execution_complete events): hooks run synchronously and delay the tool call they belong to. The second line is the number of runs. The Skill variable is ignored: hook events carry no skill.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 1,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT sum(hook_duration_ms) AS total_ms, concat(toString(count()), ' runs · all hooks') AS name\nFROM\n(\n    SELECT e.ts AS ts, e.account_uuid AS account_uuid, e.project AS project, e.session_id AS session_id, e.hook_duration_ms AS hook_duration_ms,\n           if(e.agent_id = '', 'main', if(a.agent = '', 'agent?', a.agent)) AS actor\n    FROM cc.events AS e LEFT JOIN cc.agents AS a ON a.agent_id = e.agent_id\n    WHERE e.event = 'hook_execution_complete' AND e.hook_name != '' AND $__timeFilter(e.ts)\n)\nWHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}')"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "orientation": "vertical",
+        "justifyMode": "auto",
+        "wideLayout": false,
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "text": {
+          "titleSize": 13,
+          "valueSize": 42
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 1,
+          "noValue": "0",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#ccccdc"
           }
         },
         "overrides": []
@@ -547,16 +734,16 @@
     {
       "id": 161,
       "type": "timeseries",
-      "title": "Time to first token by day (p50 / p95)",
-      "description": "ttft_ms per day, all models; requests without ttft_ms are skipped.",
+      "title": "Time to first token by day",
+      "description": "Mean ttft_ms per day and model family (requests without ttft_ms are skipped). The dashed red line is 3 s, the threshold of the slow-ttft tip (it uses the mean per project and model). Days are in server time (UTC). Target of the slow-ttft tip.",
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "clickhouse"
       },
       "gridPos": {
         "x": 3,
-        "y": 14,
-        "w": 10,
+        "y": 5,
+        "w": 13,
         "h": 8
       },
       "targets": [
@@ -569,7 +756,7 @@
           "editorType": "sql",
           "format": 0,
           "queryType": "timeseries",
-          "rawSql": "SELECT toStartOfDay(ts) AS time, round(quantile(0.5)(ttft_ms)) AS p50, round(quantile(0.95)(ttft_ms)) AS p95\nFROM (\n  SELECT e.ts AS ts, e.account_uuid AS account_uuid, e.project AS project, e.session_id AS session_id, e.skill_name AS skill, e.ttft_ms AS ttft_ms,\n         multiIf(e.agent_id != '', if(a.agent = '', 'agent?', a.agent), e.query_source IN ('sdk', 'main') OR startsWith(e.query_source, 'repl_main'), 'main', concat('aux:', e.query_source)) AS actor\n  FROM cc.events AS e LEFT JOIN cc.agents AS a ON a.agent_id = e.agent_id\n  WHERE e.event = 'api_request' AND e.ttft_ms > 0\n)\nWHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nGROUP BY time ORDER BY time"
+          "rawSql": "SELECT toStartOfDay(ts) AS time,\n       if(countIf(fam = 'Opus') = 0, NULL, round(avgIf(ttft_ms, fam = 'Opus'))) AS Opus,\n       if(countIf(fam = 'Sonnet') = 0, NULL, round(avgIf(ttft_ms, fam = 'Sonnet'))) AS Sonnet,\n       if(countIf(fam = 'Haiku') = 0, NULL, round(avgIf(ttft_ms, fam = 'Haiku'))) AS Haiku,\n       if(countIf(fam = 'Other') = 0, NULL, round(avgIf(ttft_ms, fam = 'Other'))) AS Other\nFROM\n(\n    SELECT ts, ttft_ms, multiIf(positionCaseInsensitive(model, 'opus') > 0, 'Opus', positionCaseInsensitive(model, 'sonnet') > 0, 'Sonnet', positionCaseInsensitive(model, 'haiku') > 0, 'Haiku', 'Other') AS fam\n    FROM cc.api_requests WHERE ttft_ms > 0 AND ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\n)\nGROUP BY time ORDER BY time"
         }
       ],
       "options": {
@@ -577,140 +764,101 @@
           "showLegend": true,
           "displayMode": "list",
           "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
         }
       },
       "fieldConfig": {
         "defaults": {
           "unit": "ms",
+          "min": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#8e8e9e"
+          },
           "custom": {
             "drawStyle": "line",
-            "showPoints": "always",
-            "fillOpacity": 10
-          }
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 162,
-      "type": "timeseries",
-      "title": "Request duration by day (p50 / p95)",
-      "description": "duration_ms of API requests per day, all models.",
-      "datasource": {
-        "type": "grafana-clickhouse-datasource",
-        "uid": "clickhouse"
-      },
-      "gridPos": {
-        "x": 13,
-        "y": 14,
-        "w": 11,
-        "h": 8
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "grafana-clickhouse-datasource",
-            "uid": "clickhouse"
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "auto",
+            "spanNulls": true,
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
           },
-          "editorType": "sql",
-          "format": 0,
-          "queryType": "timeseries",
-          "rawSql": "SELECT toStartOfDay(ts) AS time, round(quantile(0.5)(duration_ms)) AS p50, round(quantile(0.95)(duration_ms)) AS p95\nFROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nGROUP BY time ORDER BY time"
-        }
-      ],
-      "options": {
-        "legend": {
-          "showLegend": true,
-          "displayMode": "list",
-          "placement": "bottom"
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ms",
-          "custom": {
-            "drawStyle": "line",
-            "showPoints": "always",
-            "fillOpacity": 10
-          }
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 163,
-      "type": "table",
-      "title": "Tool duration and errors",
-      "description": "Per tool: calls, duration (avg / p50 / p95) and failed calls (success = false).",
-      "datasource": {
-        "type": "grafana-clickhouse-datasource",
-        "uid": "clickhouse"
-      },
-      "gridPos": {
-        "x": 3,
-        "y": 22,
-        "w": 10,
-        "h": 9
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "grafana-clickhouse-datasource",
-            "uid": "clickhouse"
-          },
-          "editorType": "sql",
-          "format": 1,
-          "queryType": "table",
-          "rawSql": "SELECT tool_name, count() AS calls, round(avg(duration_ms)) AS avg_ms,\n       round(quantile(0.5)(duration_ms)) AS p50_ms, round(quantile(0.95)(duration_ms)) AS p95_ms,\n       countIf(NOT success) AS errors, round(100 * countIf(NOT success) / count(), 1) AS error_pct\nFROM cc.tool_calls WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nGROUP BY tool_name ORDER BY p95_ms DESC"
-        }
-      ],
-      "options": {
-        "showHeader": true,
-        "cellHeight": "sm"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "filterable": true
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#73BF69",
+                "value": null
+              },
+              {
+                "color": "#F2495C",
+                "value": 3000
+              }
+            ]
           }
         },
         "overrides": [
           {
             "matcher": {
               "id": "byName",
-              "options": "error_pct"
+              "options": "Opus"
             },
             "properties": [
               {
-                "id": "unit",
-                "value": "percent"
-              },
-              {
-                "id": "custom.cellOptions",
+                "id": "color",
                 "value": {
-                  "type": "color-background"
+                  "mode": "fixed",
+                  "fixedColor": "#B877D9"
                 }
-              },
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Sonnet"
+            },
+            "properties": [
               {
-                "id": "thresholds",
+                "id": "color",
                 "value": {
-                  "mode": "absolute",
-                  "steps": [
-                    {
-                      "color": "green",
-                      "value": null
-                    },
-                    {
-                      "color": "yellow",
-                      "value": 5
-                    },
-                    {
-                      "color": "red",
-                      "value": 20
-                    }
-                  ]
+                  "mode": "fixed",
+                  "fixedColor": "#5794F2"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Haiku"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#73BF69"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Other"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#8e8e9e"
                 }
               }
             ]
@@ -719,69 +867,18 @@
       }
     },
     {
-      "id": 164,
-      "type": "timeseries",
-      "title": "Tool errors by day",
-      "description": "Failed tool calls (success = false) per day and tool.",
-      "datasource": {
-        "type": "grafana-clickhouse-datasource",
-        "uid": "clickhouse"
-      },
-      "gridPos": {
-        "x": 13,
-        "y": 22,
-        "w": 11,
-        "h": 9
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "grafana-clickhouse-datasource",
-            "uid": "clickhouse"
-          },
-          "editorType": "sql",
-          "format": 0,
-          "queryType": "timeseries",
-          "rawSql": "SELECT toStartOfDay(ts) AS time, tool_name, count() AS errors\nFROM cc.tool_calls WHERE NOT success AND ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nGROUP BY time, tool_name ORDER BY time"
-        }
-      ],
-      "options": {
-        "legend": {
-          "showLegend": true,
-          "displayMode": "table",
-          "placement": "right",
-          "calcs": [
-            "sum"
-          ]
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "drawStyle": "bars",
-            "stacking": {
-              "mode": "normal"
-            },
-            "fillOpacity": 80
-          }
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 165,
+      "id": 26,
       "type": "table",
-      "title": "Recent failed tool calls",
-      "description": "Latest 50 failed tool calls (no paths or commands shown).",
+      "title": "Hook time",
+      "description": "Per hook (hook_execution_complete events): runs, mean and total duration. Hooks run synchronously and delay the tool call they belong to. Mean above 200 ms is yellow, above 500 ms red (the slow-hook tip fires at 500 ms and 10 runs in 7 days). Sorted by Mean. The Skill variable is ignored: hook events carry no skill. Target of the slow-hook tip.",
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "clickhouse"
       },
       "gridPos": {
-        "x": 3,
-        "y": 31,
-        "w": 21,
+        "x": 16,
+        "y": 5,
+        "w": 8,
         "h": 8
       },
       "targets": [
@@ -794,20 +891,478 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT ts, tool_name, actor, project, session_id, duration_ms\nFROM cc.tool_calls WHERE NOT success AND ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nORDER BY ts DESC LIMIT 50"
+          "rawSql": "SELECT hook_name AS hook, count() AS runs, avg(hook_duration_ms) AS mean_ms, sum(hook_duration_ms) AS total_ms\nFROM\n(\n    SELECT e.ts AS ts, e.account_uuid AS account_uuid, e.project AS project, e.session_id AS session_id, e.hook_name AS hook_name, e.hook_duration_ms AS hook_duration_ms,\n           if(e.agent_id = '', 'main', if(a.agent = '', 'agent?', a.agent)) AS actor\n    FROM cc.events AS e LEFT JOIN cc.agents AS a ON a.agent_id = e.agent_id\n    WHERE e.event = 'hook_execution_complete' AND e.hook_name != '' AND $__timeFilter(e.ts)\n)\nWHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}')\nGROUP BY hook_name ORDER BY mean_ms DESC"
         }
       ],
       "options": {
         "showHeader": true,
-        "cellHeight": "sm"
+        "cellHeight": "sm",
+        "sortBy": [
+          {
+            "displayName": "Mean",
+            "desc": true
+          }
+        ]
       },
       "fieldConfig": {
         "defaults": {
           "custom": {
-            "filterable": true
+            "align": "auto",
+            "filterable": false,
+            "minWidth": 50
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "hook"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Hook"
+              },
+              {
+                "id": "custom.minWidth",
+                "value": 140
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "runs"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Runs"
+              },
+              {
+                "id": "unit",
+                "value": "locale"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.width",
+                "value": 70
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mean_ms"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Mean"
+              },
+              {
+                "id": "unit",
+                "value": "ms"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "#73BF69",
+                      "value": null
+                    },
+                    {
+                      "color": "#FADE2A",
+                      "value": 200
+                    },
+                    {
+                      "color": "#F2495C",
+                      "value": 500
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "total_ms"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Total"
+              },
+              {
+                "id": "unit",
+                "value": "ms"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#8e8e9e"
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 495,
+      "type": "table",
+      "title": "API errors",
+      "description": "Failed model requests (api_error events) per HTTP status and error text (first 100 characters), with the time of the last one. Status 429 and above are red, below yellow; a dash means an error without an HTTP status (e.g. a network error). Sorted by Count, 50 rows at most.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 3,
+        "y": 13,
+        "w": 10,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT status_code AS status, leftUTF8(error, 100) AS message, count() AS n, max(ts) AS last_seen\nFROM\n(\n    SELECT e.ts AS ts, e.account_uuid AS account_uuid, e.project AS project, e.session_id AS session_id, e.skill_name AS skill, e.status_code AS status_code, e.error AS error,\n           multiIf(e.agent_id != '', if(a.agent = '', 'agent?', a.agent), e.query_source IN ('sdk', 'main') OR startsWith(e.query_source, 'repl_main'), 'main', concat('aux:', e.query_source)) AS actor\n    FROM cc.events AS e LEFT JOIN cc.agents AS a ON a.agent_id = e.agent_id\n    WHERE e.event = 'api_error' AND $__timeFilter(e.ts)\n)\nWHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}')\nGROUP BY status, message ORDER BY n DESC, last_seen DESC LIMIT 50"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": [
+          {
+            "displayName": "Count",
+            "desc": true
+          }
+        ]
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": false,
+            "minWidth": 50
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "status"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Status"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "custom.width",
+                "value": 80
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": "—",
+                        "index": 0
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "#FADE2A",
+                      "value": null
+                    },
+                    {
+                      "color": "#F2495C",
+                      "value": 429
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "message"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Error"
+              },
+              {
+                "id": "custom.minWidth",
+                "value": 140
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "n"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Count"
+              },
+              {
+                "id": "unit",
+                "value": "locale"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "last_seen"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Last seen"
+              },
+              {
+                "id": "unit",
+                "value": "time:MM-DD HH:mm"
+              },
+              {
+                "id": "custom.width",
+                "value": 130
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#8e8e9e"
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 496,
+      "type": "barchart",
+      "title": "API request duration",
+      "description": "Model requests by total duration (duration_ms of api_request). Bars are green below 5 s, yellow to 10 s, orange to 20 s, red above.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 13,
+        "y": 13,
+        "w": 11,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT ['< 2 s', '2–5 s', '5–10 s', '10–20 s', '20–60 s', '> 60 s'][b.lvl + 1] AS bucket, ifNull(r.requests, 0) AS requests, b.lvl AS level\nFROM (SELECT arrayJoin([0, 1, 2, 3, 4, 5]) AS lvl) AS b\nLEFT JOIN\n(\n    SELECT lvl, count() AS requests\n    FROM\n    (\n        SELECT multiIf(duration_ms < 2000, 0, duration_ms < 5000, 1, duration_ms < 10000, 2, duration_ms < 20000, 3, duration_ms < 60000, 4, 5) AS lvl\n        FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\n    )\n    GROUP BY lvl\n) AS r ON r.lvl = b.lvl\nORDER BY b.lvl"
+        }
+      ],
+      "options": {
+        "orientation": "vertical",
+        "xField": "bucket",
+        "showValue": "always",
+        "stacking": "none",
+        "colorByField": "level",
+        "legend": {
+          "showLegend": false,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "barWidth": 0.8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "custom": {
+            "fillOpacity": 100,
+            "gradientMode": "none",
+            "axisPlacement": "hidden"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "requests"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#73BF69"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "level"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "#73BF69",
+                      "value": null
+                    },
+                    {
+                      "color": "#FADE2A",
+                      "value": 2
+                    },
+                    {
+                      "color": "#FF9830",
+                      "value": 3
+                    },
+                    {
+                      "color": "#F2495C",
+                      "value": 4
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": true,
+                  "viz": true
+                }
+              }
+            ]
+          }
+        ]
       }
     }
   ]
