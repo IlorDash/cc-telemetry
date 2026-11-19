@@ -48,8 +48,8 @@ with Windows clients.
 
 | You want to | Go to |
 | --- | --- |
-| Install the server | Installation (not written yet) |
-| Connect a PC | Clients (not written yet) |
+| Install the server | [Server](server.md) |
+| Connect a PC | [Clients](clients.md) |
 | Read a dashboard | Dashboards (not written yet) |
 | Fix a failed step | Troubleshooting (not written yet) |
 | Know what is collected | What is sent (not written yet) |

@@ -94,6 +94,12 @@ plugins:
           # both languages needs no entry; a section title above it does.
           nav_translations:
             Overview: Обзор
+            Installation: Установка
+            Server: Сервер
+            Clients: Клиенты
 
 nav:
   - Overview: index.md
+  - Installation:
+      - Server: server.md
+      - Clients: clients.md
