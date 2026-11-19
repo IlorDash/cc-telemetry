@@ -15,40 +15,33 @@
     sync-rail.js копирует одни высоты во все файлы: нужна высота по дашборду.
     ```
 
+### Мелкие несоответствия в дашбордах (найдены при сверке README)
+
+  - tags: [ui, grafana, links]
+  - priority: low
+  - workload: Easy
+  - steps:
+      - [ ] Ссылки на сессию: из Sessions сохраняют Actor/Skill, из Overview, Prompts, Agents сбрасывают — выбрать одно правило
+      - [ ] «Prompts in this session» открывает Prompts без сужения периода, в отличие от остальных ссылок
+      - [ ] ⓘ Timeline: не упомянуты Biggest subagent runs и подсказка agent-outlier; ⓘ Recent sessions: не сказано, что Actor/Skill не действуют
+      - [ ] Плитка «Most frequent» в боковой панели без заголовка
+    ```md
+    Только по решению пользователя.
+    ```
+
+### Проверить API errors на настоящих ошибках
+
+  - tags: [data, health]
+  - priority: low
+  - workload: Easy
+  - steps:
+      - [ ] Когда придёт первое событие api_error: проверить панели 493 и 495 (status_code, error)
+      - [ ] Проверить, есть ли у api_error skill.name — иначе при выбранном Skill ошибки покажут ноль
+    ```md
+    На 2026-11-19 событий api_error не было ни одного; запросы проверены только на пустых данных.
+    ```
+
 ## To Do
-
-### Коммит 8: Agents & skills, Tools & files, Health по шаблону
-
-  - tags: [ui, agents, tools, health, grafana]
-  - priority: high
-  - workload: Hard
-  - steps:
-      - [ ] Agents & skills: 4 stat, Subagent types, cost_usd per day by actor, Skills, Biggest subagent runs
-      - [ ] Tools & files: 4 stat, Calls by tool, Rejected tool calls, Files re-read, Largest tool results, Bash by first word, Most edited files
-      - [ ] Health: 4 stat, TTFT по дням (порог 3 s), Hook time, API errors, API request duration
-      - [ ] Сохранить панели-доказательства для ссылок cc.tips (repeated-read, big-results, denials, slow-hook, slow-ttft, agent-outlier)
-      - [ ] Удалить всё, чего нет в шаблоне
-      - [ ] Оформление по claude-context/guides/grafana-style.md (единый стиль панелей)
-      - [ ] Проверка в браузере на 1920 px, ревьюер
-    ```md
-    Номера панелей в ссылках cc.tips: при смене id поправить views.sql.
-    Панели с постоянным числом строк (статичный список, LIMIT n) — без вертикального скролла.
-    Поддерживаем только Full HD (1920 px) и шире — 1280 px не проверяем.
-    ```
-
-### Коммит 9: README и завершение
-
-  - tags: [docs, readme]
-  - priority: medium
-  - workload: Normal
-  - steps:
-      - [ ] README: все семь дашбордов, переменные, клики, время, подсказки
-      - [ ] Сверить README с дашбордами после коммитов 7–8
-      - [ ] Clicks: фраза «links from the tips keep the range» устарела — ссылка agent-outlier сужает период до сессии
-      - [ ] Указать, что дашборды рассчитаны на экран от 1920 px
-    ```md
-    README публичный: без личных данных.
-    ```
 
 ### Обновить claude-context после редизайна
 
@@ -63,6 +56,8 @@
       - [ ] modules/dashboard.md: новая раскладка Efficiency и заголовки после единого стиля
       - [ ] modules/telemetry-data.md: ссылка agent-outlier в cc.tips с from/to
       - [ ] context-claude.md: guides/grafana-style.md
+      - [ ] modules/dashboard.md: Agents & skills, Tools & files, Health (панели и id, удалённые id, ссылка 476 с зумом, Hook time без Skill)
+      - [ ] modules/telemetry-data.md: событие api_error, колонки status_code и error в events_raw, ttft_ms в cc.api_requests
     ```md
     Только по команде пользователя (context-auditor).
     ```
@@ -70,6 +65,46 @@
 ## In Progress
 
 ## Done
+
+### Коммит 9: README и завершение
+
+  - tags: [docs, readme]
+  - priority: medium
+  - workload: Normal
+  - steps:
+      - [x] README: все семь дашбордов, переменные, клики, время, подсказки
+      - [x] Сверить README с дашбордами после коммитов 7–8
+      - [x] Clicks: ссылка agent-outlier сужает период до сессии
+      - [x] Указать, что дашборды рассчитаны на экран от 1920 px
+    ```md
+    Клики — списком по дашбордам. Ссылка agent-outlier несёт from/to дважды (свои + ${__url_time_range}):
+    Grafana берёт первые, сужение работает (проверено в браузере).
+    ```
+
+### Коммит 8: Agents & skills, Tools & files, Health по шаблону
+
+  - tags: [ui, agents, tools, health, grafana]
+  - priority: high
+  - workload: Hard
+  - steps:
+      - [x] Agents & skills: 4 stat, Subagent types, cost_usd per day by actor, Skills, Biggest subagent runs
+      - [x] Tools & files: 4 stat, Calls by tool, Rejected tool calls, Files re-read, Largest tool results, Bash by first word, Most edited files
+      - [x] Health: 4 stat, TTFT по дням (порог 3 s), Hook time, API errors, API request duration
+      - [x] Панели-доказательства для cc.tips сохранили id (cc-tools 19, 24, 140; cc-health 26, 161)
+      - [x] Удалено всё, чего нет в шаблоне
+      - [x] Оформление по grafana-style.md; у столбчатых диаграмм со значениями ось Y скрыта (и на Efficiency, Prompts)
+      - [x] views.sql: status_code и error из api_error, ttft_ms в cc.api_requests
+      - [x] Проверка в браузере на 1920 px, ревьюер
+    ```md
+    Решения пользователя: Files re-read и Largest tool results — LIMIT 50 со скроллом (список по данным,
+    а не статичный набор); остальные LIMIT-таблицы подобраны под высоту (Calls by tool 7, Most edited 5,
+    Biggest subagent runs 5).
+    Отступления: панели с полосами выше, чем в шаблоне (без скролла); полосы синие по гайду, а не
+    оранжевые/фиолетовые; Calls by tool — таблица с колонкой Errors (bar gauge не держит вторую колонку);
+    Median result — байты (токенов результата нет); Target — путь или первое слово Bash (команда не
+    передаётся); Hook time без фильтра Skill (у хуков нет request_id); выбросы — отдельная колонка Outlier
+    (ячейку нельзя покрасить по другой колонке); квадратики цвета у типов агентов невозможны в таблице.
+    ```
 
 ### Единый стиль дашбордов и style guide
 
