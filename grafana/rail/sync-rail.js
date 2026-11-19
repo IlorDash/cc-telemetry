@@ -3,6 +3,7 @@
 // Usage (no dependencies; any folder):  node grafana/rail/sync-rail.js [--check]
 //   (no flag)  rewrite the dashboards whose rail differs from the source
 //   --check    write nothing; exit 1 if any dashboard's rail differs from the source
+// Also keeps the EN/RU switch link in links[] (added only when grafana/dashboards/ru/<file> exists).
 // Idempotent: a second run changes nothing. See the _doc lines of rail.json for the id scheme.
 const fs = require("fs");
 const path = require("path");
@@ -77,6 +78,13 @@ for (const file of files) {
     if (p.gridPos.x < rail.railW) throw new Error(file + ": panel " + p.id + " overlaps the rail column (x < " + rail.railW + ")");
   }
   dash.panels = [...buildRail(entry), ...content];
+
+  // EN -> RU switch (dashboard link): only when the Russian copy exists (see grafana/i18n/build-ru.js)
+  const isSwitch = (l) => l && l.type === "link" && /^\/d\/[A-Za-z0-9_-]+$/.test(l.url || "");
+  dash.links = (dash.links || []).filter((l) => !isSwitch(l));
+  if (fs.existsSync(path.join(dashDir, "ru", file))) {
+    dash.links.push({ type: "link", title: "RU", tooltip: "Russian version", url: "/d/" + dash.uid + "-ru", keepTime: true, includeVars: true });
+  }
 
   results.push({ file, full, before, after: JSON.stringify(dash, null, 2) + "\n" });
 }
