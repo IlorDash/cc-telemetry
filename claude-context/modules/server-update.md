@@ -10,7 +10,7 @@ The rest of the script (steps, `.env`, LAN): `modules/setup-scripts.md`.
 
 | Path | Role |
 | --- | --- |
-| `setup-server.sh` | `run_update`, `finish_update`, `reload_changed_config`, EXIT trap `update_exit_note`; `migrate_storage`, `migrate_events_t`, `warn_old_query_logs`; helpers `row_counts`, `old_row_counts`, `ttl_col` |
+| `setup-server.sh` | `run_update`, `finish_update`, `reload_changed_config`, EXIT trap `update_exit_note`; `migrate_storage`, `migrate_events_t`, `warn_old_query_logs`; helpers `row_counts`, `recent_row_counts`, `save_retention_baseline`, `ttl_col` |
 | `clickhouse/schema.sql` | source of `RETENTION_DAYS` (its `TTL` line) and of the `cc.events_t` DDL `migrate_events_t` creates as `cc.events_t_new` |
 | `linux-server-tools/backup.sh` | the safety dump (`BACKUP_DIR=<dir> ... dump`) and the restore command printed on a loss |
 
@@ -18,7 +18,7 @@ The rest of the script (steps, `.env`, LAN): `modules/setup-scripts.md`.
 
 ```
 RETENTION_DAYS = days of the `TTL ... INTERVAL <n> DAY` line in schema.sql (else 180); WINDOW = n - 1
-update re-run, no ttl-expected.tsv yet → write it (old_row_counts)
+update re-run, no ttl-recent.tsv yet (update started from an older script) → save_retention_baseline, before any TTL
 todo = otel.otel_logs, otel.otel_metrics_*, cc.events_t without ' TTL ' in engine_full
 old  = rows of todo older than WINDOW days
 old > 0  update re-run → go on (the dump keeps them)
@@ -52,12 +52,16 @@ run_update   (all post-pull code is in this function, parsed before the pull; en
   checks     .env exists; ClickHouse answers (ch.sh SELECT 1); no tracked local changes; prev = HEAD; upstream?
   dump       backup/pre-update-<YYYYmmdd-HHMMSS>/; free space (df) vs sum(data_uncompressed_bytes)
              of active otel parts: less → fail, < 1.5× → warn; BACKUP_DIR=<dir> backup.sh dump; rowcounts.tsv;
-             ttl-expected.tsv (per otel.* table: rows older than RETENTION_DAYS - 1)
+             save_retention_baseline → ttl-recent.tsv: "#cutoff<TAB><now() - WINDOW days>" (read once from
+             ClickHouse), then per otel.* table with a ttl_col: rows with that time >= cutoff
   code       upstream → git pull --ff-only; no upstream / no repo → warn, files as they are
   exec       CCT_UPDATE=1 CCT_UPDATE_DIR=<dir> CCT_UPDATE_PREV=<prev> bash setup-server.sh <args minus --update>
 re-run       steps 2–6; in step 3 after views-init exited 0 → migrate_storage → reload_changed_config (below)
-             then finish_update: every table rows now ≥ before − its ttl-expected.tsv count (missing file → 0),
-             else LOST banner + restore command, exit 1; a drop within that count → OK "removed by the retention TTL"
+             then finish_update: per rowcounts.tsv table, recount with the stored cutoff:
+               in ttl-recent.tsv → recent rows now < before → LOST (exact); else OK, older rows that
+                 shrank → OK with "<n> ... removed by the retention TTL" (informational)
+               no ttl_col / no baseline → total now < before → LOST
+             any LOST/FAIL → banner + restore command, exit 1
              after a pull prints the rollback: git checkout <prev> && bash setup-server.sh
 EXIT trap    failing exit once the dump folder is set → prints it (+ rollback command after a pull)
 ```

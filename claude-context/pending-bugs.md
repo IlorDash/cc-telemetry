@@ -36,8 +36,8 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
   `clickhouse` running on the old values (its service definition is unchanged, so `compose up -d`
   does not recreate it). Both are single-file bind mounts: git replaces the file, the running
   container likely keeps the old inode until a restart (unverified).
-- **?** `migrate_storage` was never exercised by a real `--update` run (dump → `ttl-expected.tsv` →
-  migration → `finish_update` with the TTL tolerance).
+- **?** `migrate_storage` was never exercised by a real `--update` run (dump → `ttl-recent.tsv` →
+  migration → `finish_update` with the exact recent-row check).
 
 ## setup-client.ps1
 

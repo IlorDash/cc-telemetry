@@ -12,7 +12,7 @@ The Docker services, how data moves between them, what is exposed and where it i
 | `grafana/provisioning/datasources/clickhouse.yaml` | datasource uid `clickhouse`, native `clickhouse:9000`, user `otel`, db `cc`, password from env |
 | `grafana/provisioning/dashboards/dashboards.yaml` | file provider, `updateIntervalSeconds: 30`, `allowUiUpdates: true` |
 | `clickhouse/init-views.sh`, `clickhouse/refresh-loop.sh`, `clickhouse/{schema,backfill,views,refresh}.sql` | see `modules/telemetry-data.md` |
-| `clickhouse/config.d/low-resource.xml` | server config: system logs, memory, caches, merge pool thresholds (below) |
+| `clickhouse/config.d/low-resource.xml` | server config: text log, system logs, memory, caches, merge pool thresholds (below) |
 | `clickhouse/users.d/low-resource.xml` | `default` profile: threads, per-query memory, profilers, background pool (below) |
 
 ## Services
@@ -60,6 +60,7 @@ the docker service at boot.
 
 | File | Setting | Value |
 | --- | --- | --- |
+| `config.d` | `logger`: `level` / `size` / `count` (merged into the image's `<logger>`, log paths kept) | `warning` / 10M / 2 (image default `trace` / 1000M / 10) |
 | `config.d` | `asynchronous_metric_log`, `metric_log`, `query_thread_log`, `part_log`, `session_log`, `trace_log`, `text_log`, `query_log`, `query_views_log` | `remove="1"` (not written) |
 | `config.d` | `max_server_memory_usage` / `mark_cache_size` / `uncompressed_cache_size` | 3 GB / 256 MiB / 0 |
 | `config.d` | `max_concurrent_queries` | 8 |
@@ -71,6 +72,10 @@ the docker service at boot.
 - On 22.3.20.29 all `users.d` values and both `merge_tree` thresholds show as changed in
   `system.settings` / `system.merge_tree_settings`, `trace_log` stays as an empty table
   (observed 2026-11-17); `log_queries` / `log_query_views` = 0 (observed 2026-11-19).
+- Text log: the image default wrote ~135 MB/day to the SD card; with the `logger` override the
+  preprocessed config shows it merged with the log paths kept, and `clickhouse-server.log` stopped
+  growing after the restart (observed on 22.3.20.29, 2026-11-19). Errors also go to
+  `clickhouse-server.err.log`.
 - Leftover `system.query_log*` / `system.query_views_log*` tables of a server that logged queries
   before are not dropped by anything: `setup-server.sh` prints the `DROP` command (`modules/server-update.md`).
 - A dashboard query needing more than 1.5 GB fails instead of slowing the server down; the
