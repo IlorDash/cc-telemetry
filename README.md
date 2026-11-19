@@ -343,7 +343,7 @@ Optional, only to label a project explicitly (otherwise it is inferred from file
 
 ## 3. Dashboards
 
-Grafana shows seven dashboards. They are laid out for Full HD (1920 px wide) and wider screens; narrower screens are not supported.
+Grafana shows seven dashboards, each also in Russian. They are laid out for Full HD (1920 px wide) and wider screens; narrower screens are not supported.
 A side rail (the left 3 of 24 columns) on every dashboard switches between them (the current one is
 highlighted); the links keep the time range and the variables. Under the navigation the rail shows **Usage · last 5 h**
 (one bar per Claude account: the cost of the last 5 hours as a share of that account's highest 5-hour cost in the last
@@ -375,6 +375,19 @@ Claude Code does this attribution itself; the label lasts until the end of the p
 **Time range.** The quick ranges are 5 minutes, 1 hour, 24 hours, 7 days (the default; 30 days on Overview), 30 days and `All` (10 years).
 Every dashboard refreshes itself every 10 s; the rate is picked at the top right (from 5 s to 1 h), as in any Grafana dashboard.
 Some panels ignore the time range and say so in their description: the rail panels and the tips (last 7 days).
+
+**Russian version.** Every dashboard also exists in Russian, in the Grafana folder `ru` (the English ones stay in General).
+A Russian dashboard has the uid of the English one plus `-ru` (`cc-usage-ru`, `cc-sessions-ru`, ...) and the same panels. The
+home page stays the English **Overview**. The button in the controls row switches the language: **RU** on an
+English dashboard, **EN** on a Russian one. It keeps the time range and all variables. The rail, the drill-down links and the
+links from the tips stay in the language you are in.
+
+The Russian dashboards translate what this project added and what does not depend on your data: the rail, variable labels and
+the option texts of Columns, panel and tile titles and descriptions, column headers, "no data" texts, value-mapping texts and
+the static labels built in the queries (for example the session header, timeline lanes, work phases and weekdays). They do
+not translate the data from your Claude Code sessions (prompts, names, paths), Grafana's own interface or the tip titles and
+texts, which the `cc.tips` view builds in English for both versions. Terms such as `cost_usd`, TTFT, p95 and the tool and model names
+stay as they are.
 
 **Clicks.** Panel titles that end in "click a ... to ..." say what a click does.
 
@@ -444,7 +457,36 @@ the first one arrives.
 **Editing the rail.** Grafana loads every `.json` in `grafana/dashboards/` as a dashboard, so the rail is defined once in
 `grafana/rail/rail.json` and copied into every dashboard file by `node grafana/rail/sync-rail.js` (no dependencies; run it
 from the repository root after editing `rail.json` or after adding a dashboard to its navigation list). The same command with
-`--check` changes nothing and exits with 1 when a dashboard differs from the source.
+`--check` changes nothing and exits with 1 when a dashboard differs from the source. The script also puts the **RU** switch
+into every English file that has a copy in `grafana/dashboards/ru/`.
+
+**Editing dashboards.** The English files `grafana/dashboards/*.json` are the only source you edit. The Russian copies in
+`grafana/dashboards/ru/` are generated from them and committed; never edit them by hand, the next run overwrites the change.
+After editing an English dashboard, run from the repository root:
+
+```powershell
+node grafana/rail/sync-rail.js
+node grafana/i18n/build-ru.js
+```
+
+`build-ru.js` (no dependencies) writes the Russian files from the English ones and the dictionary `grafana/i18n/ru.json`.
+Grafana does not load the dictionary: it is outside `grafana/dashboards/`. Both scripts accept `--check`: nothing is written and
+the exit code is 1 when a file differs. A second run changes nothing.
+
+The dictionary has two parts:
+
+- `strings` maps an English text to its Russian text. It covers titles, descriptions, column headers, variable labels, "no data"
+  and value-mapping texts, and every text of the text panels (each piece of text between tags, or each line of a markdown
+  panel, separately).
+- `sql` translates the static labels built in a query. `literals` maps a whole quoted literal (the text between the quotes) to
+  Russian; `fragments` maps an exact piece of SQL to another one, for what a literal cannot do (a plural that moves the number, the
+  rewrite of the tips link to the `-ru` dashboard). Fragments are applied first.
+
+A new static English text on a dashboard needs a dictionary entry, including a static label built in SQL. A text without
+an entry in `strings` stops the script: it prints the list and writes nothing. For SQL the script does not notice a new
+literal without an entry, so add it to `sql.literals` yourself. Literals that are compared with data or used as values
+(filters, `'__all'`, ids, field names, link parts) are never translated. An entry in `sql` that no file uses also stops the
+script: the SQL changed or the entry has a typo. A new dashboard also needs its file name in `files` of `ru.json`.
 
 ### Tips
 
