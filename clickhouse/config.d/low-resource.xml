@@ -1,5 +1,5 @@
 <!-- Raspberry Pi 4 (4 cores, 8 GB shared with other services): drop the system logs
-     nobody reads, keep query_log for 3 days, cap memory and background work. -->
+     nobody reads (query_log included), cap memory and background work. -->
 <clickhouse>
   <asynchronous_metric_log remove="1"/>
   <metric_log remove="1"/>
@@ -8,9 +8,8 @@
   <session_log remove="1"/>
   <trace_log remove="1"/>
   <text_log remove="1"/>
-  <query_log>
-    <ttl>event_date + INTERVAL 3 DAY DELETE</ttl>
-  </query_log>
+  <query_log remove="1"/>
+  <query_views_log remove="1"/>
 
   <max_server_memory_usage>3000000000</max_server_memory_usage>
   <mark_cache_size>268435456</mark_cache_size>

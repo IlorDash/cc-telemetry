@@ -422,10 +422,15 @@ rows keep the old values, so the change needs a migration (dump first, then rebu
 `cc.events_t` holds nothing that is not in `otel.otel_logs`, so `backup.sh` dumps only the `otel.*` tables.
 
 ClickHouse runs with limits sized for a small server such as a Raspberry Pi 4, on every machine: 2 CPU cores, 3 GB of
-memory for the server and 1.5 GB per query, 3 threads per query, and no system logs except `query_log`, which is kept for
-3 days. The limits are in `clickhouse/config.d/low-resource.xml`, `clickhouse/users.d/low-resource.xml` and `cpus` in
-`docker-compose.yml`. After editing the XML files run `docker compose restart clickhouse`; the server script does not
-restart ClickHouse for them.
+memory for the server and 1.5 GB per query, 3 threads per query, and no system logs at all (`query_log` is off too: it wrote
+most of what ClickHouse put on the disk). The limits are in `clickhouse/config.d/low-resource.xml`,
+`clickhouse/users.d/low-resource.xml` and `cpus` in `docker-compose.yml`. After editing the XML files run
+`docker compose restart clickhouse`; the server script does not restart ClickHouse for them.
+
+To find out why a dashboard panel is slow, switch `query_log` on for a while: delete the `<query_log remove="1"/>` line in
+`clickhouse/config.d/low-resource.xml`, set `<log_queries>1</log_queries>` in `clickhouse/users.d/low-resource.xml` and run
+`docker compose restart clickhouse`. Then look for the slow query in `system.query_log` (`query_duration_ms`, `query`). Afterwards
+restore both files, run `docker compose restart clickhouse` and `DROP TABLE system.query_log SYNC`.
 
 ## 5. Troubleshooting
 
