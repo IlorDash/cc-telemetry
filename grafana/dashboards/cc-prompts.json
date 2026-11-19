@@ -1083,11 +1083,23 @@
           },
           "custom": {
             "fillOpacity": 100,
-            "gradientMode": "none",
-            "axisPlacement": "hidden"
+            "gradientMode": "none"
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byType",
+              "options": "number"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "hidden"
+              }
+            ]
+          }
+        ]
       }
     },
     {
