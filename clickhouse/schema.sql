@@ -10,10 +10,17 @@
 -- expressions of cc.events_mv (or the columns of cc.events_t) needs an explicit migration, because
 -- IF NOT EXISTS skips the change and old rows keep the old values.
 -- Migrate by hand: back up (linux-server-tools/backup.sh dump), DROP VIEW cc.events_mv, rebuild cc.events_t
--- (a new table filled by INSERT ... SELECT with the new expressions from otel.otel_logs, then EXCHANGE TABLES),
+-- (a new table filled by INSERT ... SELECT with the new expressions from otel.otel_logs, one month at a time:
+-- one INSERT over more than 100 daily partitions is refused; then EXCHANGE TABLES),
 -- CREATE the new view; events that arrive in between must be covered (rerun the backfill).
 -- The expressions are written twice, here and in backfill.sql: keep them in step (and the path rules also
 -- in cc.path_roots, views.sql).
+--
+-- The layout of cc.events_t (PARTITION BY, TTL, SETTINGS) is different: setup-server.sh migrates it
+-- (migrate_storage, on every run; Windows servers: README, manual migration). It takes the CREATE TABLE of
+-- cc.events_t below as the target and reads the retention from its TTL line, which otel.* get too. So keep
+-- the lines "CREATE TABLE IF NOT EXISTS cc.events_t", "PARTITION BY ..." and "TTL ... INTERVAL <n> DAY" as
+-- they are written, and the exporter ttl in otel-collector.yaml at the same number of days.
 
 CREATE DATABASE IF NOT EXISTS cc;
 
@@ -70,8 +77,10 @@ CREATE TABLE IF NOT EXISTS cc.events_t
     bash_cmd              String
 )
 ENGINE = MergeTree
-PARTITION BY toYYYYMM(ts)
-ORDER BY (event, ts);
+PARTITION BY toDate(ts)
+ORDER BY (event, ts)
+TTL toDateTime(ts) + INTERVAL 180 DAY
+SETTINGS ttl_only_drop_parts = 1;
 
 -- Inferred project per session and usage tips: small tables rebuilt by clickhouse/refresh.sql, run only by the
 -- cc-refresh service (a new table is filled, then swapped in with EXCHANGE TABLES, so readers never see a

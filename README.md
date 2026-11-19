@@ -156,11 +156,12 @@ The first time, run `git pull` yourself: older versions of the script have no `-
 3. runs `git pull --ff-only`. It never merges or rebases. If the branch has no upstream, it prints a warning and continues with
    the files as they are;
 4. runs `setup-server.sh` again from the updated file with your other options. This starts changed containers, recreates the
-   `cc.*` views (and copies events missing from `cc.events_t`) and repeats the checks. Containers whose image and configuration did not change keep running, except that a
+   `cc.*` views (and copies events missing from `cc.events_t`), migrates the storage of an older install (see "Migrating a server
+   set up before the retention" in section 4) and repeats the checks. Containers whose image and configuration did not change keep running, except that a
    changed collector config (`otel-collector.yaml`) or Grafana provisioning (`grafana/provisioning/`) is reloaded by restarting
    that service (dashboard files are re-read by Grafana by itself). The data volumes are never removed;
-5. compares the row counts. Every table must have at least as many rows as before; the script prints `OK`, or a `FAIL` banner
-   with the dump folder, and exits with status 1.
+5. compares the row counts. Every table must have at least as many rows as before, except for rows older than 180 days, which
+   the retention TTL may remove; the script prints `OK`, or a `FAIL` banner with the dump folder, and exits with status 1.
 
 If `git pull` fails (for example because the branch diverged), nothing on the stack has changed. Fix the repository and run
 `--update` again.
@@ -404,7 +405,8 @@ folder is relative to the `cc-telemetry` folder, not to the current directory. W
 
 With Docker in WSL the data lives inside the distro: `wsl --unregister` deletes it. Dump first.
 
-Data is kept indefinitely in the `clickhouse-data` volume. The collector writes raw events to `otel.otel_logs`. A
+Data is kept for 180 days in the `clickhouse-data` volume: a TTL removes older rows from `otel.*` and `cc.events_t`
+(whole days at a time). The collector writes raw events to `otel.otel_logs`. A
 materialized view (`cc.events_mv`) flattens every new Claude Code event into the table `cc.events_t` as it arrives, and the
 `cc.*` views that the dashboards read are plain views over that table, so dashboards read a few columns instead of
 parsing the raw events. Two small tables, the inferred project of each session (`cc.session_project_t`) and the usage tips
@@ -421,6 +423,54 @@ expressions of `cc.events_mv` or the columns of `cc.events_t`, `CREATE ... IF NO
 rows keep the old values, so the change needs a migration (dump first, then rebuild `cc.events_t` from `otel.otel_logs`).
 `cc.events_t` holds nothing that is not in `otel.otel_logs`, so `backup.sh` dumps only the `otel.*` tables.
 
+**Retention.** `cc.events_t` is partitioned by day and has `TTL toDateTime(ts) + INTERVAL 180 DAY` in `clickhouse/schema.sql`;
+the `otel.*` tables get the same 180 days from `ttl: 4320h` in `otel-collector.yaml`. Both settings apply only to tables
+that do not exist yet. To change the period on a running server, alter the live tables (replace `180`):
+
+```sql
+ALTER TABLE cc.events_t MODIFY TTL toDateTime(ts) + INTERVAL 180 DAY;
+ALTER TABLE otel.otel_logs MODIFY TTL TimestampTime + toIntervalDay(180);
+ALTER TABLE otel.otel_metrics_sum MODIFY TTL toDateTime(TimeUnix) + toIntervalDay(180);  -- also _gauge, _histogram, _exponential_histogram, _summary
+```
+
+The collector sends events to ClickHouse in batches every 30 seconds, so a new event shows up in Grafana up to 30 seconds
+late.
+
+**Migrating a server set up before the retention.** Older installs keep every row and have `cc.events_t` partitioned by
+month, which makes every merge rewrite the whole month (a lot of writes to an SD card). On a Linux server
+`bash setup-server.sh --update` (or a plain `bash setup-server.sh`) migrates it by itself and does nothing when it is
+already done: it copies `cc.events_t` into a day-partitioned table month by month, swaps the tables, copies the events that
+arrived meanwhile, compares row counts, tokens and cost of both tables and drops the old one only when they match; then it sets
+the TTL on the `otel.*` tables. If rows older than 180 days exist, the TTL would delete them: `--update` goes ahead (it has
+just made its dump); a plain run asks at the terminal (default no) and `--yes` does not answer for you. Without a terminal
+it skips the step with a warning: run `--update`, or dump first and re-run at a terminal. A run that was interrupted continues where it stopped. The script also lists the old
+`system.query_log*` and `system.query_views_log*` tables, which are no longer written once ClickHouse runs with the new
+config, with a `DROP TABLE` command for each; it does not delete them itself. The collector reads `otel-collector.yaml` at
+start: after the update `--update` restarts it, otherwise run `docker compose restart otel-collector`.
+
+A Windows server (`setup-server.ps1` does not migrate) or any other setup does the same by hand. Run the SQL through
+`linux-server-tools/ch.sh` (see above) and dump first (`backup.sh dump`):
+
+1. Create the new table: copy the `CREATE TABLE IF NOT EXISTS cc.events_t (...) ... ;` statement from `clickhouse/schema.sql`
+   and change the name to `cc.events_t_new`.
+2. Copy month by month (a single `INSERT` over more than 100 days is refused). Months: `SELECT DISTINCT toYYYYMM(ts) FROM cc.events_t ORDER BY 1`.
+   For each month, for example `202611`:
+   `INSERT INTO cc.events_t_new SELECT * FROM cc.events_t WHERE toYYYYMM(ts) = 202611;`
+3. Swap: `EXCHANGE TABLES cc.events_t_new AND cc.events_t;`. The materialized view writes to `cc.events_t` by name, so new events
+   go to the new table from now on; `cc.events_t_new` is the old table.
+4. Copy the events that arrived between steps 2 and 3, for each month:
+   `INSERT INTO cc.events_t SELECT * FROM cc.events_t_new WHERE toYYYYMM(ts) = 202611 AND (session_id, seq, ts) NOT IN (SELECT session_id, seq, ts FROM cc.events_t WHERE toYYYYMM(ts) = 202611);`
+5. Check: the first query counts the old table, the second the same rows in the new one; counts and tokens must be equal, cost too
+   (rounded to 6 digits: a float sum can differ in the last digits when it is added up in another order).
+   Only rows younger than 179 days are compared: the TTL of the new table may already remove older ones. Run them per month
+   (add `AND toYYYYMM(ts) = 202611` on both sides) if the table is large:
+   `SELECT count(), sum(input_tokens + output_tokens), round(sum(cost_usd), 6) FROM cc.events_t_new WHERE ts >= now() - INTERVAL 179 DAY;`
+   `SELECT count(), sum(input_tokens + output_tokens), round(sum(cost_usd), 6) FROM cc.events_t WHERE ts >= now() - INTERVAL 179 DAY AND (session_id, seq, ts) IN (SELECT session_id, seq, ts FROM cc.events_t_new WHERE ts >= now() - INTERVAL 179 DAY);`
+6. Only when they are equal: `DROP TABLE cc.events_t_new SYNC;`. The table is a copy of `otel.otel_logs`, which stays. Otherwise keep it
+   and swap back with the same `EXCHANGE TABLES`.
+7. Set the TTL of the live `otel.*` tables with the `ALTER TABLE ... MODIFY TTL` statements above, then run
+   `docker compose restart otel-collector`.
+
 ClickHouse runs with limits sized for a small server such as a Raspberry Pi 4, on every machine: 2 CPU cores, 3 GB of
 memory for the server and 1.5 GB per query, 3 threads per query, and no system logs at all (`query_log` is off too: it wrote
 most of what ClickHouse put on the disk). The limits are in `clickhouse/config.d/low-resource.xml`,
@@ -436,7 +486,7 @@ restore both files, run `docker compose restart clickhouse` and `DROP TABLE syst
 
 | Symptom | What to check |
 | --- | --- |
-| Dashboard is empty | `docker compose logs otel-collector` (ClickHouse errors?), the client's connection test (`Test-NetConnection <SERVER_IP> -Port 4317` on Windows, the last line of `setup-client.sh` on Linux), `CLAUDE_CODE_ENABLE_TELEMETRY` in `settings.json`, sessions restarted after the setup |
+| Dashboard is empty or misses the last seconds | new events appear up to 30 s late (the collector batches them); `docker compose logs otel-collector` (ClickHouse errors?), the client's connection test (`Test-NetConnection <SERVER_IP> -Port 4317` on Windows, the last line of `setup-client.sh` on Linux), `CLAUDE_CODE_ENABLE_TELEMETRY` in `settings.json`, sessions restarted after the setup |
 | "Unknown table cc.events" | `docker compose logs views-init`, then `docker compose run --rm views-init` |
 | `project = unknown` for a session that should have a project, or the tips look stale | `docker compose logs cc-refresh`: each 5 minutes it prints `refresh ok` or `refresh FAILED` with the ClickHouse error; `docker compose up -d cc-refresh` starts it if it is not running |
 | Variable dropdowns are empty | Dashboard settings → Variables → open the variable → Run query → Save |
@@ -506,5 +556,5 @@ Observed with Claude Code 2.1.323 and the client settings above:
   directory (it contains your OS user name) and the Claude Code version, read from the local session files. Nothing of your
   prompts or Claude's replies. To opt out, run the client script with `-NoSessionMeta` / `--no-session-meta`.
 
-Everything is stored only on the server PC, indefinitely. If you don't want prompts stored, remove `OTEL_LOG_USER_PROMPTS`:
+Everything is stored only on the server PC, for 180 days. If you don't want prompts stored, remove `OTEL_LOG_USER_PROMPTS`:
 the `first_prompt` column will then be empty.
