@@ -65,8 +65,11 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
   project keeps its absolute path there.
 - **?** `cc.tips` verified only on ClickHouse 22.3 (`count()` ~0.5 s on ~4.9k events); 25.8
   untested. It reads `otel.otel_logs` once per rule through the views — watch the cost as data grows.
-- **?** `cc.tips` rules `cache`, `big-results`, `agent-outlier`, `denials`, `slow-ttft` have not
-  fired on real data yet: SQL and thresholds unconfirmed.
+- **?** `cc.tips` rules `cache`, `agent-outlier`, `slow-ttft` have not fired on real data yet
+  (2026-11-19): SQL and thresholds unconfirmed.
+- **?** No `api_error` event in the live data yet (2026-11-19, Claude Code 2.1.327): its attribute
+  names, `cc.events_raw.status_code`/`error` and the Health panels 493/495 are checked only on empty
+  data; whether `api_error` carries `agent_id` / `skill.name` (used for the Actor/Skill filter) is unknown.
 
 ## dashboards (`grafana/dashboards/*.json`)
 

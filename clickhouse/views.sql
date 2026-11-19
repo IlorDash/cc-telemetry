@@ -16,7 +16,10 @@ SELECT
     LogAttributes['event.name']                                 AS event,
     LogAttributes['session.id']                                 AS session_id,
     LogAttributes['prompt.id']                                  AS prompt_id,
-    LogAttributes['user.email']                                 AS account,
+    LogAttributes['user.account_uuid']                          AS account_uuid,
+    -- display label: email, else the first 8 characters of the account uuid, else ''
+    if(LogAttributes['user.email'] != '', LogAttributes['user.email'],
+       left(LogAttributes['user.account_uuid'], 8))             AS account,
     LogAttributes['agent_id']                                   AS agent_id,
     LogAttributes['request_id']                                 AS request_id,
     LogAttributes['query_source']                               AS query_source,
@@ -44,7 +47,10 @@ SELECT
     LogAttributes['hook_name']                                  AS hook_name,
     toUInt64OrZero(LogAttributes['total_duration_ms'])          AS hook_duration_ms,
     toUInt64OrZero(LogAttributes['tool_result_size_bytes'])     AS result_bytes,
-    toUInt64OrZero(LogAttributes['ttft_ms'])                    AS ttft_ms
+    toUInt64OrZero(LogAttributes['ttft_ms'])                    AS ttft_ms,
+    -- api_error events: HTTP status (0 when there is none, e.g. a network error) and the error text
+    toUInt32OrZero(LogAttributes['status_code'])                AS status_code,
+    LogAttributes['error']                                      AS error
 FROM otel.otel_logs
 WHERE ServiceName = 'claude-code';
 
@@ -181,7 +187,7 @@ GROUP BY request_id;
 -- 7. Model requests with actor (main / agent name / aux:<source>) and skill.
 CREATE OR REPLACE VIEW cc.api_requests AS
 SELECT
-    e.ts AS ts, e.project AS project, e.host AS host, e.account AS account,
+    e.ts AS ts, e.project AS project, e.host AS host, e.account AS account, e.account_uuid AS account_uuid,
     e.session_id AS session_id, e.prompt_id AS prompt_id, e.agent_id AS agent_id,
     multiIf(
         e.agent_id != '', if(a.agent = '', 'agent?', a.agent),
@@ -195,7 +201,9 @@ SELECT
     e.cache_creation_tokens AS cache_creation_tokens,
     e.input_tokens + e.output_tokens + e.cache_read_tokens + e.cache_creation_tokens AS total_tokens,
     e.cost_usd AS cost_usd,
-    e.duration_ms AS duration_ms
+    e.duration_ms AS duration_ms,
+    e.ttft_ms AS ttft_ms,        -- time to first token, 0 when not streamed
+    e.request_id AS request_id   -- one response; tool_result events carry the same id (work phase, Efficiency dashboard)
 FROM cc.events AS e
 LEFT JOIN cc.agents AS a ON a.agent_id = e.agent_id
 WHERE e.event = 'api_request';
@@ -204,10 +212,10 @@ WHERE e.event = 'api_request';
 --    Worktrees <project>-<name>/ fold into the same relative path as the main folder.
 CREATE OR REPLACE VIEW cc.tool_calls AS
 SELECT
-    ts, project, host, account, session_id, prompt_id, agent_id,
+    ts, project, host, account, account_uuid, session_id, prompt_id, agent_id,
     if(agent_id = '', 'main', if(agent_label = '', 'agent?', agent_label)) AS actor,
     skill_label AS skill,
-    tool_name, tool_use_id, success, duration_ms,
+    tool_name, tool_use_id, success, duration_ms, result_bytes,
     multiIf(tool_name = 'Read', 'read',
             tool_name IN ('Edit', 'MultiEdit', 'Write', 'NotebookEdit'), 'write',
             tool_name IN ('Grep', 'Glob'), 'search',
@@ -233,11 +241,11 @@ SELECT
 FROM
 (
     SELECT
-        e.ts AS ts, e.project AS project, e.host AS host, e.account AS account,
+        e.ts AS ts, e.project AS project, e.host AS host, e.account AS account, e.account_uuid AS account_uuid,
         e.session_id AS session_id, e.prompt_id AS prompt_id, e.agent_id AS agent_id,
         a.agent AS agent_label, r.skill AS skill_label,
         e.tool_name AS tool_name, e.tool_use_id AS tool_use_id,
-        e.success AS success, e.duration_ms AS duration_ms,
+        e.success AS success, e.duration_ms AS duration_ms, e.result_bytes AS result_bytes,
         e.tool_parameters AS tool_parameters,
         JSONExtractString(e.tool_input, 'file_path')     AS j_file,
         JSONExtractString(e.tool_input, 'notebook_path') AS j_nb,
@@ -252,6 +260,9 @@ FROM
 
 -- 9. One row per session.
 --    title, title_source, git_branch, cwd come from cc.session_meta ('' when the client sent none).
+--    account / account_uuid: of the latest event that has an account (a session may span accounts).
+--    last_prompt: time of the latest user_prompt; a session without a prompt gets `started`.
+--    model: the model with the highest api_request cost in the session ('' when there is no request).
 CREATE OR REPLACE VIEW cc.sessions AS
 SELECT
     s.*,
@@ -261,13 +272,19 @@ SELECT
     m.cwd                                          AS cwd
 FROM
 (
+  -- one join per query level: ClickHouse 22.3 cannot expand `s.*` over two joins
+  SELECT t.*, mm.model AS model
+  FROM
+  (
     SELECT
         session_id,
         any(project)                                   AS project,
         any(host)                                      AS host,
-        any(account)                                   AS account,
+        argMaxIf(account, ts, ev.account != '')        AS account,
+        argMaxIf(account_uuid, ts, ev.account != '')   AS account_uuid,
         min(ts)                                        AS started,
         max(ts)                                        AS last_event,
+        if(countIf(event = 'user_prompt') > 0, maxIf(ts, event = 'user_prompt'), min(ts)) AS last_prompt,
         argMinIf(prompt, ts, event = 'user_prompt')    AS first_prompt,
         countIf(event = 'user_prompt')                 AS prompts,
         sumIf(cost_usd, event = 'api_request')         AS cost_usd,
@@ -277,9 +294,22 @@ FROM
         countIf(event = 'subagent_completed')          AS agents_run,
         countIf(event = 'skill_activated')             AS skills_run,
         countIf(event = 'api_request')                 AS requests
-    FROM cc.events
+    FROM cc.events AS ev
     WHERE session_id != ''
     GROUP BY session_id
+  ) AS t
+  LEFT JOIN
+  (
+    SELECT session_id, argMax(mdl, mcost) AS model
+    FROM
+    (
+        SELECT session_id, model AS mdl, sum(cost_usd) AS mcost
+        FROM cc.events
+        WHERE event = 'api_request' AND session_id != '' AND model != ''
+        GROUP BY session_id, model
+    )
+    GROUP BY session_id
+  ) AS mm ON mm.session_id = t.session_id
 ) AS s
 LEFT JOIN cc.session_meta AS m ON m.session_id = s.session_id;
 
@@ -287,8 +317,20 @@ LEFT JOIN cc.session_meta AS m ON m.session_id = s.session_id;
 --     Columns: category, title, body, scope (project / agent / hook), metric (the number behind the tip),
 --     link (relative Grafana URL: one evidence panel full-screen via viewPanel=panel-<id>, variables preset;
 --     it always has a query string, the dashboards append '&' + the time range).
---     Savings are estimated only from our own cost_usd (no price table).
+--     affected (Nullable UInt64): tokens the tip refers to; NULL for time tips (denials, slow-hook, slow-ttft).
+--       cache = cache_creation tokens; repeated-read / big-results = result bytes / 4, i.e. "~ tokens"
+--       (an APPROXIMATION: the telemetry carries result size in bytes only, 4 bytes per token is a rule of thumb);
+--       short-opus = input + output + cache_creation tokens of the short answers (cache reads excluded);
+--       agent-outlier = tokens of the biggest run.
+--     cost_usd (Nullable Float64): sum of cost_usd of the requests the tip is about; only cache, short-opus,
+--       agent-outlier, NULL otherwise. cache: the cost of ALL the project's requests in 7 days.
+--       agent-outlier: NULL when the biggest run has no agent_id or no matching api_request.
+--       Money comes only from api_request cost_usd (no price table).
+--     Rows are ordered by affected, biggest first, NULLs last.
 CREATE OR REPLACE VIEW cc.tips AS
+SELECT *
+FROM
+(
 -- Low cache hit rate (< 40 %) per effective project, at least 20 requests.
 SELECT
     'cache' AS category,
@@ -297,11 +339,15 @@ SELECT
            ' requests in 7 days (below 40 %). A stable prefix (CLAUDE.md, tools) and fewer /clear or model switches keep the cache warm.') AS body,
     project AS scope,
     toFloat64(round(hit * 100, 1)) AS metric,
-    concat('/d/cc-usage?viewPanel=panel-57&var-project=', encodeURLComponent(project)) AS link
+    concat('/d/cc-efficiency?viewPanel=panel-226&var-project=', encodeURLComponent(project)) AS link,
+    toNullable(created) AS affected,
+    toNullable(proj_cost) AS cost_usd
 FROM
 (
     SELECT project, count() AS n,
-           sum(cache_read_tokens) / (sum(cache_read_tokens) + sum(input_tokens) + sum(cache_creation_tokens)) AS hit
+           sum(cache_read_tokens) / (sum(cache_read_tokens) + sum(input_tokens) + sum(cache_creation_tokens)) AS hit,
+           sum(cache_creation_tokens) AS created,
+           sum(cost_usd) AS proj_cost
     FROM cc.api_requests
     WHERE ts >= now() - INTERVAL 7 DAY
     GROUP BY project
@@ -315,10 +361,12 @@ SELECT
     concat('Read ', toString(n), ' times in 7 days in ', project, '. Consider keeping the key facts in CLAUDE.md or a note instead of rereading.'),
     project,
     toFloat64(n),
-    concat('/d/cc-tools?viewPanel=panel-24&var-project=', encodeURLComponent(project))
+    concat('/d/cc-tools?viewPanel=panel-24&var-project=', encodeURLComponent(project)),
+    toNullable(toUInt64(round(avg_bytes / 4 * (n - 1)))),
+    CAST(NULL AS Nullable(Float64))
 FROM
 (
-    SELECT project, path, count() AS n
+    SELECT project, path, count() AS n, avg(result_bytes) AS avg_bytes
     FROM cc.tool_calls
     WHERE ts >= now() - INTERVAL 7 DAY AND op = 'read' AND path != ''
     GROUP BY project, path
@@ -334,10 +382,12 @@ SELECT
     concat('Largest result: ', toString(round(biggest / 1048576, 2)), ' MB. Big outputs fill the context; narrow the search or limit the read range.'),
     project,
     toFloat64(n),
-    concat('/d/cc-tools?viewPanel=panel-140&var-project=', encodeURLComponent(project))
+    concat('/d/cc-tools?viewPanel=panel-140&var-project=', encodeURLComponent(project)),
+    toNullable(toUInt64(round(big_bytes / 4))),
+    CAST(NULL AS Nullable(Float64))
 FROM
 (
-    SELECT project, count() AS n, max(result_bytes) AS biggest
+    SELECT project, count() AS n, max(result_bytes) AS biggest, sum(result_bytes) AS big_bytes
     FROM cc.events
     WHERE ts >= now() - INTERVAL 7 DAY AND event = 'tool_result' AND result_bytes > 200000
     GROUP BY project
@@ -352,10 +402,13 @@ SELECT
            toString(round(short_cost, 2)), ' together. A smaller model could handle such turns for less.'),
     project,
     toFloat64(round(short_cost, 4)),
-    concat('/d/cc-prompts?viewPanel=panel-180&var-project=', encodeURLComponent(project))
+    concat('/d/cc-prompts?viewPanel=panel-180&var-project=', encodeURLComponent(project)),
+    toNullable(short_tokens),
+    toNullable(short_cost)
 FROM
 (
-    SELECT project, count() AS total, countIf(output_tokens < 500) AS short, sumIf(cost_usd, output_tokens < 500) AS short_cost
+    SELECT project, count() AS total, countIf(output_tokens < 500) AS short, sumIf(cost_usd, output_tokens < 500) AS short_cost,
+           sumIf(input_tokens + output_tokens + cache_creation_tokens, output_tokens < 500) AS short_tokens
     FROM cc.api_requests
     WHERE ts >= now() - INTERVAL 7 DAY AND positionCaseInsensitive(model, 'opus') > 0
     GROUP BY project
@@ -370,15 +423,49 @@ SELECT
     agent_type,
     toFloat64(biggest),
     concat('/d/cc-sessions?viewPanel=panel-100&var-session=', encodeURLComponent(session),
-           '&var-actor=', encodeURLComponent(agent_type))
+           '&var-actor=', encodeURLComponent(agent_type),
+           -- zoom to the session: its activity span, padded by 3 % (at least 5 s), as the Sessions table does
+           if(t1 = 0, '', concat('&from=', toString(t0 - greatest(intDiv(3 * (t1 - t0), 100), 5000)),
+                                 '&to=', toString(t1 + greatest(intDiv(3 * (t1 - t0), 100), 5000))))),
+    toNullable(biggest),
+    if(matched_agent = '', CAST(NULL AS Nullable(Float64)), toNullable(run_cost))
 FROM
 (
-    SELECT agent_type, count() AS n, avg(agent_total_tokens) AS mean, max(agent_total_tokens) AS biggest,
-           argMax(session_id, agent_total_tokens) AS session, argMax(project, agent_total_tokens) AS project
-    FROM cc.events
-    WHERE ts >= now() - INTERVAL 7 DAY AND event = 'subagent_completed' AND agent_type != ''
-    GROUP BY agent_type
-    HAVING n >= 3 AND biggest > 6 * mean AND biggest > 50000
+    SELECT o.agent_type AS agent_type, o.n AS n, o.mean AS mean, o.biggest AS biggest,
+           o.session AS session, o.project AS project, c.agent_id AS matched_agent, c.run_cost AS run_cost,
+           w.t0 AS t0, w.t1 AS t1
+    FROM
+    (
+        SELECT agent_type, count() AS n, avg(agent_total_tokens) AS mean, max(agent_total_tokens) AS biggest,
+               argMax(session_id, agent_total_tokens) AS session, argMax(project, agent_total_tokens) AS project,
+               argMax(agent_id, agent_total_tokens) AS run_agent
+        FROM cc.events
+        WHERE ts >= now() - INTERVAL 7 DAY AND event = 'subagent_completed' AND agent_type != ''
+        GROUP BY agent_type
+        HAVING n >= 3 AND biggest > 6 * mean AND biggest > 50000
+    ) AS o
+    LEFT JOIN
+    (
+        -- cost of the requests of the biggest run (its agent_id)
+        SELECT agent_id, sum(cost_usd) AS run_cost
+        FROM cc.api_requests
+        WHERE agent_id != ''
+        GROUP BY agent_id
+    ) AS c ON c.agent_id = o.run_agent
+    LEFT JOIN
+    (
+        -- activity span of the session in ms (0 when none): first start to last end of its prompts, requests and tool calls
+        SELECT session_id, min(a_s) AS t0, max(a_e) AS t1
+        FROM
+        (
+            SELECT session_id, toUnixTimestamp64Milli(ts) - if(event = 'user_prompt', toInt64(0), toInt64(duration_ms)) AS a_s,
+                   toUnixTimestamp64Milli(ts) AS a_e
+            FROM cc.events_raw
+            WHERE event IN ('user_prompt', 'api_request', 'tool_result')
+              AND session_id IN (SELECT session_id FROM cc.events_raw WHERE event = 'subagent_completed' AND ts >= now() - INTERVAL 7 DAY)
+        )
+        GROUP BY session_id
+    ) AS w ON w.session_id = o.session
 )
 UNION ALL
 -- Frequent permission denials for one tool: an allow-list or deny-list candidate.
@@ -389,7 +476,9 @@ SELECT
            '). If the rule is intended, ignore this; otherwise review the permission rules for it.'),
     project,
     toFloat64(n),
-    concat('/d/cc-tools?viewPanel=panel-19&var-project=', encodeURLComponent(project))
+    concat('/d/cc-tools?viewPanel=panel-19&var-project=', encodeURLComponent(project)),
+    CAST(NULL AS Nullable(UInt64)),
+    CAST(NULL AS Nullable(Float64))
 FROM
 (
     SELECT project, tool_name, count() AS n, topK(1)(decision_source)[1] AS top_source
@@ -406,7 +495,9 @@ SELECT
     concat('Mean ', toString(round(mean)), ' ms over ', toString(n), ' runs in 7 days. Hooks run synchronously and delay every matching tool call.'),
     hook_name,
     toFloat64(round(mean)),
-    '/d/cc-health?viewPanel=panel-26'
+    '/d/cc-health?viewPanel=panel-26',
+    CAST(NULL AS Nullable(UInt64)),
+    CAST(NULL AS Nullable(Float64))
 FROM
 (
     SELECT hook_name, count() AS n, avg(hook_duration_ms) AS mean
@@ -423,7 +514,9 @@ SELECT
     concat('Mean ', toString(round(mean)), ' ms over ', toString(n), ' requests in 7 days. Long contexts and a busy provider slow the first token.'),
     project,
     toFloat64(round(mean)),
-    concat('/d/cc-health?viewPanel=panel-161&var-project=', encodeURLComponent(project))
+    concat('/d/cc-health?viewPanel=panel-161&var-project=', encodeURLComponent(project)),
+    CAST(NULL AS Nullable(UInt64)),
+    CAST(NULL AS Nullable(Float64))
 FROM
 (
     SELECT project, model, count() AS n, avg(ttft_ms) AS mean
@@ -431,7 +524,9 @@ FROM
     WHERE ts >= now() - INTERVAL 7 DAY AND event = 'api_request' AND ttft_ms > 0
     GROUP BY project, model
     HAVING n >= 10 AND mean > 3000
-);
+)
+)
+ORDER BY affected DESC NULLS LAST, category, title;
 
 -- 11. One row per prompt (session_id + prompt_id): the user prompt and everything it triggered
 --     (main, subagent and auxiliary requests, tool calls). Sums add up to cc.sessions.
@@ -442,7 +537,8 @@ SELECT
     prompt_id,
     any(project)                                   AS project,
     any(host)                                      AS host,
-    any(account)                                   AS account,
+    argMaxIf(account, ts, ev.account != '')        AS account,
+    argMaxIf(account_uuid, ts, ev.account != '')   AS account_uuid,
     min(ts)                                        AS started,
     max(ts)                                        AS last_event,
     argMinIf(prompt, ts, event = 'user_prompt')    AS prompt,
@@ -458,7 +554,7 @@ SELECT
     countIf(event = 'tool_result')                 AS tool_calls,
     maxIf(result_bytes, event = 'tool_result')     AS max_result_bytes,
     countIf(event = 'subagent_completed')          AS agents_run
-FROM cc.events
+FROM cc.events AS ev
 WHERE session_id != '' AND prompt_id != ''
 GROUP BY session_id, prompt_id
 HAVING countIf(event IN ('user_prompt', 'api_request', 'tool_result')) > 0;

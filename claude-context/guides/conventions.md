@@ -26,8 +26,11 @@ re-run and must keep existing data, `.env` and foreign settings keys).
 - Edit the files, keep their 2-space formatting; panel `id`s and `gridPos` stay unique within a
   file. Never reuse the retired ids 6, 12, 25.
 - Variables, `timepicker`, `tags` and `links` are shared: change them in all seven files alike.
-- Every query honours all four variables with `('${v}' = '__all' OR col = '${v}')` and the time
-  range (`$__timeFilter(ts)`, or `$__fromTime`/`$__toTime` when filtering an aggregate).
+- Every query honours all five shared variables and the time range (`$__timeFilter(ts)`, or
+  `$__fromTime`/`$__toTime` when filtering an aggregate): Account (multi-value, its All value is
+  `'__all'` with quotes) with `('__all' IN (${account:singlequote}) OR account_uuid IN
+  (${account:singlequote}))`, Project, Session, Actor and Skill with `('${v}' = '__all' OR col =
+  '${v}')`. Documented exceptions: `claude-context/modules/dashboard.md`.
 - Variable queries are plain strings; keep `query` and `definition` identical.
 - `rawSql` is one JSON string with `\n` — edit it with exact replacements, then validate the JSON.
 

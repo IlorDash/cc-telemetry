@@ -343,59 +343,124 @@ Optional, only to label a project explicitly (otherwise it is inferred from file
 
 ## 3. Dashboards
 
-Grafana shows seven dashboards. A links bar at the top switches between them; it keeps the time range and the variables.
-The buttons are sorted by title.
+Grafana shows seven dashboards. They are laid out for Full HD (1920 px wide) and wider screens; narrower screens are not supported.
+A side rail (the left 3 of 24 columns) on every dashboard switches between them (the current one is
+highlighted); the links keep the time range and the variables. Under the navigation the rail shows **Usage · last 5 h**
+(one bar per Claude account: the cost of the last 5 hours as a share of that account's highest 5-hour cost in the last
+30 days; accounts without cost in the last 7 days are not listed), **Tips · 7 d** (the number of tips) and, under it, the most
+frequent tip category with its count. A click on either tips tile opens the Tips section of Efficiency. The rail
+panels have a fixed height, so the space under them stays empty; they ignore the time range and the variables.
 
 | Dashboard | Shows |
 | --- | --- |
-| **Overview** (home) | cost, tokens, sessions and turns; daily work and cache reads; cache hit rate; tokens by project and by actor; model share; top tools; recent and active sessions; coding rhythm by weekday and hour; the last 30 days against your plan; two tips tiles |
-| **Sessions** | sessions (title, else the first prompt; git branch), the prompts of the selected session, its timeline, cumulative cost and tokens |
-| **Agents & skills** | runs, tokens and tool calls per agent and per skill; main session against subagents by tool; subagent runs far above their average |
-| **Tools & files** | tool calls, Bash commands, rejected calls, top files and directories, accesses by area, files re-read within a session, largest tool results, error rate by tool |
-| **Health** | time spent in your hooks, API latency, time to first token, tool duration and errors, recent failed tool calls |
-| **Prompts** | the most expensive prompts; pick one to see its requests and tool calls |
-| **Tips** | hints about patterns that cost tokens or time (see "Tips") |
+| **Overview** (home) | four totals for the time range (`cost_usd`, cache hit rate, billable tokens, tool error rate with the p95 API latency); daily tokens with the cache hit rate; projects (`cost_usd`, tokens, hit rate, sessions); `cost_usd` by model; work rhythm by weekday and 3-hour block; top tools; the six most recent sessions |
+| **Sessions** | four totals (sessions, median length as activity time, median `cost_usd`, sessions with errors); the sessions table (name, last prompt, project, git branch, model, turns, tokens, `cost_usd`, cache hit rate, tool errors); for the selected session: a header, five totals, a timeline (prompts, main requests, subagents, tools), cumulative `cost_usd` and tokens, and its prompts |
+| **Efficiency** | all tips (see "Tips"; fixed 7 days): the number of tips, the tokens they affect, affected tokens by category, the token tips table, the time and friction tips table; below, where tokens and money are lost: `cost_usd` per day by work phase of a response (Explore, Edit, Run, Delegate, Talk, Other) with a phase summary, pauses between requests against the 5-minute cache lifetime, cache hit rate and cache-creation tokens by project; at the bottom the tip rules |
+| **Agents & skills** | four totals (subagent share of `cost_usd`, subagent runs, skills used, outlier runs); subagent types (runs, mean and max tokens, max against mean, `cost_usd`); `cost_usd` per day, main against subagents; skills (uses, sessions, projects, `cost_usd` of their turns); the biggest subagent runs |
+| **Tools & files** | four totals (tool calls, error rate, rejected calls split by config / hook / user, median result size); calls by tool with the error rate (top 7); rejected tool calls; files re-read within a session; largest tool results; Bash by first word; most edited files |
+| **Health** | four totals (mean time to first token, p95 API latency, API errors, hook time); time to first token by day per model against the 3 s line; time per hook; API errors by status; API request duration by bucket |
+| **Prompts** | four totals (prompts, median and p95 `cost_usd`, requests per prompt); the most expensive prompts; prompts by `cost_usd` bucket; mean `cost_usd` per prompt by model |
 
-**Variables.** The four at the top are shared and nested: **Project → Session → Actor → Skill** (`All` = no filter). The Session
+**Variables.** The five at the top are shared and nested: **Account → Project → Session → Actor → Skill** (`All` = no filter).
+**Account** is multi-select and shows the e-mail of the Claude account, or the first 8 characters of its id when there is no
+e-mail; events without an account show only under `All`. The Tips section of Efficiency and the rail ignore the variables;
+Recent sessions on Overview ignores Actor and Skill, and the hook panels on Health ignore Skill. The Session
 dropdown shows `title (short id)`, or the full id while the session has no title; it lists the newest 300 sessions that made
-a model request. Overview adds **Plan, USD/month** (0, 20, 100 or 200) and Prompts adds **Prompt**.
+a model request. Sessions adds **Columns** (Session ID, Started, Account: extra columns of the sessions table, none by default).
 **Actor**: `main` is the main session, an agent name (`developer`, `Explore`, …) is a subagent, `aux:*` are Claude Code's
 own service requests.
 **Skill**: a tool call is attributed to a skill through the `request_id` of the model request that carried `skill.name`.
 Claude Code does this attribution itself; the label lasts until the end of the prompt in which the skill was invoked.
 
-**Time range.** The quick ranges are 5 minutes, 1 hour, 24 hours, 7 days (the default), 30 days and `All` (10 years).
-The refresh rate is picked at the top right (10 s by default, from 5 s), as in any Grafana dashboard.
-Some panels ignore the time range and say so in their description: Active sessions (last 15 minutes), the 30-day plan tile
-and the tips (last 7 days).
+**Time range.** The quick ranges are 5 minutes, 1 hour, 24 hours, 7 days (the default; 30 days on Overview), 30 days and `All` (10 years).
+Every dashboard refreshes itself every 10 s; the rate is picked at the top right (from 5 s to 1 h), as in any Grafana dashboard.
+Some panels ignore the time range and say so in their description: the rail panels and the tips (last 7 days).
 
-**Clicks.** In the tables a click on a `session_id` opens that session on **Sessions**; a project in Tokens by project opens
-**Overview** for it; an agent or a skill opens **Agents & skills** filtered by it; a `prompt_id` in Most expensive prompts opens
-the prompt on **Prompts**.
+**Clicks.** Panel titles that end in "click a ... to ..." say what a click does.
 
-**Sessions.** Cumulative cost, cumulative tokens, the prompts and the timeline show data only for one session: pick it in the
-Session variable (the cumulative graphs say "Select a session").
+- **Overview.** A session name in Recent sessions opens that session on **Sessions**; the **all →** link next to the
+  Recent sessions title opens **Sessions** with the current range and variables; a project in Projects filters **Overview** by it.
+- **Sessions.** A session name in the Sessions table selects that session on **Sessions**; a prompt in Prompts in this
+  session opens **Prompts** filtered by that session (the range stays; Actor and Skill reset to `All`).
+- **Prompts.** A prompt in Most expensive prompts opens its session on **Sessions**; a project there filters **Prompts** by it.
+- **Agents & skills.** An agent type in Subagent types filters **Agents & skills** by it (Actor); a skill in Skills filters
+  it by that skill (Skill); a session in Biggest subagent runs opens that session on **Sessions**.
+- **Efficiency.** A tip title in the token tips or the time and friction tips opens its evidence panel full-screen (see "Tips").
+- **Rail.** The navigation switches the dashboard; the two tips tiles open the Tips section of Efficiency.
 
-**Plan tile.** "Last 30 days: API equivalent vs plan" sums `cost_usd` of the last 30 days and divides it by the **Plan,
-USD/month** you chose; with Plan = 0 the ratio is 0. `cost_usd` is computed by Claude Code from API prices, so the sum is
-not a bill: on a subscription you pay the flat fee. A ratio above 1 means the plan costs less than the same use at API prices.
+Opening a session from a session name (Recent sessions, Sessions table), from a prompt in Most expensive prompts or from
+Biggest subagent runs also zooms the time range to that session: from its first prompt, request or tool call to the end of its
+last one, padded by 3 % of that span on each side, at least 5 seconds each. The timeline and the cumulative graph then fill their
+width, and the Sessions table and its four totals list the sessions active in that window. Links that open a session from
+Overview, Prompts and Agents & skills reset Actor and Skill to `All`. The browser Back button or the time picker returns to the earlier range. Picking a
+session in the Session variable keeps the time range; the links from the tips (`cc.tips`) keep the range of the dashboard
+they start from, except the `agent-outlier` tip, which zooms to its session.
 
-**Explanations.** The collapsed row **What do these numbers mean?** at the bottom of Overview explains tokens, cache, `cost_usd`,
-actors and LIVE / IDLE.
+**Sessions.** The four totals and the table list the sessions whose last prompt falls into the time range; they follow
+Account, Project, Actor and Skill but not Session, so the selected row (marked with ▶ before its name) stays among the others. Click a name to
+select the session, or pick it in the Session variable. Everything below the table shows data only for the selected session
+and says "No session selected" until you pick one. The header gives name, git branch, project, model with the highest cost,
+account, short id, activity time (the time requests and tool calls were running; idle time and overlaps are not counted; the same
+measure as the median length above) and `LIVE` when the session's last event is under 10 minutes old. The timeline has one cell per
+time step of the dashboard time range; a request, a subagent run or a tool call fills every step it ran in (Claude Code logs
+it when it ends, so it runs back from its end by its duration), and a prompt marks one step. So a click on a session zooms the range to it (picking the session in the variable does not: narrow the range yourself); a Tools cell is red when
+at least one call in it failed. Prompts show in the timeline only with Actor and Skill set to `All`. Turns are model requests (subagents and auxiliary requests included); Tokens are input +
+output + cache create; Hit is the cache hit rate and Errors the share of failed tool calls, coloured like the totals on Overview
+(Errors: below 2 % green, 5 % and above red). Session ID, Started and Account are hidden until you pick them in **Columns**.
+The prompt text appears only when the client sets `OTEL_LOG_USER_PROMPTS=1`.
+
+**Prompts.** A prompt is a user message and every API request until the next user message (subagent and auxiliary requests
+included); its `cost_usd` is the sum over those requests. The panels follow the time range (the time of the prompt) and all
+variables; with Actor or Skill set, only prompts with such a request are counted, at their full cost. Most expensive prompts
+lists the eight costliest; Model is the model with the highest cost within the prompt, and so is the model a prompt counts
+for in the mean per model.
+
+**Overview.** All panels follow the time range (30 days by default) and the variables, except that **Recent sessions**
+ignores Actor and Skill and shows whole-session tokens and cost. `cost_usd` is computed by Claude Code
+from API prices, so the sum is not a bill: on a subscription you pay the flat fee. Billable tokens are input + output + cache
+create; cache reads are left out. Cache hit rate is cache read / (cache read + input + cache create): 90 % and above is green,
+75 % and above yellow, below red. In **Work rhythm** a cell is brighter the closer it is to the busiest weekday and 3-hour block
+(columns 00, 03, ... 21; server time zone, UTC in Docker); it is a table with coloured cells, because the Grafana heatmap
+cannot put the time of day on its X axis and a table column cannot be narrower than 50 px.
+
+**Efficiency.** The Tips section at the top (counts, affected tokens, affected tokens by category, the token tips table and the time and
+friction tips table) reads the tips (last 7 days, no time range, no variables); the "Where cost goes" and "Cache" sections below
+follow the time range and the variables. The work phase of a response comes from the tools it called: Edit (any
+Edit / Write / MultiEdit / NotebookEdit), Delegate (Task / Agent / SendMessage / SubagentHandback / TaskStop), Run (Bash), Explore (only Read / Grep / Glob / LS), Talk
+(no tool result), Other (any other tools, e.g. MCP or web); a response with several kinds takes the first match in that
+order. Pauses over 5 minutes are red: past the prompt-cache lifetime the next request writes the cache again. Gaps are
+between consecutive requests of a session, subagents included (filter Actor = main for the main conversation only); the
+first request in the time range has no predecessor and is not counted.
+
+**Agents & skills, Tools & files, Health.** All panels follow the time range and the five variables, with these exceptions:
+the hook panels on Health ignore Skill (hook events carry no skill); skill activations are reported by the main session
+only, so Skills used and the Skills table are empty when an agent is picked as Actor. Outlier runs use the rule of the
+`agent-outlier` tip (a run above 6 times the mean of its type and above 50k tokens) over the time range. Sizes of tool results
+are bytes: the telemetry has no token count, so Repeat tokens in Files re-read is about size / 4 × (reads − 1), the same
+rule of thumb as the tips. Bash by first word counts only the first word of a command, which is all Claude Code sends. API
+errors come from `api_error` events: a request that failed and was retried counts each time, and the panels stay empty until
+the first one arrives.
+
+**Editing the rail.** Grafana loads every `.json` in `grafana/dashboards/` as a dashboard, so the rail is defined once in
+`grafana/rail/rail.json` and copied into every dashboard file by `node grafana/rail/sync-rail.js` (no dependencies; run it
+from the repository root after editing `rail.json` or after adding a dashboard to its navigation list). The same command with
+`--check` changes nothing and exits with 1 when a dashboard differs from the source.
 
 ### Tips
 
 A tip is a heuristic hint, not an error: something exceeded a threshold over the last 7 days. It is worth a look and may be
-fine for your work. The window is fixed to the last 7 days; the Tips dashboard ignores the time range and the variables, as
-do the two tips tiles on Overview. Click a tip's title to open one evidence panel full-screen, with the project (or session) preset.
+fine for your work. The window is fixed to the last 7 days; the Tips section of Efficiency (the top of that dashboard) ignores the time range and the variables, as
+do the two tips tiles in the rail. Click a tip's title to open one evidence panel full-screen, with the project (or session) preset;
+the range of the dashboard you start from is kept (the `agent-outlier` tip zooms to its session). The table below is repeated at
+the bottom of Efficiency.
 
 | Category | Fires when (grouped by) | What to do | Link opens |
 | --- | --- | --- | --- |
-| `cache` | cache hit rate below 40 % with at least 20 requests (project) | keep the prompt prefix (CLAUDE.md, tools) stable; fewer `/clear` and model switches | Overview, Cache hit rate by project |
+| `cache` | cache hit rate below 40 % with at least 20 requests (project) | keep the prompt prefix (CLAUDE.md, tools) stable; fewer `/clear` and model switches | Efficiency, Cache hit rate by project |
 | `repeated-read` | one file read more than 10 times (project, file) | keep the key facts in CLAUDE.md or a note instead of rereading | Tools & files, Files re-read within one session |
 | `big-results` | at least 5 tool results over 200 KB (project) | narrow the search or limit the read range: big outputs fill the context | Tools & files, Largest tool results |
 | `short-opus` | Opus model: at least 20 answers under 500 output tokens, and they are at least half of its requests (project) | a smaller model may handle such turns; the shown cost is an upper bound of the saving | Prompts, Most expensive prompts |
-| `agent-outlier` | a subagent's biggest run is over 6 times its mean and over 50,000 tokens, at least 3 runs (agent type) | open the session of that run and check what it did | Sessions, timeline of that session |
+| `agent-outlier` | a subagent's biggest run is over 6 times its mean and over 50,000 tokens, at least 3 runs (agent type) | open the session of that run and check what it did | Sessions, Timeline of that session (session and agent type preset; the range is zoomed to the session) |
 | `denials` | a tool rejected at least 5 times (project, tool) | add an allow or deny rule if the rejections are not intended; the text names the main source (config, hook, user) | Tools & files, Rejected tool calls |
 | `slow-hook` | a hook's mean duration over 500 ms, at least 10 runs (hook) | hooks run synchronously and delay every matching tool call: speed it up or make it async | Health, Hook time |
 | `slow-ttft` | mean time to first token over 3 s, at least 10 requests (project, model) | long contexts or a busy provider; compare days in the panel | Health, Time to first token by day |
@@ -510,7 +575,7 @@ Observed with Claude Code 2.1.323 and the client settings above:
 - **Tool arguments** (`OTEL_LOG_TOOL_DETAILS=1`): file paths, search patterns, Bash commands. Not file contents and not tool
   output: only their size (`tool_result_size_bytes`).
 - **Usage**: model, tokens (incl. cache), cost, durations, time to first token, effort, subagent and skill names, permission
-  decisions, hook timings; plus metrics (tokens, cost, lines of code changed, active time).
+  decisions, hook timings, API errors (HTTP status and the error message); plus metrics (tokens, cost, lines of code changed, active time).
 - **Identity**: account email, account/organization IDs, plan (`pro`, …), session and prompt IDs, OS version,
   and the `host` (and optionally `project`) you set. The project guess sends nothing of its own: the server derives it from the
   tool-call paths above and the hook's working directory below.

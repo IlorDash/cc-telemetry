@@ -29,7 +29,7 @@ unless asked. For "review only" requests, review the diff or files the user name
 Full rule text: `claude-context/guides/conventions.md` (read it before reviewing); checks:
 `claude-context/guides/verification.md`.
 - [ ] Correctness: SQL logic (joins, `multiIf` order, `OrZero` conversions, `ServiceName` filter
-      only in `cc.events_raw`, plus `cc-session-meta` in `cc.session_meta`), dashboard queries honour all four variables and the time range,
+      only in `cc.events_raw`, plus `cc-session-meta` in `cc.session_meta`), dashboard queries honour all five shared variables (Account with its own pattern, see `guides/conventions.md`; exceptions in `modules/dashboard.md`) and the time range,
       `query`/`definition` identical, panel ids unique, JSON valid
 - [ ] Idempotency: re-running a setup script on a configured machine changes nothing it should
       not — `.env` kept, data kept, foreign settings keys kept, `.bak` only once
@@ -62,6 +62,18 @@ that are NOT introduced by this change go to `claude-context/pending-bugs.md`, n
   or view names instead of line numbers, one to three lines, in the existing entries' style;
 - never remove or reword existing entries (developer removes fixed ones, context-auditor prunes).
 A bug introduced or made worse by the reviewed change is a Blocker, not a ledger entry.
+
+**In a parallel-task worktree** (working directory `cc-telemetry-<name>`) `claude-context/` is
+locked (hook `guard-worktree-context.py`): append to `<wt>/.wt-ledger/pending-bugs.md` under
+`## Add` instead, in the ledger's format (`claude-context/guides/ledgers.md`); read the main ledger
+and the buffer first. What to review there: `git diff HEAD` in the worktree. Live-stack checks
+use the main folder's helpers (`claude-context/guides/verification.md` "In a parallel-task
+worktree"); never `docker compose` from the worktree. A check that can only run after the merge
+is not a false claim when the developer says so.
+
+When the prompt names a plan stage (`claude-context/guides/feature-planning.md`), review against
+that stage's scope and checkable result: work outside the stage, or a result not met, is a
+Blocker; later stages' work missing is not.
 
 "Bug hunt in <area>" mode: read the area's code and module file, write findings only to the
 ledger, change nothing else; the report lists what was added.

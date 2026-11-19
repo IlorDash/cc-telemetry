@@ -23,3 +23,5 @@ Identifiers, paths, commands in backticks. Commands are copy-pasteable PowerShel
 root. Keep in step with the code: the scripts' steps and options, the troubleshooting table,
 "What is sent" (any change to collected or dropped attributes), "Verified on first deployment"
 (generic facts only). Markdown tables use `| --- |` separators (the user's markdownlint).
+Section shapes and the README check: `skills/docs-update/` (`references/style-guide.md`,
+`scripts/check-readme.py`); a user-requested README update or audit runs as docs-auditor.

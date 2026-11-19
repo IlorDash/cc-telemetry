@@ -11,11 +11,13 @@ claude-context/                 .claude  ── directory junction ──> claud
 ├── CLAUDE.md                   (so .claude/CLAUDE.md, .claude/settings.json,
 ├── settings.json                .claude/agents/<name>.md, .claude/skills/<name>,
 ├── .gitignore                   .claude/hooks/... all resolve to the files on the left)
-├── agents/*.md                 developer, reviewer, context-auditor
-├── skills/<name>/              commit-message
-├── hooks/                      guard-secrets.py (PreToolUse, wired in settings.json)
+├── agents/*.md                 developer, reviewer, context-auditor, docs-auditor, mr-reviewer
+├── skills/<name>/              commit-message, parallel-task, docs-update, mr-description
+├── hooks/                      guard-secrets.py, guard-worktree-context.py (PreToolUse, wired in settings.json)
 ├── guides/*.md                 rules moved out of CLAUDE.md, read on demand
 ├── scripts/                    check-dashboard.js (verification helper)
+├── plans/                      feature plans (guides/feature-planning.md)
+├── pull-requests/              git-ignored: PR descriptions drafted by mr-description
 ├── context-claude.md
 ├── modules/*.md
 ├── pending-bugs.md
@@ -42,8 +44,18 @@ claude-context/                 .claude  ── directory junction ──> claud
 ## Git
 - Denied in `settings.json` (also as `git -C <dir> ...`): `add`, `commit`, `push`, `pull`,
   `fetch`, `checkout`, `switch`, `restore`, `reset`, `stash`, `rebase`, `merge`, `cherry-pick`,
-  `revert`, `tag`, `rm`, `mv`, `clean`, `am`, `apply`, `init`, `worktree`, branch delete/rename,
-  plus `rm -r`/`rmdir`. Give the user the command instead.
+  `revert`, `tag`, `rm`, `mv`, `clean`, `am`, `apply`, `init`, `worktree remove/prune/move/lock`,
+  branch delete/rename, plus `rm -r`/`rmdir`. Give the user the command instead.
+- **One exception, parallel tasks:** the `parallel-task` skill may run `git worktree add -b` and
+  the junctions `mklink /J` — only in the shapes written in the skill, each behind an `ask` rule
+  (the user clicks Allow/Deny). `git worktree list` is allowed. Deleting is denied: the skill checks
+  the worktree and hands the user the cleanup commands. Worktrees live next to the repo as
+  `..\cc-telemetry-<name>`, never under `.claude/`.
+- **In a worktree `claude-context/` is locked** (`guides/ledgers.md`): the hook
+  `hooks/guard-worktree-context.py` (Edit, Write, NotebookEdit, Bash, PowerShell) blocks writes into
+  `claude-context`/`.claude` and any `docker compose` when the session's cwd or
+  `CLAUDE_PROJECT_DIR` is inside a `cc-telemetry-*` folder. A worktree made for an AI-setup change
+  gets the user-created marker `.wt-context-unlocked`, which unlocks its own copy only.
 - Also denied for the Bash tool: data-destroying stack commands (`docker compose down -v`,
   `docker volume rm/prune`, `wsl --unregister`). The PowerShell tool is not covered by these
   rules — the CLAUDE.md "Safety" rule applies there: the user runs them after a dump.
