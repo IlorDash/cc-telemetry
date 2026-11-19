@@ -9,6 +9,8 @@ wider; narrower screens are not supported.
     Russian pages. Some titles end in a hint such as `· click a type to filter by it`; the tables
     below leave that tail out and describe the click in their own column.
 
+The screenshots on this page show made-up demo data.
+
 ---
 
 ## Open Grafana
@@ -120,6 +122,8 @@ Picking a session in the Session variable does not zoom: narrow the range yourse
 
 **Question:** what did I spend, and how well did the cache work, in this period?
 
+[![The Overview dashboard: cost, cache hit rate, daily tokens, projects, models and recent sessions](assets/overview.png)](assets/overview.png)
+
 | Panel | Shows | Click |
 | --- | --- | --- |
 | **cost_usd** | The sum of `cost_usd` of the API requests in the range | - |
@@ -145,8 +149,12 @@ Picking a session in the Session variable does not zoom: narrow the range yourse
 
 **Question:** what happened in one session: its prompts, requests, subagents and tools over time?
 
+[![The Sessions dashboard: the session table with nothing selected](assets/sessions.png)](assets/sessions.png)
+
 The top part lists sessions and ignores the Session variable; everything below it is about the
 one session you select. Pick it by a click on a name in the table or in the Session variable.
+
+[![The Sessions dashboard with one session selected: its timeline, cumulative cost and prompts](assets/session-selected.png)](assets/session-selected.png)
 
 | Panel | Shows | Click |
 | --- | --- | --- |
@@ -187,6 +195,8 @@ say `(text not logged)`.
 
 **Question:** which prompts cost the most, and what does a typical prompt cost?
 
+[![The Prompts dashboard: the most expensive prompts and cost per prompt](assets/prompts.png)](assets/prompts.png)
+
 A prompt is a user message and every API request until the next user message (subagent and
 auxiliary requests included); its `cost_usd` is the sum over those requests. The panels follow the
 range (by the time of the prompt) and all variables; with Actor or Skill set, only prompts with
@@ -207,6 +217,8 @@ such a request are counted, at their full cost.
 ## Efficiency
 
 **Question:** where are tokens and money lost, and which tips apply to my work?
+
+[![The Efficiency dashboard: the tips, cost by work phase and cache hit rate by project](assets/efficiency.png)](assets/efficiency.png)
 
 The page has three parts. The Tips section on top reads the [tips](tips.md): fixed to the last 7
 days, no time range, no variables. The "Where cost goes" and "Cache" sections below follow the
@@ -237,6 +249,8 @@ time range and the variables.
 
 **Question:** how much do subagents and skills cost, and which runs are outliers?
 
+[![The Agents & skills dashboard: subagent and skill usage and the biggest subagent runs](assets/agents.png)](assets/agents.png)
+
 | Panel | Shows | Click |
 | --- | --- | --- |
 | **Subagent share** | The share of `cost_usd` spent by subagents (requests with an `agent_id`) among all requests | - |
@@ -257,6 +271,8 @@ time range and the variables.
 ## Tools & files
 
 **Question:** which tools fail or are rejected, and which files are re-read or edited most?
+
+[![The Tools & files dashboard: tool calls, rejections, re-read files and the largest results](assets/tools.png)](assets/tools.png)
 
 | Panel | Shows | Click |
 | --- | --- | --- |
@@ -281,6 +297,8 @@ time range and the variables.
 ## Health
 
 **Question:** how fast and how reliable are the API requests and the hooks?
+
+[![The Health dashboard: time to first token, API latency, API errors and hook time](assets/health.png)](assets/health.png)
 
 | Panel | Shows | Click |
 | --- | --- | --- |

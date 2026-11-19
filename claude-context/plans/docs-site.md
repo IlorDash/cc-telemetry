@@ -1,6 +1,6 @@
 # Plan: user guide on GitHub Pages (MkDocs)
 
-Status: approved 2026-11-19; branch `docs-site` from `develop`; site publishes from `main`.
+Status: approved 2026-11-19; stages 1–5 done; branch `docs-site` from `develop`; site publishes from `main`.
 
 ## Goal
 
@@ -113,6 +113,11 @@ project.
    removed afterwards; the live stack untouched), screenshots at 1920 px into `docs/assets/`,
    placed on the pages. Result: strict build 0; images show only made-up data (checked by eye
    and by grep of the demo data).
+   Done as `tools/docs-demo/` (not published): `generate.py` (made-up events, fixed seed),
+   `otel_logs.sql` (table DDL), `demo.sh up|down` (cc-demo-* containers, Grafana on
+   127.0.0.1:13000, tmpfs), `check.js` (dashboard check against the demo), `screenshots.js`
+   (Playwright function writing `docs/assets/*.png`). Each image links to its full-size file.
+   Side find: the bar charts had lost their x labels (fixed in develop before the screenshots).
 6. **Release notes, README, publishing.** `release-1-0-0` (EN + RU) describing the current
    features; README shortened with a link to the site. The user enables Pages
    (Settings → Pages → Source: GitHub Actions) and merges; result: the deploy job publishes and

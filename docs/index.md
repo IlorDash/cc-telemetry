@@ -36,6 +36,8 @@ the time range and the variables.
 | **Tools & files** | Which tools fail or are rejected, and which files are re-read or edited most? |
 | **Health** | How fast and how reliable are the API requests and the hooks? |
 
+[![The Overview dashboard, shown with made-up demo data](assets/overview.png)](assets/overview.png)
+
 ## Supported platforms
 
 | Role | Windows | Linux |
