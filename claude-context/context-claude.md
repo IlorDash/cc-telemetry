@@ -87,8 +87,12 @@ Grafana :3000 (host port GRAFANA_PORT)  7 dashboards, shared variables + side ra
   Bash scripts: `set -euo pipefail`.
 - `.sh/.sql/.yaml` are LF (`.gitattributes`); they run inside Linux containers.
 - Every change is checked on the live stack (`guides/verification.md`) before it is reported done.
+- README checks: `skills/docs-update/scripts/check-readme.py`; user-requested README update/audit →
+  docs-auditor. Whole-branch review before a PR → mr-reviewer (PR review gate of the
+  `mr-description` skill; drafts in git-ignored `pull-requests/`). Routing: CLAUDE.md; layout of
+  agents/skills: `guides/context-repo.md`.
 
 ## Ledger
 
-`pending-bugs.md` — suspected bugs and unverified behaviour, grouped by area. reviewer adds,
-developer removes what it fixes, context-auditor prunes on a requested audit.
+`pending-bugs.md` — suspected bugs and unverified behaviour, grouped by area. reviewer and
+mr-reviewer add, developer removes what it fixes, context-auditor prunes on a requested audit.
