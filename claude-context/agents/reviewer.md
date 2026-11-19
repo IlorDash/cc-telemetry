@@ -29,7 +29,7 @@ unless asked. For "review only" requests, review the diff or files the user name
 Full rule text: `claude-context/guides/conventions.md` (read it before reviewing); checks:
 `claude-context/guides/verification.md`.
 - [ ] Correctness: SQL logic (joins, `multiIf` order, `OrZero` conversions, `ServiceName` filter
-      only in `cc.events_raw`, plus `cc-session-meta` in `cc.session_meta`), dashboard queries honour all four variables and the time range,
+      only in `cc.events_raw`, plus `cc-session-meta` in `cc.session_meta`), dashboard queries honour all five shared variables (Account with its own pattern, see `guides/conventions.md`; exceptions in `modules/dashboard.md`) and the time range,
       `query`/`definition` identical, panel ids unique, JSON valid
 - [ ] Idempotency: re-running a setup script on a configured machine changes nothing it should
       not — `.env` kept, data kept, foreign settings keys kept, `.bak` only once
