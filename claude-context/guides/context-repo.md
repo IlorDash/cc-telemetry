@@ -12,7 +12,7 @@ claude-context/                 .claude  ── directory junction ──> claud
 ├── settings.json                .claude/agents/<name>.md, .claude/skills/<name>,
 ├── .gitignore                   .claude/hooks/... all resolve to the files on the left)
 ├── agents/*.md                 developer, reviewer, context-auditor
-├── skills/<name>/              commit-message
+├── skills/<name>/              commit-message, mr-description
 ├── hooks/                      guard-secrets.py (PreToolUse, wired in settings.json)
 ├── guides/*.md                 rules moved out of CLAUDE.md, read on demand
 ├── scripts/                    check-dashboard.js (verification helper)
