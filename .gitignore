@@ -4,3 +4,6 @@ backup/
 /.claude
 # Playwright MCP screenshots and prototypes
 .playwright-mcp/
+# parallel-task worktree: ledger/plan buffer and the AI-setup unlock marker (claude-context/guides/ledgers.md)
+/.wt-ledger/
+/.wt-context-unlocked
