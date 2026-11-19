@@ -160,8 +160,10 @@ The first time, run `git pull` yourself: older versions of the script have no `-
    set up before the retention" in section 4) and repeats the checks. Containers whose image and configuration did not change keep running, except that a
    changed collector config (`otel-collector.yaml`) or Grafana provisioning (`grafana/provisioning/`) is reloaded by restarting
    that service (dashboard files are re-read by Grafana by itself). The data volumes are never removed;
-5. compares the row counts. Every table must have at least as many rows as before, except for rows older than 180 days, which
-   the retention TTL may remove; the script prints `OK`, or a `FAIL` banner with the dump folder, and exits with status 1.
+5. compares the row counts. Before the dump it fixes a cutoff (179 days ago) and counts the rows younger than it; after the
+   update it counts them again with the same cutoff, and no table may have fewer. Rows older than the cutoff may be removed by
+   the retention TTL; the script only reports how many. It prints `OK`, or a `FAIL` banner with the dump folder, and exits with
+   status 1.
 
 If `git pull` fails (for example because the branch diverged), nothing on the stack has changed. Fix the repository and run
 `--update` again.

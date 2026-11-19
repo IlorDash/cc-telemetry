@@ -82,8 +82,9 @@ Grafana (port 3000, admin login) are published on all interfaces and opened in u
                      backup/pre-update-<time>/ (earlier dumps stay), records the row count per table,
                      runs `git pull --ff-only` (skipped with a warning when there is no upstream), runs
                      this script again from the updated file with your other options, and finally
-                     checks that no table has fewer rows than before (rows older than the 180-day
-                     retention may be removed by the TTL and are not counted as lost). Nothing is
+                     checks that no row the 180-day retention TTL cannot remove is missing (it counts
+                     the rows younger than a cutoff fixed at dump time before and after; older rows
+                     may be removed by the TTL and are only reported). Nothing is
                      removed by the script itself (no `down -v`, volumes stay). Rollback: git checkout
                      <previous commit>, then bash setup-server.sh
   --yes              do not ask before installing Docker, using sudo or enabling the docker service
@@ -282,16 +283,27 @@ ttl_col() { # table
   esac
 }
 
-# "<table><TAB><rows>" for every otel.* table: rows older than the retention minus a day. Only those can
-# disappear through the TTL, so the data check of --update tolerates a drop of up to that many rows.
-old_row_counts() {
+# "<table><TAB><rows>" for every otel.* table that has a TTL column: rows with that time >= the cutoff.
+# The TTL cannot remove those, so the data check of --update compares them exactly.
+recent_row_counts() { # cutoff ('YYYY-MM-DD hh:mm:ss', server time zone)
   local tables t col n
   tables="$(chq 'SHOW TABLES FROM otel')" || return 1
   for t in $tables; do
-    col="$(ttl_col "$t")"; n=0
-    [ -z "$col" ] || n="$(chq "SELECT count() FROM otel.$t WHERE $col < now() - INTERVAL $WINDOW_DAYS DAY")" || return 1
+    col="$(ttl_col "$t")"
+    [ -n "$col" ] || continue
+    n="$(chq "SELECT count() FROM otel.$t WHERE $col >= toDateTime('$1')")" || return 1
     printf '%s\t%s\n' "$t" "$n"
   done
+}
+
+# Writes <dir>/ttl-recent.tsv: first line "#cutoff<TAB><retention minus a day ago>", then recent_row_counts of
+# that cutoff. finish_update counts again with the same cutoff. Must run before any TTL is applied.
+save_retention_baseline() { # dir
+  local cutoff rows
+  cutoff="$(chq "SELECT toString(now() - INTERVAL $WINDOW_DAYS DAY)")" || return 1
+  rows="$(recent_row_counts "$cutoff")" || return 1
+  { printf '#cutoff\t%s\n' "$cutoff"; [ -z "$rows" ] || printf '%s\n' "$rows"; } > "$1/ttl-recent.tsv.tmp" \
+    && mv "$1/ttl-recent.tsv.tmp" "$1/ttl-recent.tsv"
 }
 
 # bash reads a script while it runs, and git pull rewrites this file: everything after the pull is in
@@ -340,7 +352,7 @@ run_update() {
   UPD_DIR="$dir"
   tool BACKUP_DIR="$dir" bash "$ROOT/linux-server-tools/backup.sh" dump || fail 'The safety dump failed (see above). Nothing was changed.'
   row_counts > "$dir/rowcounts.tsv" || fail 'Could not count the rows. Nothing was changed.'
-  old_row_counts > "$dir/ttl-expected.tsv" || fail 'Could not count the rows. Nothing was changed.'
+  save_retention_baseline "$dir" || fail 'Could not count the rows. Nothing was changed.'
   ok "dump and row counts saved in $dir (earlier dumps are kept)"
   [ "${D[0]}" != sudo ] || ok "docker runs through sudo, so the dump files in $dir belong to root (read or delete them with sudo)"
 
@@ -364,9 +376,11 @@ run_update() {
   fail 'could not start setup-server.sh again'
 }
 
-# Last step of the re-run: no table has fewer rows than before the update.
+# Last step of the re-run: no row the retention TTL cannot remove is gone. Tables with a baseline in
+# ttl-recent.tsv: the rows with time >= the stored cutoff must not be fewer (exact); older rows may shrink
+# through the TTL and are only reported. Other tables (or no baseline): the total must not be smaller.
 finish_update() {
-  local post t n now allow bad=0 restore="BACKUP_DIR=$UPDATE_DIR"
+  local post rec_post cutoff='' t n now rb rn gone bad=0 restore="BACKUP_DIR=$UPDATE_DIR"
   # sudo resets the environment: the variable must go through env, after sudo
   [ "${D[0]}" != sudo ] || restore="sudo env BACKUP_DIR=$UPDATE_DIR"
   step 'Update: data check'
@@ -374,18 +388,31 @@ finish_update() {
     warn "no row counts in $UPDATE_DIR (empty stack before the update?): nothing to compare"
   else
     post="$(row_counts)" || fail 'could not count the rows after the update.'
+    if [ -r "$UPDATE_DIR/ttl-recent.tsv" ]; then
+      cutoff="$(awk -F'\t' '$1 == "#cutoff" { print $2 }' "$UPDATE_DIR/ttl-recent.tsv")"
+    fi
+    if [ -n "$cutoff" ]; then rec_post="$(recent_row_counts "$cutoff")" || fail 'could not count the rows after the update.'; fi
     while IFS=$'\t' read -r t n; do
       [ -n "$t" ] || continue
       now="$(printf '%s\n' "$post" | awk -F'\t' -v t="$t" '$1 == t { print $2 }')"
-      # rows older than the retention that the TTL may have removed (ttl-expected.tsv, written before any TTL was applied)
-      allow=0
-      if [ -r "$UPDATE_DIR/ttl-expected.tsv" ]; then allow="$(awk -F'\t' -v t="$t" '$1 == t { print $2 }' "$UPDATE_DIR/ttl-expected.tsv")"; fi
-      [[ "$allow" =~ ^[0-9]+$ ]] || allow=0
+      rb=''; rn=''
+      if [ -n "$cutoff" ]; then
+        rb="$(awk -F'\t' -v t="$t" '$1 == t { print $2 }' "$UPDATE_DIR/ttl-recent.tsv")"
+        rn="$(printf '%s\n' "$rec_post" | awk -F'\t' -v t="$t" '$1 == t { print $2 }')"
+      fi
       if ! [[ "$n" =~ ^[0-9]+$ ]]; then bad=1; printf '   FAIL %s: the row count before the update is not a number (%s), cannot compare\n' "$t" "$n" >&2
       elif [ -z "$now" ]; then bad=1; printf '   LOST %s: %s rows before, table missing now\n' "$t" "$n" >&2
       elif ! [[ "$now" =~ ^[0-9]+$ ]]; then bad=1; printf '   FAIL %s: the row count now is not a number (%s), cannot compare\n' "$t" "$now" >&2
-      elif [ "$now" -lt $((n - allow)) ]; then bad=1; printf '   LOST %s: %s rows before, %s now (%s older than %s days may go through the retention TTL)\n' "$t" "$n" "$now" "$allow" "$RETENTION_DAYS" >&2
-      elif [ "$now" -lt "$n" ]; then printf '   OK   %s: %s rows before, %s now (%s older than %s days removed by the retention TTL)\n' "$t" "$n" "$now" "$((n - now))" "$RETENTION_DAYS"
+      elif [[ "$rb" =~ ^[0-9]+$ ]]; then
+        if ! [[ "$rn" =~ ^[0-9]+$ ]]; then bad=1; printf '   FAIL %s: the count of rows since %s is not a number now (%s), cannot compare\n' "$t" "$cutoff" "$rn" >&2
+        elif [ "$rn" -lt "$rb" ]; then bad=1; printf '   LOST %s: %s rows newer than %s before, %s now (the retention TTL cannot remove them)\n' "$t" "$rb" "$cutoff" "$rn" >&2
+        else
+          gone=$(( (n - rb) - (now - rn) ))
+          if [ "$gone" -gt 0 ]; then printf '   OK   %s: %s rows before, %s now (%s older than %s days removed by the retention TTL)\n' "$t" "$n" "$now" "$gone" "$RETENTION_DAYS"
+          else printf '   OK   %s: %s rows before, %s now\n' "$t" "$n" "$now"
+          fi
+        fi
+      elif [ "$now" -lt "$n" ]; then bad=1; printf '   LOST %s: %s rows before, %s now\n' "$t" "$n" "$now" >&2
       else printf '   OK   %s: %s rows before, %s now\n' "$t" "$n" "$now"
       fi
     done < "$UPDATE_DIR/rowcounts.tsv"
@@ -571,10 +598,10 @@ warn_old_query_logs() {
 migrate_storage() {
   local list db t col n old=0 todo=() tbl answer
   step "Storage: retention ($RETENTION_DAYS days) and partitions"
-  # Rows older than the retention that the TTL may remove: --update must not count them as lost. Taken before any TTL is
-  # applied (an update that started from an older script has not written the file).
-  if [ -n "$UPDATE_DIR" ] && [ ! -e "$UPDATE_DIR/ttl-expected.tsv" ]; then
-    old_row_counts > "$UPDATE_DIR/ttl-expected.tsv" || fail 'Could not count the rows older than the retention.'
+  # The baseline of the --update data check: taken before any TTL is applied (an update that started from an
+  # older script has not written it).
+  if [ -n "$UPDATE_DIR" ] && [ ! -e "$UPDATE_DIR/ttl-recent.tsv" ]; then
+    save_retention_baseline "$UPDATE_DIR" || fail 'Could not count the rows younger than the retention.'
   fi
   list="$(chq "SELECT database, name FROM system.tables WHERE ((database = 'otel' AND (name = 'otel_logs' OR startsWith(name, 'otel_metrics_'))) OR (database = 'cc' AND name = 'events_t')) AND position(engine_full, ' TTL ') = 0 ORDER BY database, name")" \
     || fail 'Could not read system.tables.'

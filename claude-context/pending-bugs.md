@@ -38,9 +38,6 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
   container likely keeps the old inode until a restart (unverified).
 - **?** `migrate_storage` was never exercised by a real `--update` run (dump → `ttl-expected.tsv` →
   migration → `finish_update` with the TTL tolerance).
-- **M** `finish_update` lowers the bar per table by its `ttl-expected.tsv` count (rows older than
-  the retention): a loss of recent rows up to that count is reported `OK` ("removed by the retention
-  TTL") instead of `LOST`.
 
 ## setup-client.ps1
 
