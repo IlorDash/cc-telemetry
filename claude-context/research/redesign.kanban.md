@@ -43,28 +43,29 @@
 
 ## To Do
 
+## In Progress
+
+## Done
+
 ### Обновить claude-context после редизайна
 
   - tags: [docs, context]
   - priority: medium
   - workload: Normal
   - steps:
-      - [ ] modules/dashboard.md: боковая панель, Efficiency, новый Overview, удалённые панели и id, plan_monthly
-      - [ ] modules/telemetry-data.md: request_id в cc.api_requests, фазы ответа
-      - [ ] context-claude.md: упоминания cc-tips
-      - [ ] modules/dashboard.md: Sessions и Prompts (панели и id, extra_cols, shown_cols, session_header, переменная prompt удалена, from_ms/to_ms и сужение периода, timeline по длительности, длина сессии как время работы)
-      - [ ] modules/dashboard.md: новая раскладка Efficiency и заголовки после единого стиля
-      - [ ] modules/telemetry-data.md: ссылка agent-outlier в cc.tips с from/to
-      - [ ] context-claude.md: guides/grafana-style.md
-      - [ ] modules/dashboard.md: Agents & skills, Tools & files, Health (панели и id, удалённые id, ссылка 476 с зумом, Hook time без Skill)
-      - [ ] modules/telemetry-data.md: событие api_error, колонки status_code и error в events_raw, ttft_ms в cc.api_requests
+      - [x] modules/dashboard.md: боковая панель, Efficiency, новый Overview, удалённые панели и id, plan_monthly
+      - [x] modules/telemetry-data.md: request_id в cc.api_requests, фазы ответа
+      - [x] context-claude.md: упоминания cc-tips
+      - [x] modules/dashboard.md: Sessions и Prompts (панели и id, extra_cols, shown_cols, session_header, переменная prompt удалена, from_ms/to_ms и сужение периода, timeline по длительности, длина сессии как время работы)
+      - [x] modules/dashboard.md: новая раскладка Efficiency и заголовки после единого стиля
+      - [x] modules/telemetry-data.md: ссылка agent-outlier в cc.tips с from/to
+      - [x] context-claude.md: guides/grafana-style.md
+      - [x] modules/dashboard.md: Agents & skills, Tools & files, Health (панели и id, удалённые id, ссылка 476 с зумом, Hook time без Skill)
+      - [x] modules/telemetry-data.md: событие api_error, колонки status_code и error в events_raw, ttft_ms в cc.api_requests
     ```md
-    Только по команде пользователя (context-auditor).
+    Только по команде пользователя (context-auditor). Сделано 2026-11-19: dashboard.md переписан, telemetry-data.md,
+    context-claude.md, pending-bugs.md (api_error не проверен на живых данных).
     ```
-
-## In Progress
-
-## Done
 
 ### Коммит 9: README и завершение
 

@@ -1,7 +1,7 @@
 # cc-telemetry — navigation hub
 
 Local Claude Code usage statistics: clients export OTLP events, the server stores them in
-ClickHouse and shows them in Grafana. Everything stays on the LAN. Single branch `main`, remote `origin`.
+ClickHouse and shows them in Grafana. Everything stays on the LAN. Default branch `main`, remote `origin`.
 
 ## Glossary
 
@@ -14,6 +14,7 @@ ClickHouse and shows them in Grafana. Everything stays on the LAN. Single branch
 | `project`, `host` | resource attributes the client sets via `OTEL_RESOURCE_ATTRIBUTES`; not sent by Claude Code itself |
 | project label / effective project | `project_label` = the explicit `project=` attribute; `project` = label, else inferred (`cc.session_project`: folder of the session's `cwd`, else tool-call paths), else `unknown` |
 | session meta | title, git branch, first `cwd` of a session, read from the local session JSONL by the client hook and sent as OTLP/HTTP logs (`service.name=cc-session-meta`) → `cc.session_meta` |
+| account | Claude account of an event: `account_uuid`, shown as `account` (`user.email`, else uuid 8); the Account variable filters by it |
 | actor | who made a model request / tool call: `main`, an agent name, or `aux:<query_source>` |
 | skill attribution | tool call → skill via `tool_result.request_id` → `api_request.skill.name` |
 | keepalive | hidden `wsl.exe --exec sleep infinity` that keeps the WSL distro (and Docker) running |
@@ -40,12 +41,12 @@ ClickHouse  otel.otel_logs (events), otel.otel_metrics_* (metrics, unused by the
 cc.events_raw + cc.session_meta → cc.path_roots → cc.session_project → cc.events (effective project)
 cc.events_raw → cc.agents, cc.requests;   cc.events → cc.api_requests, cc.tool_calls, cc.prompts,
                                           cc.sessions (+ cc.session_meta: title, branch, cwd)
-cc.tips (usage tips, last 7 days; Tips dashboard + Overview tiles) ← the views above
+cc.tips (usage tips, last 7 days; Efficiency Tips section + rail tiles) ← the views above
    │ grafana-clickhouse-datasource (uid clickhouse, native :9000, user otel)
    ▼
-Grafana :3000 (host port GRAFANA_PORT)  7 dashboards, shared variables + links bar:
-   Overview (uid cc-usage, home page), cc-sessions, cc-agents, cc-tools, cc-health,
-   cc-prompts, cc-tips
+Grafana :3000 (host port GRAFANA_PORT)  7 dashboards, shared variables + side rail (grafana/rail/):
+   Overview (uid cc-usage, home page), cc-sessions, cc-prompts, cc-efficiency, cc-agents,
+   cc-tools, cc-health
 ```
 
 ## Boundaries
@@ -70,7 +71,7 @@ Grafana :3000 (host port GRAFANA_PORT)  7 dashboards, shared variables + links b
 | --- | --- |
 | `modules/stack.md` | `docker-compose.yml`, `otel-collector.yaml`, `.env`, ClickHouse tables and versions, Grafana provisioning, ports |
 | `modules/telemetry-data.md` | events and attributes Claude Code sends, session-meta records of the client hook, `clickhouse/views.sql` (incl. `cc.tips` rules), `clickhouse/init-views.sh` |
-| `modules/dashboard.md` | `grafana/dashboards/*.json` (7 dashboards): uids, shared variables and links bar, panels, fixed panel ids, drill-down links, `check-dashboard.js` |
+| `modules/dashboard.md` | `grafana/dashboards/*.json` (7 dashboards): uids, shared variables, side rail (`grafana/rail/`), panels, fixed panel ids, drill-down links, `check-dashboard.js` |
 | `modules/setup-scripts.md` | `setup-server.ps1`, `setup-server.sh` (incl. `--update`), `client/setup-client.{ps1,sh}` (incl. the session-meta hook), `client/*.json`, `linux-server-tools/*.sh`, keepalive, LAN access |
 
 ## Key conventions (details in `guides/`, index in CLAUDE.md)
@@ -78,6 +79,8 @@ Grafana :3000 (host port GRAFANA_PORT)  7 dashboards, shared variables + links b
 - Views are plain, not materialized: editing `views.sql` and re-running
   `docker compose run --rm views-init` recomputes all history; no migrations.
 - Dashboards are file-provisioned: Grafana re-reads `grafana/dashboards/` every 30 s; edit the files, not the UI.
+  The side rail is edited in `grafana/rail/rail.json` and copied by `node grafana/rail/sync-rail.js`.
+  Panel look and grid (Full HD only): `guides/grafana-style.md`.
 - Views and dashboard queries must run on ClickHouse 22.3 through 25.8: no multiple `USING` joins.
 - Scripts run on stock Windows PowerShell 5.1: ASCII only, `setup-server.ps1` uses
   `$ErrorActionPreference = 'Continue'` + `$LASTEXITCODE` checks, JSON written without BOM.
