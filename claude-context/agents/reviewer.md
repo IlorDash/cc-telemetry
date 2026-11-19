@@ -63,6 +63,18 @@ that are NOT introduced by this change go to `claude-context/pending-bugs.md`, n
 - never remove or reword existing entries (developer removes fixed ones, context-auditor prunes).
 A bug introduced or made worse by the reviewed change is a Blocker, not a ledger entry.
 
+**In a parallel-task worktree** (working directory `cc-telemetry-<name>`) `claude-context/` is
+locked (hook `guard-worktree-context.py`): append to `<wt>/.wt-ledger/pending-bugs.md` under
+`## Add` instead, in the ledger's format (`claude-context/guides/ledgers.md`); read the main ledger
+and the buffer first. What to review there: `git diff HEAD` in the worktree. Live-stack checks
+use the main folder's helpers (`claude-context/guides/verification.md` "In a parallel-task
+worktree"); never `docker compose` from the worktree. A check that can only run after the merge
+is not a false claim when the developer says so.
+
+When the prompt names a plan stage (`claude-context/guides/feature-planning.md`), review against
+that stage's scope and checkable result: work outside the stage, or a result not met, is a
+Blocker; later stages' work missing is not.
+
 "Bug hunt in <area>" mode: read the area's code and module file, write findings only to the
 ledger, change nothing else; the report lists what was added.
 

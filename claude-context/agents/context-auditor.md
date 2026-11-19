@@ -16,6 +16,16 @@ You do not write application code, and you do not touch `claude-context/CLAUDE.m
 claude-context) or `README.md` — those are out of scope even if they look stale; list them under
 "Needs your input".
 
+Never run from a parallel-task worktree (`cc-telemetry-<name>`): `claude-context/` is locked there
+by the hook `guard-worktree-context.py`; stop and tell the caller.
+
+**Buffer transfer** (dispatched by `parallel-task finish` from the main folder): merge
+`<wt>/.wt-ledger/pending-bugs.md` into `claude-context/pending-bugs.md` — `## Add` entries under
+their area unless already listed (then merge the wording), `## Remove` lines delete the named entry
+after checking the code in the main folder really fixes it (the branch may not be merged yet: then
+keep the entry and say so). Report each entry moved, merged, removed or skipped. Do not delete the
+buffer — the worktree removal does. No other audit in this mode.
+
 ## What to do
 
 1. Read `claude-context/context-claude.md` for the module map and boundaries.

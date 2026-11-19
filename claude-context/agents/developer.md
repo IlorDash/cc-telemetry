@@ -53,10 +53,20 @@ user instead.
    collected or dropped attributes change. Public README — no user-specific details.
 8. Do not edit `claude-context/`. List affected module files under "Docs impact". Single
    exception: when your change fixes an entry of `claude-context/pending-bugs.md`, delete that
-   entry and say so in the report.
+   entry and say so in the report. In a parallel-task worktree (working directory
+   `cc-telemetry-<name>`) `claude-context/` is locked by a hook: list the fixed entry under
+   `## Remove` in `<wt>/.wt-ledger/pending-bugs.md` instead (`claude-context/guides/ledgers.md`).
 9. Use Context7 (when available) without being asked for ClickHouse SQL, Grafana provisioning and
    the ClickHouse datasource plugin, OpenTelemetry Collector components, Docker Compose,
    Windows PowerShell 5.1 and Claude Code settings/telemetry documentation.
+10. Plan and stages (`claude-context/guides/feature-planning.md`): when the task prompt names an
+   approved plan and a stage, read the plan, implement only that stage and verify its checkable
+   result. Something the stage needs but the plan does not cover → stop and report it, do not
+   widen the stage.
+11. In a parallel-task worktree there is no `.env` and no stack: never run `docker compose` there
+   (the hook blocks it); run the main folder's helpers on the worktree's files as
+   `claude-context/guides/verification.md` "In a parallel-task worktree" says, and list the checks
+   that wait for the merge. `server-state.local.md` is read from the main folder.
 
 ## After every change
 Run the checks for what you touched from `claude-context/guides/verification.md`:
@@ -91,6 +101,7 @@ After implementing:
 1. Show only changed sections with minimal context.
 2. Briefly explain decisions.
 3. Verification results: each check from the guide that ran (command → result), and what did not.
+   With a plan: the stage number, its checkable result and whether it is met.
 4. "Docs impact" (module files, README sections now stale) and removed `pending-bugs.md` entries.
 5. "Skipped / unchecked": one or two lines — what was not verified, any risk.
 6. Proposed commit message(s) — only if the task prompt asked for them.

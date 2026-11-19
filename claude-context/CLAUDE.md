@@ -34,6 +34,8 @@ server or connecting a PC. Never copy its content into tracked files.
 | Drafting a commit message | `claude-context/guides/commit-messages.md` |
 | Writing context docs or the README | `claude-context/guides/docs-writing.md` |
 | Changing the AI setup (junction, agents, skills, hooks, settings) | `claude-context/guides/context-repo.md` |
+| Planning a feature or fix, splitting it into stages | `claude-context/guides/feature-planning.md` |
+| Writing to the ledger, working in a parallel-task worktree | `claude-context/guides/ledgers.md` |
 
 ---
 
@@ -90,6 +92,12 @@ it as `model` on the Agent call.
 | `reviewer` | sonnet | reviews the diff vs `HEAD`; "review only" and "bug hunt in <area>" | only appends to `pending-bugs.md` |
 | `context-auditor` | opus | keeps `context-claude.md`, `modules/*.md` and the ledger in sync with the code | `claude-context/` docs only |
 
+**Plan first** (`guides/feature-planning.md`): every non-trivial "implement X" / "fix Y" starts
+with a plan the main session writes itself (chat or `claude-context/plans/<name>.md`) and the
+user approves; its last section splits the work into stages, one stage = one commit with a
+checkable result. Each stage runs through the feature chain; the next stage starts after the user
+has committed the previous one.
+
 **Feature chain** — always sequential: developer → reviewer (BLOCKED → back to developer with the
 blocker list). **Trivial change** (comment or text, a typo, README wording, a constant the user
 named with its new value, a rename inside one function) → no reviewer; end the reply with the bold
@@ -97,9 +105,18 @@ line **РЕВЬЮЕР НЕ ЗАПУСКАЛСЯ (ТРИВИАЛЬНАЯ ПРАВ
 queries or variables, collector pipeline, anything in the setup scripts touching the network,
 firewall, WSL, `.env` or user settings files, or more than ~10 lines. In doubt → not trivial.
 
-**Routing:** "implement X" / "fix Y" → full chain. "review only" → reviewer. "find bugs in X" /
+**Routing:** "implement X" / "fix Y" → plan → approval → full chain per stage. "parallel task" /
+"в отдельном worktree" / the main folder already holds someone's uncommitted work →
+`parallel-task` skill (`start`; "фича закончена" → `finish`). "review only" → reviewer. "find bugs in X" /
 "bug hunt" → reviewer in bug-hunt mode (ledger only). Never fix ledger bugs unasked.
 
 **Context updates are user-initiated only** — never as the closing step of a feature; pass the
 developer's "Docs impact" to the user instead. "update claude-context / context" →
 context-auditor. Never edit module files directly.
+
+**Parallel-task worktree** (`..\cc-telemetry-<name>`, `skills/parallel-task`): `claude-context/`
+is locked there for the session and every subagent (hook `guard-worktree-context.py`) — ledger
+findings and plans go to `<wt>/.wt-ledger/`, other context changes are only reported; no
+`docker compose` there, live checks use the main folder's helpers (`guides/verification.md`).
+Pass the worktree path and this rule in every subagent prompt. Never create, delete or clean up a
+worktree outside the skill's shapes.

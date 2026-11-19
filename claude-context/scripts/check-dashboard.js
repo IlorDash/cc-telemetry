@@ -2,6 +2,7 @@
 // /api/ds/query and prints ok/FAIL per query. Reads the Grafana password from .env (never prints it).
 // Usage (repo root): node claude-context/scripts/check-dashboard.js [--account uuid[,uuid]] [--project p] [--session id]
 //                    [--actor a] [--skill s] [--from now-24h] [--url http://localhost:3000]
+//                    [--dashboards <dir>]
 // Exit code: 0 all ok, 1 any failure.
 const fs = require("fs");
 const path = require("path");
@@ -30,7 +31,10 @@ if (!pass) {
 }
 const auth = "Basic " + Buffer.from("admin:" + pass.trim()).toString("base64");
 
-const dashDir = path.join(root, "grafana", "dashboards");
+// --dashboards <dir>: check another copy of the files (a parallel-task worktree) against the live
+// stack; .env still comes from this script's repo. Grafana serves the main folder's files, so a
+// uid new in that copy reports "not provisioned".
+const dashDir = path.resolve(opt("dashboards", path.join(root, "grafana", "dashboards")));
 // `own` = the dashboard's custom/constant/textbox variables (current value); the five shared ones and CLI overrides win.
 // Like Grafana 12.1: with All selected a variable renders its RAW allValue whatever the format
 // (account: the string `'__all'` with quotes, so `${account:singlequote}` -> '__all'); one or

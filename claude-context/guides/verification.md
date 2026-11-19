@@ -31,6 +31,19 @@ macros, not the visual layout — say so when layout changed.
 
 The stack is not running → say "not verified on the live stack" and why.
 
+**In a parallel-task worktree** (`cc-telemetry-<name>`, `skills/parallel-task`) there is no `.env`
+and no stack: the live stack runs from the main folder `<main>` and serves its views and
+dashboards. Never `docker compose` from the worktree (the hook blocks it). Use the main folder's
+helpers on the worktree's files:
+
+| Changed in `<wt>` | Check |
+| --- | --- |
+| `grafana/dashboards/*.json` | JSON parse; `node <main>/claude-context/scripts/check-dashboard.js --dashboards <wt>/grafana/dashboards` — queries run against the live views; a uid new in the worktree reports `not provisioned` (expected, say so). The live Grafana shows the main folder's files: layout is not visible until merge |
+| `clickhouse/views.sql` | never applied from the worktree (the live stack holds one version of the views; the main folder's dashboards read them). Run the changed view's `SELECT` body (with `cc.` names of unchanged views) through `wsl -d Ubuntu -- bash <main as /mnt/c/...>/linux-server-tools/ch.sh`; panels that need the new columns: "verified after merge" |
+| collector, compose, setup scripts | static checks only (parser, `bash -n`, client scripts on scratchpad copies); live run after merge |
+
+Say which checks wait for the merge; after the merge they run in the main folder as above.
+
 **Raw events without the server** (what a Claude Code version sends). The user `settings.json`
 env overrides process env, so skip user settings (PowerShell, from a scratchpad folder):
 `$env:CLAUDE_CODE_ENABLE_TELEMETRY="1"; $env:OTEL_LOGS_EXPORTER="console"; $env:OTEL_METRICS_EXPORTER="none"; $env:OTEL_LOG_TOOL_DETAILS="1"; claude -p "<task>" --setting-sources local --model haiku *> "<scratchpad>\otel-console.log"`
