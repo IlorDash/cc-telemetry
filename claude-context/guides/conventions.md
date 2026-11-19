@@ -17,7 +17,7 @@ re-run and must keep existing data, `.env` and foreign settings keys).
   The one exception: `cc.session_meta` reads the client hook's records (`ServiceName = 'cc-session-meta'`)
   straight from `otel.otel_logs`.
 - New attribute → add a column to `cc.events_raw` (reaches `cc.events` via `e.*`), document it in
-  `modules/telemetry-data.md` (via context-auditor) and, if it is collected text, in README "What is sent".
+  `modules/telemetry-data.md` (via context-auditor) and, if it is collected text, on the `data` page (`docs/data.md` + `docs/data.ru.md`).
 - Explicit column aliases in joins (`e.ts AS ts`): ClickHouse keeps the `e.` prefix otherwise.
 - Target ClickHouse 22.3 (old ARM servers) through 25.8: never several `USING` joins in one query
   (22.3/23.3 reject them) — join with `ON`. Applies to dashboard queries too.

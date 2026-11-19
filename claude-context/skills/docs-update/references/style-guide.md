@@ -1,12 +1,13 @@
-# README style guide
+# Guide style (site pages and README)
 
-How `README.md` is written. The README as it stands wins where it differs — match the file, not
-this guide. The short rule set is in `claude-context/guides/docs-writing.md`; this file adds the
-shapes.
+How the guide site (`docs/<page>.md` + `.ru.md`) and `README.md` are written. The pages as they
+stand win where they differ — match the page, not this guide. The short rule set is in
+`claude-context/guides/docs-writing.md`; this file adds the voice details and the page shapes.
 
 ## Reader and voice
 
-The reader installs the stack on their own PCs or reads a dashboard. They have one task.
+The reader installs the stack on their own PCs, reads a dashboard or has something broken. They
+have one task.
 
 - **Describe behaviour, not features.** Not "supports LAN access", but "`-EnableLan` opens ports
   4317 and 4318 in the Windows firewall and forwards them from the LAN IP to WSL".
@@ -20,44 +21,85 @@ The reader installs the stack on their own PCs or reads a dashboard. They have o
 ## Density
 
 - One fact per sentence, 10–25 words. Paragraphs of 1–4 sentences.
-- A setup section: one or two sentences of what it does → the command in a fenced block →
-  what it prints or changes → its options as a table.
-- Say a thing once, in the section that owns it; elsewhere, link to it
-  (`see [1b](#1b-server-on-linux)`).
+- Tables over prose for anything enumerable: options, panels, messages, ports, env keys.
+- Say a thing once, on the page that owns it (the page → source map in
+  `claude-context/modules/docs-site.md`); elsewhere, link to it.
 
 ## Markup
 
 | Thing | Markup | Example |
 | --- | --- | --- |
-| Command, path, file, option, env var, value, port, view, column | `` `code` `` | `-EnableLan`, `cc.sessions` |
-| Panel, dashboard, button, menu in Grafana | plain text with the exact label | Efficiency, Cache hit rate by project |
+| Command, path, file, option, env var, value, port, view, column, message | `` `code` `` | `-EnableLan`, `cc.sessions` |
+| Grafana dashboard, panel, variable, button — exactly as in the JSON | `**bold**` | **Efficiency**, **Cache hit rate by project** |
 | A whole command to run | fenced block, `powershell` or `bash` | |
-| Link to another section | `[text](#slug)` (GitHub slug: lowercase, punctuation dropped, spaces → `-`) | `[2. Clients](#2-clients-every-pc)` |
+| Link to another page | relative file + anchor | `[Ports](server.md#ports-and-access-on-linux)` |
+| Keyboard keys | `++ctrl+c++` | |
 
+- Wrap prose at ~95 columns; table rows are exempt. `---` between major sections on long pages.
+- List continuations (a paragraph or fence inside a list item) are indented **4** spaces.
 - Tables use `| --- |` separators (the user's markdownlint).
 - Commands are copy-pasteable from the repo root; placeholders as `<SERVER_IP>`.
 - Never a literal value of a secret; name the `.env` key.
+- Images: `[![alt](assets/x.png)](assets/x.png)` — the image links to its full-size file; alt
+  text says what the screenshot shows. Only demo data (`tools/docs-demo/`).
 
-## Section shapes
+## Admonitions
 
-**Setup section (1a, 1b, 2a, 2b)** — "Requirements" as a short list → one fenced block with the
-command variants, each with a trailing `# what this variant adds` comment → "The script:" and a
-numbered list of what it does, in the order it does it: lowercase items ending with `;`, the
-last with `.` → notes on re-running and on options that need more than a comment.
+Always titled; an untitled one renders as a bare box that tells the reader nothing.
 
-**Dashboards (3)** — a `Dashboard | Shows` table, then per dashboard what it answers and its
-notable panels; drill-down links named by the panel they start from and the dashboard they open.
+| Kind | Use |
+| --- | --- |
+| `!!! warning "If it fails"` (or another title) | failures closing a procedure, risks |
+| `!!! note "…"` | a consequence that will surprise someone, a requirement |
+| `!!! tip "…"` | helpful but not required |
+| `!!! info "…"` | status of the document itself, e.g. the unreleased banner |
 
-**Tips** — one table (`Category | Fires when (grouped by) | What to do | Link opens`), one row per
-`cc.tips` category, thresholds exactly as in the view.
+## Page shapes
 
-**Troubleshooting (5)** — one table `Symptom | What to check`. The symptom is what the reader sees
-(the message text in backticks); the check names the command or setting and the fix.
+**`index`** — what the stack is in two sentences, How the data flows, What the dashboards answer
+(`Dashboard | Question it answers` + a screenshot), Supported platforms, **Where to start**
+routing each reader to one page (install, connect a PC, read dashboards, something failed,
+release notes).
 
-**What is sent** — an `Observed with Claude Code X.Y.Z ...` line, then bullets with a bold lead
-(**Text**, **Tool arguments**, **Usage**, **Identity**, **Session hook**) naming the attributes and
-the env var that turns each on; what the collector drops and why; where it is stored. A change to
-collected or dropped data always updates it.
+**`server`, `clients`** — Before you start (a requirements table per OS) → numbered steps per OS
+with the command in a fenced block → an option table per OS (`Option | What it does`) → what the
+script does (`Step | Windows | Linux`) → how to check that it works → If it fails, linked to
+`troubleshooting`.
 
-**Verified on first deployment** — generic facts only (versions, behaviour seen), dated in the
-heading; no PC names or editions of the user's machines.
+**`dashboards`** — the rail, the variables (and the panels that ignore them), the time range,
+clicks; then one section per dashboard: **Question:** line, screenshot, a
+`Panel | Shows | Click` table, the terms the panels use.
+
+**`tips`** — what a tip is, then one table row per `cc.tips` rule, thresholds exactly as in the
+view, what the affected tokens and cost mean, which panel a tip opens.
+
+**`maintenance`** — one section per task (check, update, roll back, back up / restore, recreate
+the views, change a setting, stop / remove), each as numbered steps with the commands.
+
+**`troubleshooting`** — opens with What to include in a report; then sections by step (Server
+install, Client, No data in Grafana, Dashboards, Update) with tables
+`Message | Cause | What to do` (or `Symptom | …` where nothing is printed) or numbered checks.
+Messages verbatim from the scripts.
+
+**`data`** — what Claude Code sends and the server keeps, what the collector drops and why,
+where the data lives, what Grafana contacts by itself, prompt logging on/off, deleting data. A
+change to collected or dropped data always updates it.
+
+**`release-X-Y-Z`** — `# Version X.Y.Z`, a date line `*Released 19 November 2026.*` (or the
+`<!-- unreleased` marker + `!!! info` banner while in preparation), then sections chosen from
+What's new / Fixed / Improvements / Data and privacy; each item a bold lead and the behaviour,
+linking into the guide. Newest first in `nav`.
+
+**`README.md`** — intro, How the data flows, Quick start (server and client, Windows and Linux,
+minimal commands), links to the site in English and Russian. No details that live on the site.
+
+## Russian twins
+
+- Same page set, same headings in the same order, so the language switcher lands in the same
+  place and a missing update shows as a structural difference. Idiomatic Russian, same level of
+  detail — not a word-by-word rendering.
+- Grafana titles, options and script messages stay in English verbatim (Grafana is not
+  localized); the explanation next to them is in Russian.
+- Links into Russian pages use the Russian anchors (`--strict` catches a wrong one).
+- Russian typography: «…» for quoted names, em dash — with spaces, `ё` where it is written.
+- Both files change together, in the same commit.

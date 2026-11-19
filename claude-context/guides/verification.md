@@ -17,6 +17,8 @@ did not; never claim a check that did not run.
 | `linux-server-tools/*.sh` | run it when harmless (`backup.sh dump` is; `restore` appends — only on an empty stack) |
 | `setup-server.sh` | `wsl -d Ubuntu -- bash setup-server.sh` — must exit 0; without `--lan`/`--local-only` every `.env` key reports `kept`. Never `--update` (runs `git pull`) unless the user asks |
 | `client/setup-client.sh` | `--dry-run`, or against copies in the scratchpad with `--user-settings <copy>` and `--project <copy dir>`; same comparison as for `setup-client.ps1`. Never against the real files unless the user asked |
+| `docs/`, `mkdocs.yml`, `hooks/`, `VERSION` | `.venv/Scripts/python.exe -m mkdocs build --strict` exits 0 with no warnings (no `.venv`: `py -3 -m venv .venv`, then `.venv\Scripts\python.exe -m pip install -r docs/requirements.txt`); `bash ci/check-release-markers.sh docs`; `py -3 claude-context/skills/docs-update/scripts/check-readme.py --root . --file <page>` on changed pages and the README. Not on the live stack |
+| screenshots (`docs/assets/`) | only from the demo stack: `wsl -d Ubuntu -- bash tools/docs-demo/demo.sh up`, `node tools/docs-demo/check.js --from now-30d` all `ok`, `screenshots.js` via a Playwright runner, then `demo.sh down` (`tools/docs-demo/README.md`). Never from the live Grafana |
 
 A live check covers only the ClickHouse version the stack runs (`server-state.local.md`), not
 every supported tag.
@@ -40,6 +42,7 @@ helpers on the worktree's files:
 | --- | --- |
 | `grafana/dashboards/*.json` | JSON parse; `node <main>/claude-context/scripts/check-dashboard.js --dashboards <wt>/grafana/dashboards` — queries run against the live views; a uid new in the worktree reports `not provisioned` (expected, say so). The live Grafana shows the main folder's files: layout is not visible until merge |
 | `clickhouse/views.sql` | never applied from the worktree (the live stack holds one version of the views; the main folder's dashboards read them). Run the changed view's `SELECT` body (with `cc.` names of unchanged views) through `wsl -d Ubuntu -- bash <main as /mnt/c/...>/linux-server-tools/ch.sh`; panels that need the new columns: "verified after merge" |
+| `docs/`, `mkdocs.yml` | strict build from `<wt>` with the main folder's interpreter: `<main>/.venv/Scripts/python.exe -m mkdocs build --strict -d <scratchpad>/site` |
 | collector, compose, setup scripts | static checks only (parser, `bash -n`, client scripts on scratchpad copies); live run after merge |
 
 Say which checks wait for the merge; after the merge they run in the main folder as above.

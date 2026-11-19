@@ -13,7 +13,8 @@ claude-context/                 .claude  ── directory junction ──> claud
 ├── .gitignore                   .claude/hooks/... all resolve to the files on the left)
 ├── agents/*.md                 developer, reviewer, context-auditor, docs-auditor, mr-reviewer
 ├── skills/<name>/              commit-message, parallel-task, docs-update, mr-description
-├── hooks/                      guard-secrets.py, guard-worktree-context.py (PreToolUse, wired in settings.json)
+├── hooks/                      guard-secrets.py, guard-worktree-context.py (PreToolUse, wired in settings.json;
+│                               not the repo-root hooks/, which holds the MkDocs hook app_version.py)
 ├── guides/*.md                 rules moved out of CLAUDE.md, read on demand
 ├── scripts/                    check-dashboard.js (verification helper)
 ├── plans/                      feature plans (guides/feature-planning.md)
