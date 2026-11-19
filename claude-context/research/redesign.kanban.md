@@ -17,27 +17,6 @@
 
 ## To Do
 
-### Коммит 7: Sessions и Prompts по шаблону
-
-  - tags: [ui, sessions, prompts, grafana]
-  - priority: high
-  - workload: Hard
-  - steps:
-      - [ ] Sessions: 4 stat (Sessions, Median length, Median cost_usd, Sessions with errors)
-      - [ ] Sessions: таблица сессий (Name, Last prompt, Project, Branch, Model, Turns, Tokens, cost_usd, Hit, Errors), ссылка на var-session
-      - [ ] Sessions: переменная extra_cols (id, started, account) — скрытые по умолчанию колонки
-      - [ ] Sessions: заголовок выбранной сессии, 5 stat, State timeline (Prompts, Main · API, Subagents, Tools)
-      - [ ] Sessions: накопительные cost_usd и токены (2 оси), промпты сессии
-      - [ ] Prompts: 4 stat (Prompts, Median cost_usd, p95 cost_usd, Requests per prompt)
-      - [ ] Prompts: Most expensive prompts, гистограмма по корзинам стоимости, средняя стоимость по модели
-      - [ ] Удалить всё, чего нет в шаблоне; проверить ссылки cc.tips на удалённые панели
-      - [ ] Проверка в браузере на 1920 и 1280 px, ревьюер
-    ```md
-    Правило пользователя: дашборды 100% как в шаблоне, кроме того, что Grafana не умеет.
-    Каждое отступление — проверить в браузере и назвать с причиной.
-    Панели с постоянным числом строк (статичный список, LIMIT n) — без вертикального скролла на 1920 и 1280 px.
-    ```
-
 ### Коммит 8: Agents & skills, Tools & files, Health по шаблону
 
   - tags: [ui, agents, tools, health, grafana]
@@ -49,10 +28,12 @@
       - [ ] Health: 4 stat, TTFT по дням (порог 3 s), Hook time, API errors, API request duration
       - [ ] Сохранить панели-доказательства для ссылок cc.tips (repeated-read, big-results, denials, slow-hook, slow-ttft, agent-outlier)
       - [ ] Удалить всё, чего нет в шаблоне
-      - [ ] Проверка в браузере, ревьюер
+      - [ ] Оформление по claude-context/guides/grafana-style.md (единый стиль панелей)
+      - [ ] Проверка в браузере на 1920 px, ревьюер
     ```md
     Номера панелей в ссылках cc.tips: при смене id поправить views.sql.
-    Панели с постоянным числом строк (статичный список, LIMIT n) — без вертикального скролла на 1920 и 1280 px.
+    Панели с постоянным числом строк (статичный список, LIMIT n) — без вертикального скролла.
+    Поддерживаем только Full HD (1920 px) и шире — 1280 px не проверяем.
     ```
 
 ### Коммит 9: README и завершение
@@ -63,6 +44,8 @@
   - steps:
       - [ ] README: все семь дашбордов, переменные, клики, время, подсказки
       - [ ] Сверить README с дашбордами после коммитов 7–8
+      - [ ] Clicks: фраза «links from the tips keep the range» устарела — ссылка agent-outlier сужает период до сессии
+      - [ ] Указать, что дашборды рассчитаны на экран от 1920 px
     ```md
     README публичный: без личных данных.
     ```
@@ -76,6 +59,10 @@
       - [ ] modules/dashboard.md: боковая панель, Efficiency, новый Overview, удалённые панели и id, plan_monthly
       - [ ] modules/telemetry-data.md: request_id в cc.api_requests, фазы ответа
       - [ ] context-claude.md: упоминания cc-tips
+      - [ ] modules/dashboard.md: Sessions и Prompts (панели и id, extra_cols, shown_cols, session_header, переменная prompt удалена, from_ms/to_ms и сужение периода, timeline по длительности, длина сессии как время работы)
+      - [ ] modules/dashboard.md: новая раскладка Efficiency и заголовки после единого стиля
+      - [ ] modules/telemetry-data.md: ссылка agent-outlier в cc.tips с from/to
+      - [ ] context-claude.md: guides/grafana-style.md
     ```md
     Только по команде пользователя (context-auditor).
     ```
@@ -83,6 +70,51 @@
 ## In Progress
 
 ## Done
+
+### Единый стиль дашбордов и style guide
+
+  - tags: [ui, style, grafana, docs]
+  - priority: high
+  - workload: Normal
+  - steps:
+      - [x] claude-context/guides/grafana-style.md, строка в CLAUDE.md
+      - [x] Overview, Efficiency, Sessions, Prompts приведены к гайду
+      - [x] Проверка в браузере, ревьюер
+    ```md
+    Решения пользователя: гайд важнее шаблона. Плитки — два уровня (главные 13/42 h4, выбранной
+    сессии 13/30 h3); заголовок = имя + максимум одна подсказка про клик, остальное в ⓘ; bar gauge
+    сплошной, имя над полосой 15/14; в таблицах нет фильтров колонок.
+    Исключение: Tips и Affected в Efficiency — прежний вид (Tips · 7d, 15/56, h8) в одном ряду с
+    Affected tokens by category (h8 под 5 категорий).
+    Поддерживаем только Full HD (1920 px) и шире: на 1280 px боковая панель и узкие плитки режут
+    текст — оставлено как есть.
+    ```
+
+### Коммит 7: Sessions и Prompts по шаблону
+
+  - tags: [ui, sessions, prompts, grafana]
+  - priority: high
+  - workload: Hard
+  - steps:
+      - [x] Sessions: 4 stat (Sessions, Median length, Median cost_usd, Sessions with errors)
+      - [x] Sessions: таблица сессий (Name, Last prompt, Project, Branch, Model, Turns, Tokens, cost_usd, Hit, Errors), ссылка на var-session
+      - [x] Sessions: переменная extra_cols (id, started, account) — скрытые по умолчанию колонки
+      - [x] Sessions: заголовок выбранной сессии, 5 stat, State timeline (Prompts, Main · API, Subagents, Tools)
+      - [x] Sessions: накопительные cost_usd и токены (2 оси), промпты сессии
+      - [x] Prompts: 4 stat (Prompts, Median cost_usd, p95 cost_usd, Requests per prompt)
+      - [x] Prompts: Most expensive prompts, гистограмма по корзинам стоимости, средняя стоимость по модели
+      - [x] Удалить всё, чего нет в шаблоне; проверить ссылки cc.tips на удалённые панели
+      - [x] Клик по сессии сужает период до времени её работы (+3 %, не меньше 5 s); так же ссылка agent-outlier
+      - [x] Длина сессии и длительность в заголовке — время работы (запросы и инструменты, без пересечений)
+      - [x] Проверка в браузере, ревьюер
+    ```md
+    Решения пользователя: шкала Timeline и Cumulative подстраивается под сессию (сужение периода по клику);
+    все промпты остаются, включая сообщения субагентов; Actor/Skill не меняют длину сессии.
+    Отступления (Grafana не умеет): нет счётчика в заголовке таблицы; Columns — переменная, а не кнопки
+    в заголовке; нет подсветки строки (applyToRow перекрашивает текст всех ячеек) — выбранная помечена ▶;
+    нет моноширинного шрифта; заголовок сессии одного цвета; имя полосы bar gauge не красится, число
+    промптов в имени; подпись stat над числом.
+    ```
 
 ### Коммит 6: Overview по шаблону
 

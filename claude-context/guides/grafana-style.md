@@ -15,11 +15,12 @@ mock where they differ. Layout rules (grid, rail) are here too; JSON editing rul
 ## Grid
 
 - Rail at x0 w3 (ids 300–399, synced by `grafana/rail/sync-rail.js`); content at x3, w21.
-- One grid unit is about 38 px high. Check every layout at 1920 and 1280 px width.
+- One grid unit is about 38 px high. Supported screens: Full HD (1920 px) and wider; check
+  every layout at 1920 px. Narrower windows (1280 px) are not supported (user's decision).
 - Panels in one row have the same `y` and `h`; rows have no gaps.
 - **No scroll in fixed-size panels:** a panel whose row count does not depend on the data
   (static list, fixed categories, `LIMIT n`, markdown) is tall enough to show everything at
-  1920 and 1280 px, sized for the full set. Data-dependent tables may scroll.
+  1920 px, sized for the full set. Data-dependent tables may scroll.
 - Do not leave a large empty area inside a panel to match a neighbour; rearrange instead.
 
 ## Titles and descriptions
@@ -67,7 +68,7 @@ query (display name), sits above the number; Grafana centres the content vertica
 ## Tables
 
 - `cellHeight sm`, header on, `minWidth 50`, column filters off (`filterable false`: the filter
-  icon eats header width and cuts names at 1280 px). No row background colours (`applyToRow` repaints
+  icon eats header width and cuts names in narrow columns). No row background colours (`applyToRow` repaints
   every cell's text).
 - Columns, left to right: the main name (link), text columns, numbers. Numbers right-aligned
   with a fixed `width` (70–100); the name column gets `minWidth` and takes the rest.
@@ -83,7 +84,7 @@ query (display name), sits above the number; Grafana centres the content vertica
 - Time series: legend at the bottom as a list; money on a `currencyUSD` axis; a second
   metric goes on the right axis.
 - Vertical bar charts: `barWidth 0.8`, `showValue always`, legend off when there is one series.
-  Axis labels must not overlap at 1280 px: short labels from the query, or a wider panel.
+  Axis labels must not overlap: short labels from the query, or a wider panel.
 - State timeline: `rowHeight 0.8`, `showValue never`, legend off.
 - Pie / donut: legend on the right with values.
 
