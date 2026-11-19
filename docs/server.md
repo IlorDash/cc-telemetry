@@ -106,7 +106,7 @@ needing that, run `sudo usermod -aG docker $USER` and log in again.
 | `--lan-ip <addr>` | The LAN address to report, when the script detects the wrong one |
 | `--grafana-port <n>` | Host port of Grafana, 1-65535, default 3000. Kept as `GRAFANA_PORT` in `.env`; use it when 3000 is taken |
 | `--clickhouse-version <tag>` | ClickHouse image tag, kept as `CLICKHOUSE_VERSION` in `.env` (default 25.8) |
-| `--update` | Update a running server without losing data. See the Maintenance page |
+| `--update` | Update a running server without losing data. See [Maintenance](maintenance.md#update-the-server) |
 | `--yes` | Do not ask before installing Docker, using `sudo` or enabling the service. `-y` is the same |
 | `--help` | Print the options. `-h` is the same |
 
@@ -211,5 +211,6 @@ never removes data.
     | `--grafana-port '<value>' is not a port number (1-65535)` | Linux: the value is not a port number | Pass a number from 1 to 65535 |
     | `--clickhouse-version '<value>' is not an image tag (like 25.8 or 22.3.20.29)` | Linux: the value is not a valid image tag | Pass a tag like `25.8` |
 
-→ Fixing problems and updating the server are covered on the Troubleshooting and Maintenance
-pages. Next: [connect a PC](clients.md).
+→ More symptoms are on [the Troubleshooting page](troubleshooting.md), updating and backups on
+[the Maintenance page](maintenance.md), and what the stack stores on
+[the Data and privacy page](data.md). Next: [connect a PC](clients.md).

@@ -1,0 +1,250 @@
+# Maintain the server
+
+This page covers what you do with a running server: update it, check it, back up and restore the
+data, change its settings, and stop or remove it. Problems are on
+[the Troubleshooting page](troubleshooting.md).
+
+Run every command from the `cc-telemetry` folder on the server PC.
+
+| Your server | How to run the `docker compose ...` and `bash linux-server-tools/...` commands |
+| --- | --- |
+| Linux | As they are. Add `sudo` if you are not in the `docker` group |
+| Windows, Docker in WSL | Put `wsl -d Ubuntu --` in front, from PowerShell (use your distro name if it is not `Ubuntu`) |
+| Windows, Docker Desktop | `docker compose ...` works as it is in PowerShell. The helper scripts in `linux-server-tools/` are bash scripts and are documented here only for Linux and for Docker in WSL |
+
+---
+
+## Check the stack
+
+```bash
+docker compose ps
+```
+
+Every service is `Up` and `views-init` is `Exited (0)`. `views-init` is a one-shot job that
+creates the `cc.*` views, so it is not supposed to keep running.
+
+Logs of one service (add `-f` to follow them, `--tail 100` for the last lines):
+
+```bash
+docker compose logs otel-collector
+docker compose logs clickhouse
+docker compose logs grafana
+docker compose logs views-init
+```
+
+The collector log is the first place to look when events do not arrive; it says
+`Everything is ready` after a start.
+
+Running the server script again is also a health check: it never regenerates `.env` and never
+removes data. It prints `FAIL` for what is wrong and `WARN` for what is only suspicious.
+
+To run SQL without typing the password, pipe it into `ch.sh`. The password is read from `.env`
+and never printed:
+
+```bash
+echo "SELECT event, count() FROM cc.events GROUP BY event" | bash linux-server-tools/ch.sh
+```
+
+```powershell
+"SELECT event, count() FROM cc.events GROUP BY event" | wsl -d Ubuntu -- bash linux-server-tools/ch.sh
+```
+
+---
+
+## Update the server
+
+An update moves the server to a newer version of this repository. Your data is in the
+`clickhouse-data` volume and is never removed by an update.
+
+### Linux
+
+Run in the `cc-telemetry` folder, with the options you normally use:
+
+```bash
+bash setup-server.sh --update
+```
+
+!!! note "The first time, run `git pull` yourself"
+    Versions of the script from before `--update` existed do not know the option. Run `git pull`
+    once, then use `--update` from then on.
+
+The command goes through these steps and stops at the first problem:
+
+| Step | What it does | When it refuses |
+| --- | --- | --- |
+| Checks | Looks for `.env`, asks ClickHouse a test question and checks the git working tree | `.env` is missing (this folder is not a configured server yet); ClickHouse does not answer; tracked files have local changes (`.env` and `backup/` are git-ignored and do not count) |
+| Safety dump | Writes every `otel.*` table to `backup/pre-update-<date>-<time>/` and the row count of each table next to it. Earlier dumps stay | The free disk space is less than the uncompressed size of the data (the dump is that large); it warns when there is less than 1.5 times that. It also stops when it cannot create the folder or the dump fails |
+| Code | Runs `git pull --ff-only`. It never merges or rebases | The pull fails (a diverged branch, no network): nothing on the stack has changed. With no upstream branch or no git repository it only warns and goes on with the files as they are |
+| Server script | Runs `setup-server.sh` again from the updated file with your other options: starts changed containers, recreates the `cc.*` views, repeats the checks. If `otel-collector.yaml` or `grafana/provisioning/` changed, it restarts that service. Dashboard files are re-read by Grafana by itself | The usual install errors, see [the server page](server.md#if-it-fails) |
+| Data check | Compares the row counts with the ones from before. Every table must have at least as many rows | A table has fewer rows: a `FAIL` banner with the dump folder, exit status 1 |
+
+On success it prints `update finished, no data lost` with the dump folder and the rollback
+command. The dump folders are not deleted for you: delete old `pre-update-*` folders yourself
+when you no longer need them. If Docker runs through `sudo`, the dump files belong to root.
+
+An update also publishes port `4318` and opens it in the firewall on a LAN server, so an older
+server gets it too.
+
+### Windows
+
+The Windows script has no `--update`. Pull the new version and run the script again:
+
+```powershell
+git pull
+powershell -ExecutionPolicy Bypass -File .\setup-server.ps1
+```
+
+The script starts changed containers and recreates the `cc.*` views. It does not restart a
+service whose bind-mounted config changed, so after a pull that changed `otel-collector.yaml`
+or `grafana/provisioning/`, restart that service (add the WSL prefix when Docker runs in WSL):
+
+```bash
+docker compose restart otel-collector grafana
+```
+
+There is no automatic safety dump on Windows. If you want one, [dump the data
+yourself](#back-up-and-restore) before `git pull`. To pick up only a change in
+`clickhouse/views.sql`, you do not need the whole script:
+
+```bash
+docker compose run --rm views-init
+```
+
+A server set up before the session hook existed needs `setup-server.ps1 -EnableLan` once more
+to open port `4318`.
+
+### Roll back
+
+The `--update` output ends with the previous commit. To return to it:
+
+```bash
+git checkout <previous commit>
+bash setup-server.sh
+```
+
+On Windows, run `setup-server.ps1` instead of `setup-server.sh`. The data stays in the volume,
+so a rollback needs no restore. After a rollback, run `git checkout main` so that the next
+`--update` has an upstream branch to pull (on a detached `HEAD` nothing is pulled).
+
+---
+
+## Back up and restore
+
+`linux-server-tools/backup.sh` dumps every `otel.*` table to a `<table>.native` file in the
+`backup` folder (ClickHouse Native format). The views are not dumped: they are recreated from
+`clickhouse/views.sql`.
+
+```bash
+bash linux-server-tools/backup.sh dump              # otel.* tables -> backup/<table>.native
+bash linux-server-tools/backup.sh restore           # appends rows: use on a fresh, empty stack
+bash linux-server-tools/backup.sh restore <table>   # one table only
+```
+
+On a Windows server with Docker in WSL, from PowerShell:
+
+```powershell
+wsl -d Ubuntu -- bash linux-server-tools/backup.sh dump
+```
+
+`BACKUP_DIR=<folder>` in front of the command uses another folder for dump and restore. A
+relative folder is relative to the `cc-telemetry` folder, not to the current directory:
+
+```bash
+BACKUP_DIR=backup/pre-update-<date>-<time> bash linux-server-tools/backup.sh restore otel_logs
+```
+
+If Docker needs `sudo`, the variable is lost after it. Pass it through `env`:
+
+```bash
+sudo env BACKUP_DIR=backup/pre-update-<date>-<time> bash linux-server-tools/backup.sh restore
+```
+
+!!! warning "Restore appends rows"
+    `restore` adds the dumped rows to what is in the table. Run it only for tables that are
+    empty now, for example on a fresh stack after `setup-server.*`. On a table that already has
+    rows you get duplicates. Check the row counts first.
+
+!!! warning "The backup holds your prompts"
+    `backup/` is git-ignored because the dump contains everything the stack stores, including
+    prompts. Keep it where you keep other private files. With Docker in WSL the data lives
+    inside the distro: `wsl --unregister` deletes it, so dump first.
+
+The dump is in the Native format, so it is not tied to the volume. To move data to a server with
+another ClickHouse version, restore it into a fresh stack and compare the row count of every
+table.
+
+---
+
+## Recreate the views
+
+The `cc.*` views are plain: they store nothing and are computed on every query. Editing
+`clickhouse/views.sql` therefore changes what the dashboards show for the whole history, not
+only for new events. Apply the file with:
+
+```bash
+docker compose run --rm views-init
+```
+
+It waits until the collector has created `otel.otel_logs`, then recreates the views. Running
+`setup-server.sh` or `setup-server.ps1` does the same.
+
+---
+
+## Disk use and retention
+
+The stack sets no retention: the collector creates its tables without a TTL and nothing deletes
+rows. Events stay in the `clickhouse-data` volume until you delete them yourself. Claude Code
+deletes its own local session files after about 30 days, so the server keeps your history
+longer than the PC does.
+
+To see how much room the data takes:
+
+```bash
+echo "SELECT table, formatReadableSize(sum(bytes_on_disk)) AS size, sum(rows) AS rows FROM system.parts WHERE database = 'otel' AND active GROUP BY table" | bash linux-server-tools/ch.sh
+```
+
+Deleting data is described on [the Data and privacy page](data.md#delete-data).
+
+---
+
+## Change a setting
+
+| You want to | Do this |
+| --- | --- |
+| Use another Grafana port (Linux) | `bash setup-server.sh --grafana-port 3001`. The port is kept as `GRAFANA_PORT` in `.env` |
+| Use another Grafana port (Windows) | Not supported: the script checks and prints port `3000` only |
+| Use other OTLP ports | Not supported: `4317` and `4318` are fixed |
+| Keep the server on this PC only, or open it to the LAN (Linux) | `bash setup-server.sh --local-only` or `--lan`. See [the server page](server.md#ports-and-access-on-linux) |
+| Open the server to the LAN (Windows) | `setup-server.ps1 -EnableLan` |
+| Use another ClickHouse version (Linux) | `bash setup-server.sh --clickhouse-version <tag>`. A data volume written by a newer ClickHouse does not start with an older one |
+| Change the Grafana admin password | The repo has no switch for it. `GRAFANA_ADMIN_PASSWORD` in `.env` is read by Grafana when it creates its database on the first start, so editing `.env` later does not change the password. Change it in Grafana (your profile), or reset it with `grafana cli admin reset-admin-password` inside the grafana container |
+| Change the ClickHouse password | The repo has no switch for it. `CLICKHOUSE_PASSWORD` in `.env` is applied only when the ClickHouse volume is first created, and the collector, Grafana and `ch.sh` all read it from `.env`. Changing it later breaks the connection |
+
+---
+
+## Stop and remove the stack
+
+| You want to | Command | Your data |
+| --- | --- | --- |
+| Stop the stack | `docker compose stop` | Kept |
+| Start it again | `docker compose up -d`, or run the server script | Kept |
+| Stop and remove the containers | `docker compose down` | Kept in the volumes `clickhouse-data` and `grafana-data` |
+| Remove everything, data included | `docker compose down -v` | **Deleted** |
+
+!!! warning "`down -v` deletes all collected data"
+    `-v` removes the volumes, and with them every event the stack has stored and Grafana's own
+    database. There is no undo. Dump first (see [Back up and restore](#back-up-and-restore)) and
+    check that the dump is not empty. A plain `docker compose down` is safe.
+
+On a Windows server with Docker in WSL, `wsl --unregister <distro>` also deletes the data.
+
+Stopping the stack does not undo what the Windows script set up. Remove those parts yourself
+when you no longer need them:
+
+| Part | How to remove it |
+| --- | --- |
+| The keepalive (WSL only) | Delete `cc-telemetry-keepalive.vbs` from your Startup folder; it ends with the next sign-out or reboot |
+| Firewall rules and port forwards (`-EnableLan`) | Rules named `OTLP 4317 (Claude Code telemetry)` and `OTLP 4318 (Claude Code telemetry)`, and `netsh interface portproxy` forwards for both ports. Both need admin rights |
+| Firewall rules on Linux | `ufw delete allow <port>/tcp` or `firewall-cmd --remove-port=<port>/tcp` |
+
+The clients keep sending to the server until you [undo their settings](clients.md#undo).

@@ -100,6 +100,10 @@ plugins:
             Using the dashboards: Работа с дашбордами
             Dashboards: Дашборды
             Tips: Подсказки
+            Operations: Эксплуатация
+            Maintenance: Обслуживание
+            Troubleshooting: Решение проблем
+            Data and privacy: Данные и приватность
 
 nav:
   - Overview: index.md
@@ -109,3 +113,7 @@ nav:
   - Using the dashboards:
       - Dashboards: dashboards.md
       - Tips: tips.md
+  - Operations:
+      - Maintenance: maintenance.md
+      - Troubleshooting: troubleshooting.md
+      - Data and privacy: data.md

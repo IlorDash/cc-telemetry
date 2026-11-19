@@ -119,7 +119,7 @@ never duplicates them. Run it again with a new address when the server's address
 !!! note "What is sent"
     `OTEL_LOG_USER_PROMPTS=1` sends your prompts. The same switch also makes Claude Code send
     its replies; the server drops the reply text before storing it. The full list of what is
-    collected is on a separate page.
+    collected is on [the Data and privacy page](data.md).
 
 ### Undo
 
@@ -222,5 +222,5 @@ knows), and events produced while the server is unreachable are dropped after a 
     | `Unknown option: <option>` | Linux: a mistyped option | Check the options table |
     | Nothing appears in Grafana | The session was not restarted, Claude Code is older than 2.1.310, or a `-Project` folder was never trusted | Restart the session; check `claude --version`; open the folder once in Claude Code and accept the trust dialog |
 
-→ More symptoms are covered on the Troubleshooting page, and what is collected on the page
-about the data. Back to [the server](server.md).
+→ More symptoms are on [the Troubleshooting page](troubleshooting.md), and what is collected on
+[the Data and privacy page](data.md). Back to [the server](server.md).

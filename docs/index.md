@@ -2,7 +2,9 @@
 
 cc-telemetry shows how you use Claude Code: cost, tokens, sessions, prompts, tools, subagents and
 errors. Claude Code sends its telemetry to a server PC on your LAN, where it is stored and shown
-in Grafana; nothing leaves your network.
+in Grafana. The telemetry stays on that server: the collector has no exporter besides
+ClickHouse. Grafana itself contacts grafana.com by default, see
+[Data and privacy](data.md#where-the-data-lives).
 
 This guide describes version {{ app_version }}.
 
@@ -51,8 +53,9 @@ with Windows clients.
 | Install the server | [Server](server.md) |
 | Connect a PC | [Clients](clients.md) |
 | Read a dashboard | [Dashboards](dashboards.md) |
-| Fix a failed step | Troubleshooting (not written yet) |
-| Know what is collected | What is sent (not written yet) |
+| Fix a failed step | [Troubleshooting](troubleshooting.md) |
+| Update, back up or stop the server | [Maintenance](maintenance.md) |
+| Know what is collected | [Data and privacy](data.md) |
 
 !!! note "Languages"
     This guide comes in English and Russian; switch the language in the header. Grafana itself
