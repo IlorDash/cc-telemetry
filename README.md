@@ -477,6 +477,10 @@ most of what ClickHouse put on the disk). The limits are in `clickhouse/config.d
 `clickhouse/users.d/low-resource.xml` and `cpus` in `docker-compose.yml`. After editing the XML files run
 `docker compose restart clickhouse`; the server script does not restart ClickHouse for them.
 
+The ClickHouse text log (`/var/log/clickhouse-server/clickhouse-server.log` in the container) is limited to level `warning`,
+10 MB per file, and two rotated (compressed) files are kept; errors also go to `clickhouse-server.err.log`. For a detailed log, set `<level>` to `trace` in the
+same file and restart ClickHouse.
+
 To find out why a dashboard panel is slow, switch `query_log` on for a while: delete the `<query_log remove="1"/>` line in
 `clickhouse/config.d/low-resource.xml`, set `<log_queries>1</log_queries>` in `clickhouse/users.d/low-resource.xml` and run
 `docker compose restart clickhouse`. Then look for the slow query in `system.query_log` (`query_duration_ms`, `query`). Afterwards

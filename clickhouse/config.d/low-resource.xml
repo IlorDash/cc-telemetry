@@ -1,6 +1,15 @@
 <!-- Raspberry Pi 4 (4 cores, 8 GB shared with other services): drop the system logs
-     nobody reads (query_log included), cap memory and background work. -->
+     nobody reads (query_log included), cap memory and background work, keep the text log small
+     (the image default `trace` wrote ~135 MB a day to the SD card). -->
 <clickhouse>
+  <!-- Merged into the image's <logger>: only these three change, the log paths stay.
+       Errors also go to clickhouse-server.err.log. -->
+  <logger>
+    <level>warning</level>
+    <size>10M</size>
+    <count>2</count>
+  </logger>
+
   <asynchronous_metric_log remove="1"/>
   <metric_log remove="1"/>
   <query_thread_log remove="1"/>
