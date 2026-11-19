@@ -99,7 +99,7 @@ Work down the list; stop at the first step that fails.
    Open the folder in Claude Code once and accept the trust dialog.
 5. On the server, read `docker compose logs otel-collector`. A ClickHouse error there means
    the events arrive but are not stored: read `docker compose logs clickhouse` too.
-6. Make a request and wait 5-10 seconds, then reload the dashboard. The first events fill
+6. Make a request and wait a few seconds, then reload the dashboard. The first events fill
    **Overview**.
 
 ---

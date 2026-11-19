@@ -194,7 +194,7 @@ knows), and events produced while the server is unreachable are dropped after a 
 
 1. Restart the Claude Code sessions, then make any request.
 2. Open Grafana (see [the server page](server.md)) and look at the **Overview** dashboard. Within
-   5-10 seconds the session appears.
+   a few seconds the session appears.
 3. The project shows in the **Project** dropdown once the session has touched a file or its
    working directory has arrived through the hook, or at once with an explicit label.
 

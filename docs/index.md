@@ -58,6 +58,7 @@ with Windows clients.
 | Fix a failed step | [Troubleshooting](troubleshooting.md) |
 | Update, back up or stop the server | [Maintenance](maintenance.md) |
 | Know what is collected | [Data and privacy](data.md) |
+| See what the current version offers | [Release notes](release-1-0-0.md) |
 
 !!! note "Languages"
     This guide comes in English and Russian; switch the language in the header. Grafana itself

@@ -1,588 +1,85 @@
 # cc-telemetry — local Claude Code usage statistics
 
+cc-telemetry shows how you use Claude Code: cost, tokens, sessions, prompts, tools, subagents and
+errors. Claude Code sends its telemetry to a server PC on your LAN, where it is stored in
+ClickHouse and shown in seven Grafana dashboards.
+
+**Guide: <https://ilordash.github.io/cc-telemetry/>** · **Руководство на русском:
+<https://ilordash.github.io/cc-telemetry/ru/>**
+
+The guide has the full installation, the dashboards, the tips, maintenance, troubleshooting and
+what data is collected. This page only gets you started.
+
+## How the data flows
+
 ```text
-PC-1, PC-2, …  Claude Code ──OTLP gRPC :4317──►  server PC (Docker)
-               session hook ──OTLP HTTP :4318──►  OTel Collector → ClickHouse → Grafana :3000
+Claude Code (every PC)  ─ OTLP gRPC :4317 ─┐
+session hook            ─ OTLP HTTP :4318 ─┤
+                                           ▼
+        OTel Collector ─► ClickHouse ─► Grafana :3000
 ```
 
-Everything stays on your LAN. Claude Code exports the events itself, so client PCs need no extra software, only settings.
-A small hook that the client script installs adds the session titles and git branches (see "2. Clients").
-Claude Code **2.1.310 or newer** is required: older versions do not put `agent_id` on tool events.
+Claude Code exports the events itself, so a client PC needs settings only. A small hook that the
+client script installs adds the session titles and git branches. Claude Code **2.1.310 or newer**
+is required. The server and the clients can run on different systems: any mix of Windows and
+Linux works.
 
-Setup is one script on the server PC and one script on every PC whose sessions you want to see (the server PC included).
-Both are safe to re-run. Each comes in a Windows and a Linux variant:
+## Quick start
 
-| | Windows (PowerShell) | Linux (bash) |
-| --- | --- | --- |
-| Server, once | [setup-server.ps1](setup-server.ps1) | [setup-server.sh](setup-server.sh) |
-| Client, every PC | [client/setup-client.ps1](client/setup-client.ps1) | [client/setup-client.sh](client/setup-client.sh) |
+### 1. Server (once)
 
-The server and the clients are independent: they only talk OTLP over TCP: port 4317 (gRPC, Claude Code telemetry) and port 4318 (HTTP, the session-meta hook).
-Any mix works, for example a Linux server with Windows clients.
+Docker runs the stack. On Windows you need Docker Desktop (running) or WSL2 with Ubuntu; on
+Linux the script installs Docker on Debian and Ubuntu if it is missing.
 
-Contents: [1. Server](#1-server-one-pc) · [2. Clients](#2-clients-every-pc) · [3. Dashboards](#3-dashboards) · [Tips](#tips) ·
-[4. Maintenance](#4-maintenance) · [5. Troubleshooting](#5-troubleshooting) · [What is sent](#what-is-sent)
-
-## 1. Server (one PC)
-
-Internet access is needed on the first start (images and the Grafana ClickHouse plugin are downloaded).
-On a Windows server Grafana (port `3000`) is published on `localhost` only; the OTLP ports `4317` (gRPC) and `4318` (HTTP, session titles) can be opened to the LAN.
-On a Linux server `4317`, `4318` and Grafana (port `3000` by default) are opened to the LAN by default (see 1b).
-
-### 1a. Server on Windows
-
-Requirements, one of:
-
-- **Docker Desktop** (WSL2 backend), which needs Windows 10 22H2 (build 19045) or Windows 11. Start it before running the script.
-- **Older Windows 10**: WSL2 with an Ubuntu distro and systemd enabled (`[boot]` / `systemd=true` in `/etc/wsl.conf`).
-  The script installs Docker Engine inside it; Docker Desktop is not needed.
+Windows (PowerShell):
 
 ```powershell
+git clone https://github.com/IlorDash/cc-telemetry.git
 cd cc-telemetry
-powershell -ExecutionPolicy Bypass -File .\setup-server.ps1               # this PC only
-powershell -ExecutionPolicy Bypass -File .\setup-server.ps1 -EnableLan    # + accept data from other PCs (asks for admin via UAC)
+powershell -ExecutionPolicy Bypass -File .\setup-server.ps1
+powershell -ExecutionPolicy Bypass -File .\setup-server.ps1 -EnableLan   # accept data from other PCs (UAC prompt)
 ```
 
-The script:
-
-1. finds Docker: Docker Desktop, or Docker Engine in WSL (offers to install it there if missing);
-2. creates `.env` with random passwords (an existing `.env` is kept);
-3. starts the stack and waits until the `cc.*` views are created;
-4. checks Grafana (`localhost:3000`) and the OTLP ports (`localhost:4317` and `localhost:4318`);
-5. WSL only: WSL stops a distro ~15 s after the last Windows-started process exits, which would stop the stack.
-   The script runs a hidden keepalive and adds it to the Startup folder (no admin rights needed);
-6. with `-EnableLan`: adds a firewall rule for each of TCP 4317 and 4318 (Private networks, named `OTLP <port> (Claude Code
-   telemetry)`) and, for WSL, a port forward of both from the LAN address to WSL (WSL2 on Windows 10 listens on `localhost` only).
-   Warns if the network is marked Public, then tests both ports on the LAN address.
-
-At the end it prints the Grafana address and the ready-to-run client command with the server's LAN IP.
-
-Options: `-Mode desktop|wsl` (skip auto-detection), `-Distro <name>` (default `Ubuntu`), `-LanIp <address>`
-(if the LAN address is detected wrong), `-Yes` (install Docker into WSL without asking).
-Best reserve the server's IP in the router's DHCP; if it changes, run `setup-server.ps1 -EnableLan` again.
-A server set up before the session hook existed has the rule and the forward for 4317 only: run `setup-server.ps1 -EnableLan`
-again to add 4318.
-
-The Windows script always checks and prints Grafana on port `3000`. If you set `GRAFANA_PORT` in `.env` by hand, Docker publishes
-that port, but the script's check and the printed address still say 3000; use the Windows script with the default port.
-
-### 1b. Server on Linux
-
-Requirements: a systemd-based distribution. On Debian, Ubuntu and derivatives the script installs Docker Engine and the compose
-plugin from `download.docker.com` if they are missing. On other distributions install
-[Docker Engine with the compose plugin](https://docs.docker.com/engine/install/) first.
+Linux (bash, as your normal user):
 
 ```bash
+git clone https://github.com/IlorDash/cc-telemetry.git
 cd cc-telemetry
-bash setup-server.sh              # reachable from the LAN (default: Linux servers are usually headless)
+bash setup-server.sh              # reachable from the LAN
 bash setup-server.sh --local-only # this PC only
 ```
 
-Run it as your normal user (it also works as root, but then no user is added to the `docker` group). It asks before it uses
-`sudo`. If you are not in the `docker` group, the script runs Docker through `sudo` and says so; `sudo usermod -aG docker $USER`
-and a new login remove the need.
+At the end the script prints the Grafana address and the client command with the server's
+address. Open Grafana, log in as `admin` with `GRAFANA_ADMIN_PASSWORD` from `.env`. Running the
+script again is safe: it keeps `.env` and the data.
 
-The script:
+The OTLP ports have no authentication: use the LAN mode on a trusted network only.
 
-1. checks that `docker` and the compose plugin are present and the daemon answers; if not, offers to install them (Debian/Ubuntu
-   and derivatives whose release Docker publishes packages for) or tells you what to install. The installer also enables the
-   `docker` service at boot and adds your user to the `docker` group;
-2. creates `.env` with random passwords (an existing `.env` is kept) and sets `OTLP_BIND`, `GRAFANA_BIND` and `GRAFANA_PORT` in it
-   (see below), plus `CLICKHOUSE_VERSION` on an old ARM CPU (see "Raspberry Pi 4");
-3. stops with a message if the Grafana port is taken by another program (a busy 4317/4318 is reported as a warning), then starts
-   the stack and waits until the `cc.*` views are created;
-4. checks Grafana and the OTLP ports (`localhost:4317`, `localhost:4318`), and that the `docker` service starts at boot
-   (offers `sudo systemctl enable docker` if not), so the stack comes back after a restart;
-5. LAN access (unless `--local-only`): publishes ports 4317, 4318 (clients) and Grafana on all interfaces, adds `ufw` or `firewalld`
-   rules for them (whichever is active; asks first) and prints the server's LAN address.
+### 2. Client (every PC)
 
-At the end it prints the Grafana address (`http://<server-ip>:<grafana-port>`, log in as `admin`) and the ready-to-run client
-commands for Windows (`powershell -ExecutionPolicy Bypass -File .\setup-client.ps1 -ServerIp <server-ip> -Project <project folder>`)
-and Linux (`bash setup-client.sh --server-ip <server-ip> --project <project folder>`; copy the client script to that PC first).
+Copy the script to the PC and run it with the server's address.
 
-Options: `--local-only` (4317, 4318 and Grafana on this PC only), `--lan` (back to all interfaces after an earlier `--local-only`;
-`--enable-lan` is the same), `--lan-ip <address>` (if the LAN address is detected wrong), `--grafana-port <n>`,
-`--clickhouse-version <tag>`, `--update` (see "Updating the server"), `--yes` (do not ask before installing Docker, using `sudo`
-or enabling the service), `--help`.
-
-**Ports and the firewall.** Docker publishes ports through its own `iptables` rules, which `ufw` and `firewalld` do not
-filter. Therefore the script controls access with the address Docker publishes each port on, two lines in `.env`:
-`OTLP_BIND` (ports 4317 and 4318) and `GRAFANA_BIND` (Grafana), each `0.0.0.0` (every PC that can reach the host) or `127.0.0.1`
-(this PC only). The firewall rules the script adds do not limit access, they only let the traffic in; `--local-only` does not
-remove rules added earlier (remove them yourself with `ufw delete allow <port>/tcp` or `firewall-cmd --remove-port=<port>/tcp`).
-Without a flag, a missing `OTLP_BIND` becomes `0.0.0.0` and a missing `GRAFANA_BIND` copies `OTLP_BIND`; values already in `.env`
-are kept, so running the script again does not change the exposure by itself. The one exception to "unchanged": an `.env` from an
-earlier version of the script that has `OTLP_BIND=0.0.0.0` but no `GRAFANA_BIND` now gets `GRAFANA_BIND=0.0.0.0` (the script
-warns); use `--local-only` to keep Grafana on this PC. `--local-only` and `--lan` set both explicitly. A bind you set by hand,
-for example `OTLP_BIND=192.168.1.5`, counts as reachable from the LAN: the script opens the firewall for it and prints that address.
-
-If you start the stack by hand with a plain `docker compose up -d`: with no `GRAFANA_BIND` Grafana is published on `localhost`
-only, with no `OTLP_BIND` ports 4317 and 4318 are published on `0.0.0.0` (and `ufw`/`firewalld` do not stop it). Put both lines into `.env`
-first (the script on Linux writes `GRAFANA_BIND=0.0.0.0` for the LAN default).
-
-**Grafana port.** If another program already uses port 3000 (for example another Grafana), Docker cannot publish it and the
-script stops with "port is already in use". Run `bash setup-server.sh --grafana-port 3001`: the port is stored as `GRAFANA_PORT`
-in `.env` (a plain re-run keeps it), and the checks, the firewall rule and the printed addresses use it. The ports 4317 and 4318
-are fixed; the script only warns if another program holds them.
-
-**Raspberry Pi 4 and other old ARM CPUs.** Since ClickHouse 22.10 (PR #41610) the ARM builds need ARMv8.2 with the `lrcpc` CPU
-feature; on a Raspberry Pi 4 (Cortex-A72, ARMv8.0) every newer image, including 23.3, stops with `Illegal instruction`
-(exit code 132). The newest tag known to run there is `22.3.20.29`. On `aarch64` without `lrcpc` in `/proc/cpuinfo` the script
-writes `CLICKHOUSE_VERSION=22.3.20.29` to `.env` if the key is missing, replaces the value `23.3.22.3` (what earlier versions of
-the script wrote, and which does not run there) and warns. Any other value you set stays; if it is 22.10 or newer, the script
-warns and suggests `bash setup-server.sh --clickhouse-version 22.3.20.29`. `--clickhouse-version <tag>` sets another tag on any
-machine; remove the line from `.env` to return to the default. Caveats: 22.3 dates from 2022 and has long been out of support
-(no security fixes: use it on a trusted LAN only), a data volume written by a newer ClickHouse does not start with it (so a Pi 4
-needs a fresh volume), and a Native dump from a newer server (`linux-server-tools/backup.sh`) should be restored into a fresh
-stack and checked with a row count per table. The collector's tables, the `cc.*` views and every dashboard query were checked on
-22.3 (see the verification notes in section 5).
-
-**Security.** Grafana is plain HTTP behind the `admin` login (no anonymous access); OTLP (4317 and 4318) has no authentication. Use the LAN
-mode on a trusted home or office network only, or `--local-only` and an SSH tunnel for Grafana.
-
-**Updating the server.** To move a running Linux server to a newer version of this repository without losing data, run
-`bash setup-server.sh --update` in the `cc-telemetry` folder (add the options you normally use, for example `--local-only`).
-This also publishes port 4318 and opens it in the firewall on a LAN server; a Windows server needs `setup-server.ps1 -EnableLan`
-for that (see 1a).
-
-The first time, run `git pull` yourself: older versions of the script have no `--update`. The command:
-
-1. stops with a message if ClickHouse does not answer or if the git working tree has local changes to tracked files (`.env`
-   and `backup/` are git-ignored and do not count);
-2. dumps all `otel.*` tables to `backup/pre-update-<date>-<time>/` and records the row count of every table there. Earlier dumps
-   stay; delete old `pre-update-*` folders yourself. Before dumping, it compares the free disk space with the uncompressed size
-   of the data (the dump is that large) and stops if there is less, or warns if there is less than 1.5 times that. If Docker
-   needs `sudo` here, the dump files belong to root;
-3. runs `git pull --ff-only`. It never merges or rebases. If the branch has no upstream, it prints a warning and continues with
-   the files as they are;
-4. runs `setup-server.sh` again from the updated file with your other options. This starts changed containers, recreates the
-   `cc.*` views and repeats the checks. Containers whose image and configuration did not change keep running, except that a
-   changed collector config (`otel-collector.yaml`) or Grafana provisioning (`grafana/provisioning/`) is reloaded by restarting
-   that service (dashboard files are re-read by Grafana by itself). The data volumes are never removed;
-5. compares the row counts. Every table must have at least as many rows as before; the script prints `OK`, or a `FAIL` banner
-   with the dump folder, and exits with status 1.
-
-If `git pull` fails (for example because the branch diverged), nothing on the stack has changed. Fix the repository and run
-`--update` again.
-
-**Roll back** to the previous version (the script prints its commit):
-
-```bash
-git checkout <previous commit>
-bash setup-server.sh
-```
-
-The data stays in the volume, so the rollback needs no restore. Use the dump only if a table lost rows (the `FAIL` banner).
-`restore` appends rows, so use it only for tables that are empty now:
-
-```bash
-BACKUP_DIR=backup/pre-update-<date>-<time> bash linux-server-tools/backup.sh restore            # all tables
-BACKUP_DIR=backup/pre-update-<date>-<time> bash linux-server-tools/backup.sh restore otel_logs  # one table
-```
-
-If Docker needs `sudo` on this PC, `BACKUP_DIR=... sudo bash ...` loses the variable (sudo resets the environment) and would
-restore the default `backup` folder. Pass it after sudo instead (the script prints the right form):
-
-```bash
-sudo env BACKUP_DIR=backup/pre-update-<date>-<time> bash linux-server-tools/backup.sh restore
-```
-
-After a rollback, `git checkout main` returns the branch for the next `--update` (on a detached `HEAD` there is no upstream and
-nothing is pulled).
-
-### 1c. Both
-
-Open `http://localhost:3000` (or your `GRAFANA_PORT`): user `admin`, password `GRAFANA_ADMIN_PASSWORD` from `.env`.
-The **Overview** dashboard is the home page (see section 3 for all seven dashboards).
-
-The OTLP ports have no authentication: enable LAN access on a trusted network only.
-
-## 2. Clients (every PC)
-
-Run the client script on every PC whose Claude Code sessions you want to see, the server PC included. It changes only
-your own user's files. It needs the server's address: the LAN IP printed by the server script, or `localhost` on the server PC itself.
-
-### 2a. Client on Windows
-
-Copy [client/setup-client.ps1](client/setup-client.ps1) to the PC (it is the only file a client needs) and run:
+Windows (PowerShell):
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\setup-client.ps1 -ServerIp <SERVER_IP> -Project C:\Projects\ProjA, C:\Projects\ProjB
+powershell -ExecutionPolicy Bypass -File .\setup-client.ps1 -ServerIp <server-ip>
 ```
 
-- `-ServerIp`: the server's address.
-- `-Project`: optional. Folders to label explicitly with their name; add more later by re-running with other folders.
-  Without it the server infers the project from file paths (see "Project" below).
-- `-PcName`: optional, the computer name by default; letters, digits, `.`, `_`, `-`.
-- `-ImportHistory`: once, upload title, branch and folder of the sessions already on this PC (see "Session titles" below).
-- `-NoSessionMeta`: do not install the session hook; on a re-run it removes the hook and its files.
-- `-WhatIf`: show the result and write nothing.
+The script is [client/setup-client.ps1](client/setup-client.ps1).
 
-It adds the telemetry keys to the `env` section of `%USERPROFILE%\.claude\settings.json` and
-`OTEL_RESOURCE_ATTRIBUTES=project=<folder name>,host=<PC name>` to `<project>\.claude\settings.local.json` (created if missing;
-only for the `-Project` folders).
-It leaves every other key (permissions, model, plugins, …) as it was, saves `<file>.bak` before the first change,
-checks that the result is valid JSON (Windows PowerShell 5.1 re-indents it; the content stays the same)
-and tests the connection to `<SERVER_IP>:4317` and, with the hook, `<SERVER_IP>:4318`.
-It also installs the session hook (see "Session titles" below): `%USERPROFILE%\.claude\cc-telemetry\session-meta.ps1` and its
-state file, which the script writes itself, so the client still needs only one file.
-
-### 2b. Client on Linux
-
-Copy [client/setup-client.sh](client/setup-client.sh) to the PC (it is the only file a client needs). It needs `jq` or `python3`.
-Run it as your normal user, without `sudo`:
+Linux (bash, without `sudo`):
 
 ```bash
-bash setup-client.sh --server-ip <SERVER_IP> --project ~/projects/ProjA --project ~/projects/ProjB
+bash setup-client.sh --server-ip <server-ip>
 ```
 
-- `--server-ip`: the server's address (required).
-- `--project`: optional. A folder to label explicitly with its name; repeat the option for more, add more later by re-running.
-  Without it the server infers the project from file paths (see "Project" below).
-- `--pc-name`: optional, `hostname -s` by default; letters, digits, `.`, `_`, `-`.
-- `--settings-dir`: project settings folder if it is not `.claude`.
-- `--import-history`: once, upload title, branch and folder of the sessions already on this PC (see "Session titles" below).
-- `--no-session-meta`: do not install the session hook; on a re-run it removes the hook and its files.
-- `--dry-run`: show the result and write nothing.
+The script is [client/setup-client.sh](client/setup-client.sh).
 
-It does the same as the Windows script: it merges the keys into `~/.claude/settings.json` and
-`<project>/.claude/settings.local.json`, leaves every other key as it was, saves `<file>.bak` before the first change,
-checks that the result is valid JSON (the JSON is re-indented with two spaces; the content stays the same)
-and tests the connection to `<SERVER_IP>:4317` and, with the hook, `<SERVER_IP>:4318`.
-The session hook is `~/.claude/cc-telemetry/session-meta.sh`. It needs bash 4+, GNU `find`, `python3` or `jq`, and `curl` or `python3`.
+On the server PC itself, use `localhost` as the address. The script changes only your own
+user's Claude Code settings and keeps every other key. Then restart running Claude Code
+sessions and make a request: within a few seconds the session appears in Grafana.
 
-### 2c. After the client script
+## Next
 
-1. Claude Code must be **2.1.310 or newer** (`claude --version`, otherwise `claude update`).
-2. Only if you used `-Project` / `--project`: project settings are read only in a **trusted** folder. If a project was never
-   opened in Claude Code on this PC, run `claude` in it once and accept the trust dialog.
-3. **Restart running sessions**, settings are read at start: in VS Code *Developer: Reload Window*,
-   in the terminal exit and continue with `claude -c`.
-4. Make any request. Within 5–10 s the session appears in Grafana; its project shows in the **Project** dropdown once the
-   session has touched a file or its working directory has arrived through the hook (or at once with an explicit label).
-
-### Session titles, git branch and working directory
-
-Claude Code's telemetry carries neither the session title nor the git branch nor the working directory. They exist only in the
-local session files (`~/.claude/projects/*/<session>.jsonl`). Unless you pass `-NoSessionMeta` / `--no-session-meta`, the client
-script therefore adds a Claude Code `UserPromptSubmit` hook to the user `settings.json` (async: it runs in the background and
-does not delay your prompt; your other hooks stay). On every prompt it sends the session title (the `/rename` title, else
-Claude Code's automatic title), the git branch, the first working directory and the Claude Code version of the current session
-and of the sessions that changed since the last run to `<server>:4318`, only when something changed. It never reads or sends
-prompts or replies.
-
-- **Timing.** Claude Code generates a new session's title after its first prompt, so it reaches the server with the next prompt
-  (in any session). A `/rename` is picked up with the next prompt too.
-- **Server unreachable.** After a failed send the hook does nothing for 10 minutes, then tries again with the same sessions.
-- **Existing sessions.** Claude Code keeps session files about 30 days. Run the client script once with `-ImportHistory` /
-  `--import-history` (after installing or updating) to upload title, branch and folder of the sessions already on the PC.
-  It sends nothing else from them.
-- **Remove.** Re-run the client script with `-NoSessionMeta` / `--no-session-meta`: it deletes the hook entry from `settings.json`
-  and the folder `cc-telemetry` next to it (the script and the state file).
-
-### Project
-
-The telemetry does not carry the working directory, but the session hook does, so the dashboard's `project` is decided on the
-server, per session:
-
-1. **Explicit label wins.** `project=<name>` from `OTEL_RESOURCE_ATTRIBUTES` (written by `-Project` / `--project`) is used as is.
-   Use it for projects whose sessions touch no files (pure chat, MCP only) and for folders the guess gets wrong.
-2. **Otherwise the working directory.** The folder of the session's first working directory (sent by the hook) follows the same
-   folder rules as file paths (below). Sessions recorded before the hook get it after `-ImportHistory` / `--import-history`,
-   while their session files still exist.
-3. **Otherwise inferred** from the absolute file paths of the session's tool calls (Read, Edit, Write, Glob, Grep, ...):
-   the folder name (lower case, as with `--project`) that appears most often, ties broken alphabetically. The folder is the
-   first path segment after the home directory and generic containers such as `Documents`, `projects`, `src`, `dev`, `work`,
-   `repos`, `github`: `C:\Users\me\Documents\Projects\Alpha\a.cpp` and `/home/me/src/alpha/a.cpp` both give `alpha`.
-   A worktree folder `alpha-feature` counts as `alpha` when `alpha` is also known (seen in other paths or set as a label).
-   Worktree folding is a name-prefix heuristic: it can merge different projects whose names share a prefix (`my` and
-   `my-app`) and is not transitive (`b`, `b-c`, `b-c-d`); an explicit `--project` label avoids it.
-   Paths in hidden folders (`~/.claude`), temp and system folders are ignored.
-4. **Otherwise `unknown`**: no explicit label, no working directory and no file paths in the session. Files attached with an `@` mention
-   do not count: Claude Code inlines them without a tool call and its `at_mention` event carries no path.
-
-It is computed on every query, so sessions recorded earlier get their project too. A project in an unusual layout (folders
-directly under `/data/x/y/`) is named after the first folder (`data`): label it with `--project`.
-
-Only sessions started after the setup are recorded. Telemetry is sent live: past sessions in `~/.claude/projects`
-(`%USERPROFILE%\.claude\projects` on Windows) are not uploaded (`-ImportHistory` adds only title, branch and folder to
-sessions the server already knows), and events produced while the server is unreachable are dropped after a short retry.
-
-<details>
-<summary>Manual client setup (what the scripts write)</summary>
-
-User settings (`%USERPROFILE%\.claude\settings.json` on Windows, `~/.claude/settings.json` on Linux), **add** to `"env"`
-(don't replace the section):
-
-```json
-"env": {
-  "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
-  "OTEL_LOGS_EXPORTER": "otlp",
-  "OTEL_METRICS_EXPORTER": "otlp",
-  "OTEL_EXPORTER_OTLP_PROTOCOL": "grpc",
-  "OTEL_EXPORTER_OTLP_ENDPOINT": "http://<SERVER_IP>:4317",
-  "OTEL_LOG_TOOL_DETAILS": "1",
-  "OTEL_LOG_USER_PROMPTS": "1",
-  "OTEL_LOGS_EXPORT_INTERVAL": "2000",
-  "OTEL_RESOURCE_ATTRIBUTES": "project=unknown,host=<PC_NAME>"
-}
-```
-
-Optional, only to label a project explicitly (otherwise it is inferred from file paths, see "Project"): in the project's
-`.claude/settings.local.json`, add to `"env"`:
-
-```json
-"OTEL_RESOURCE_ATTRIBUTES": "project=<project folder name, lower case>,host=<PC_NAME>"
-```
-
-- `project` must equal the project folder name (case does not matter): tool-call paths are made relative by it,
-  and worktrees `<project>-<name>` fold into the main folder.
-- It is one variable for both attributes, so `host` is repeated: the project value fully replaces the user one.
-
-</details>
-
-## 3. Dashboards
-
-Grafana shows seven dashboards. They are laid out for Full HD (1920 px wide) and wider screens; narrower screens are not supported.
-A side rail (the left 3 of 24 columns) on every dashboard switches between them (the current one is
-highlighted); the links keep the time range and the variables. Under the navigation the rail shows **Usage · last 5 h**
-(one bar per Claude account: the cost of the last 5 hours as a share of that account's highest 5-hour cost in the last
-30 days; accounts without cost in the last 7 days are not listed), **Tips · 7 d** (the number of tips) and, under it, the most
-frequent tip category with its count. A click on either tips tile opens the Tips section of Efficiency. The rail
-panels have a fixed height, so the space under them stays empty; they ignore the time range and the variables.
-
-| Dashboard | Shows |
-| --- | --- |
-| **Overview** (home) | four totals for the time range (`cost_usd`, cache hit rate, billable tokens, tool error rate with the p95 API latency); daily tokens with the cache hit rate; projects (`cost_usd`, tokens, hit rate, sessions); `cost_usd` by model; work rhythm by weekday and 3-hour block; top tools; the six most recent sessions |
-| **Sessions** | four totals (sessions, median length as activity time, median `cost_usd`, sessions with errors); the sessions table (name, last prompt, project, git branch, model, turns, tokens, `cost_usd`, cache hit rate, tool errors); for the selected session: a header, five totals, a timeline (prompts, main requests, subagents, tools), cumulative `cost_usd` and tokens, and its prompts |
-| **Efficiency** | all tips (see "Tips"; fixed 7 days): the number of tips, the tokens they affect, affected tokens by category, the token tips table, the time and friction tips table; below, where tokens and money are lost: `cost_usd` per day by work phase of a response (Explore, Edit, Run, Delegate, Talk, Other) with a phase summary, pauses between requests against the 5-minute cache lifetime, cache hit rate and cache-creation tokens by project; at the bottom the tip rules |
-| **Agents & skills** | four totals (subagent share of `cost_usd`, subagent runs, skills used, outlier runs); subagent types (runs, mean and max tokens, max against mean, `cost_usd`); `cost_usd` per day, main against subagents; skills (uses, sessions, projects, `cost_usd` of their turns); the biggest subagent runs |
-| **Tools & files** | four totals (tool calls, error rate, rejected calls split by config / hook / user, median result size); calls by tool with the error rate (top 7); rejected tool calls; files re-read within a session; largest tool results; Bash by first word; most edited files |
-| **Health** | four totals (mean time to first token, p95 API latency, API errors, hook time); time to first token by day per model against the 3 s line; time per hook; API errors by status; API request duration by bucket |
-| **Prompts** | four totals (prompts, median and p95 `cost_usd`, requests per prompt); the most expensive prompts; prompts by `cost_usd` bucket; mean `cost_usd` per prompt by model |
-
-**Variables.** The five at the top are shared and nested: **Account → Project → Session → Actor → Skill** (`All` = no filter).
-**Account** is multi-select and shows the e-mail of the Claude account, or the first 8 characters of its id when there is no
-e-mail; events without an account show only under `All`. The Tips section of Efficiency and the rail ignore the variables;
-Recent sessions on Overview ignores Actor and Skill, and the hook panels on Health ignore Skill. The Session
-dropdown shows `title (short id)`, or the full id while the session has no title; it lists the newest 300 sessions that made
-a model request. Sessions adds **Columns** (Session ID, Started, Account: extra columns of the sessions table, none by default).
-**Actor**: `main` is the main session, an agent name (`developer`, `Explore`, …) is a subagent, `aux:*` are Claude Code's
-own service requests.
-**Skill**: a tool call is attributed to a skill through the `request_id` of the model request that carried `skill.name`.
-Claude Code does this attribution itself; the label lasts until the end of the prompt in which the skill was invoked.
-
-**Time range.** The quick ranges are 5 minutes, 1 hour, 24 hours, 7 days (the default; 30 days on Overview), 30 days and `All` (10 years).
-Every dashboard refreshes itself every 10 s; the rate is picked at the top right (from 5 s to 1 h), as in any Grafana dashboard.
-Some panels ignore the time range and say so in their description: the rail panels and the tips (last 7 days).
-
-**Clicks.** Panel titles that end in "click a ... to ..." say what a click does.
-
-- **Overview.** A session name in Recent sessions opens that session on **Sessions**; the **all →** link next to the
-  Recent sessions title opens **Sessions** with the current range and variables; a project in Projects filters **Overview** by it.
-- **Sessions.** A session name in the Sessions table selects that session on **Sessions**; a prompt in Prompts in this
-  session opens **Prompts** filtered by that session (the range stays; Actor and Skill reset to `All`).
-- **Prompts.** A prompt in Most expensive prompts opens its session on **Sessions**; a project there filters **Prompts** by it.
-- **Agents & skills.** An agent type in Subagent types filters **Agents & skills** by it (Actor); a skill in Skills filters
-  it by that skill (Skill); a session in Biggest subagent runs opens that session on **Sessions**.
-- **Efficiency.** A tip title in the token tips or the time and friction tips opens its evidence panel full-screen (see "Tips").
-- **Rail.** The navigation switches the dashboard; the two tips tiles open the Tips section of Efficiency.
-
-Opening a session from a session name (Recent sessions, Sessions table), from a prompt in Most expensive prompts or from
-Biggest subagent runs also zooms the time range to that session: from its first prompt, request or tool call to the end of its
-last one, padded by 3 % of that span on each side, at least 5 seconds each. The timeline and the cumulative graph then fill their
-width, and the Sessions table and its four totals list the sessions active in that window. Links that open a session from
-Overview, Prompts and Agents & skills reset Actor and Skill to `All`. The browser Back button or the time picker returns to the earlier range. Picking a
-session in the Session variable keeps the time range; the links from the tips (`cc.tips`) keep the range of the dashboard
-they start from, except the `agent-outlier` tip, which zooms to its session.
-
-**Sessions.** The four totals and the table list the sessions whose last prompt falls into the time range; they follow
-Account, Project, Actor and Skill but not Session, so the selected row (marked with ▶ before its name) stays among the others. Click a name to
-select the session, or pick it in the Session variable. Everything below the table shows data only for the selected session
-and says "No session selected" until you pick one. The header gives name, git branch, project, model with the highest cost,
-account, short id, activity time (the time requests and tool calls were running; idle time and overlaps are not counted; the same
-measure as the median length above) and `LIVE` when the session's last event is under 10 minutes old. The timeline has one cell per
-time step of the dashboard time range; a request, a subagent run or a tool call fills every step it ran in (Claude Code logs
-it when it ends, so it runs back from its end by its duration), and a prompt marks one step. So a click on a session zooms the range to it (picking the session in the variable does not: narrow the range yourself); a Tools cell is red when
-at least one call in it failed. Prompts show in the timeline only with Actor and Skill set to `All`. Turns are model requests (subagents and auxiliary requests included); Tokens are input +
-output + cache create; Hit is the cache hit rate and Errors the share of failed tool calls, coloured like the totals on Overview
-(Errors: below 2 % green, 5 % and above red). Session ID, Started and Account are hidden until you pick them in **Columns**.
-The prompt text appears only when the client sets `OTEL_LOG_USER_PROMPTS=1`.
-
-**Prompts.** A prompt is a user message and every API request until the next user message (subagent and auxiliary requests
-included); its `cost_usd` is the sum over those requests. The panels follow the time range (the time of the prompt) and all
-variables; with Actor or Skill set, only prompts with such a request are counted, at their full cost. Most expensive prompts
-lists the eight costliest; Model is the model with the highest cost within the prompt, and so is the model a prompt counts
-for in the mean per model.
-
-**Overview.** All panels follow the time range (30 days by default) and the variables, except that **Recent sessions**
-ignores Actor and Skill and shows whole-session tokens and cost. `cost_usd` is computed by Claude Code
-from API prices, so the sum is not a bill: on a subscription you pay the flat fee. Billable tokens are input + output + cache
-create; cache reads are left out. Cache hit rate is cache read / (cache read + input + cache create): 90 % and above is green,
-75 % and above yellow, below red. In **Work rhythm** a cell is brighter the closer it is to the busiest weekday and 3-hour block
-(columns 00, 03, ... 21; server time zone, UTC in Docker); it is a table with coloured cells, because the Grafana heatmap
-cannot put the time of day on its X axis and a table column cannot be narrower than 50 px.
-
-**Efficiency.** The Tips section at the top (counts, affected tokens, affected tokens by category, the token tips table and the time and
-friction tips table) reads the tips (last 7 days, no time range, no variables); the "Where cost goes" and "Cache" sections below
-follow the time range and the variables. The work phase of a response comes from the tools it called: Edit (any
-Edit / Write / MultiEdit / NotebookEdit), Delegate (Task / Agent / SendMessage / SubagentHandback / TaskStop), Run (Bash), Explore (only Read / Grep / Glob / LS), Talk
-(no tool result), Other (any other tools, e.g. MCP or web); a response with several kinds takes the first match in that
-order. Pauses over 5 minutes are red: past the prompt-cache lifetime the next request writes the cache again. Gaps are
-between consecutive requests of a session, subagents included (filter Actor = main for the main conversation only); the
-first request in the time range has no predecessor and is not counted.
-
-**Agents & skills, Tools & files, Health.** All panels follow the time range and the five variables, with these exceptions:
-the hook panels on Health ignore Skill (hook events carry no skill); skill activations are reported by the main session
-only, so Skills used and the Skills table are empty when an agent is picked as Actor. Outlier runs use the rule of the
-`agent-outlier` tip (a run above 6 times the mean of its type and above 50k tokens) over the time range. Sizes of tool results
-are bytes: the telemetry has no token count, so Repeat tokens in Files re-read is about size / 4 × (reads − 1), the same
-rule of thumb as the tips. Bash by first word counts only the first word of a command, which is all Claude Code sends. API
-errors come from `api_error` events: a request that failed and was retried counts each time, and the panels stay empty until
-the first one arrives.
-
-**Editing the rail.** Grafana loads every `.json` in `grafana/dashboards/` as a dashboard, so the rail is defined once in
-`grafana/rail/rail.json` and copied into every dashboard file by `node grafana/rail/sync-rail.js` (no dependencies; run it
-from the repository root after editing `rail.json` or after adding a dashboard to its navigation list). The same command with
-`--check` changes nothing and exits with 1 when a dashboard differs from the source.
-
-### Tips
-
-A tip is a heuristic hint, not an error: something exceeded a threshold over the last 7 days. It is worth a look and may be
-fine for your work. The window is fixed to the last 7 days; the Tips section of Efficiency (the top of that dashboard) ignores the time range and the variables, as
-do the two tips tiles in the rail. Click a tip's title to open one evidence panel full-screen, with the project (or session) preset;
-the range of the dashboard you start from is kept (the `agent-outlier` tip zooms to its session). The table below is repeated at
-the bottom of Efficiency.
-
-| Category | Fires when (grouped by) | What to do | Link opens |
-| --- | --- | --- | --- |
-| `cache` | cache hit rate below 40 % with at least 20 requests (project) | keep the prompt prefix (CLAUDE.md, tools) stable; fewer `/clear` and model switches | Efficiency, Cache hit rate by project |
-| `repeated-read` | one file read more than 10 times (project, file) | keep the key facts in CLAUDE.md or a note instead of rereading | Tools & files, Files re-read within one session |
-| `big-results` | at least 5 tool results over 200 KB (project) | narrow the search or limit the read range: big outputs fill the context | Tools & files, Largest tool results |
-| `short-opus` | Opus model: at least 20 answers under 500 output tokens, and they are at least half of its requests (project) | a smaller model may handle such turns; the shown cost is an upper bound of the saving | Prompts, Most expensive prompts |
-| `agent-outlier` | a subagent's biggest run is over 6 times its mean and over 50,000 tokens, at least 3 runs (agent type) | open the session of that run and check what it did | Sessions, Timeline of that session (session and agent type preset; the range is zoomed to the session) |
-| `denials` | a tool rejected at least 5 times (project, tool) | add an allow or deny rule if the rejections are not intended; the text names the main source (config, hook, user) | Tools & files, Rejected tool calls |
-| `slow-hook` | a hook's mean duration over 500 ms, at least 10 runs (hook) | hooks run synchronously and delay every matching tool call: speed it up or make it async | Health, Hook time |
-| `slow-ttft` | mean time to first token over 3 s, at least 10 requests (project, model) | long contexts or a busy provider; compare days in the panel | Health, Time to first token by day |
-
-There is no rule for repeated Bash commands: the telemetry carries only the first word of a command (`git`, `cd`), so counting
-them would report noise. The thresholds are first guesses and there is no way to dismiss a tip: it disappears when the pattern
-leaves the 7-day window. The rules are the `cc.tips` view in `clickhouse/views.sql`; edit the numbers there and run
-`docker compose run --rm views-init` (see "4. Maintenance").
-
-## 4. Maintenance
-
-Run these from the `cc-telemetry` folder. Re-running the server script is also a quick health check.
-
-On a Windows server with Docker in WSL, prefix the commands with `wsl -d Ubuntu --`. On a Linux server run them as they are
-(add `sudo` if you are not in the `docker` group).
-
-```bash
-docker compose ps                         # all Up (views-init: Exited (0))
-docker compose run --rm views-init        # recreate the views after editing clickhouse/views.sql
-docker compose down                       # stop (data stays in the volume)
-```
-
-SQL without typing the password (taken from `.env`, never printed):
-
-```powershell
-"SELECT event, count() FROM cc.events GROUP BY event" | wsl -d Ubuntu -- bash linux-server-tools/ch.sh   # Windows server, Docker in WSL
-```
-
-```bash
-echo "SELECT event, count() FROM cc.events GROUP BY event" | bash linux-server-tools/ch.sh               # Linux server
-```
-
-Backup and restore of all collected data (`backup/` is git-ignored: it contains your prompts). Shown for a Linux server;
-on Windows with Docker in WSL run `wsl -d Ubuntu -- bash linux-server-tools/backup.sh …` from PowerShell:
-
-```bash
-bash linux-server-tools/backup.sh dump              # otel.* tables -> backup/<table>.native
-bash linux-server-tools/backup.sh restore           # appends rows: use on a fresh, empty stack
-bash linux-server-tools/backup.sh restore <table>   # one table only
-```
-
-`BACKUP_DIR=<folder>` in front of the command uses another folder instead of `backup` (for dump and restore). A relative
-folder is relative to the `cc-telemetry` folder, not to the current directory. With `sudo`, write `sudo env BACKUP_DIR=<folder> bash ...`.
-
-With Docker in WSL the data lives inside the distro: `wsl --unregister` deletes it. Dump first.
-
-Data is kept indefinitely in the `clickhouse-data` volume. Claude Code deletes its own local session files after about
-30 days, so the server keeps your history longer than the PC does. The `cc.*` views are plain (not materialized),
-so editing `views.sql` recomputes the whole history.
-
-## 5. Troubleshooting
-
-| Symptom | What to check |
-| --- | --- |
-| Dashboard is empty | `docker compose logs otel-collector` (ClickHouse errors?), the client's connection test (`Test-NetConnection <SERVER_IP> -Port 4317` on Windows, the last line of `setup-client.sh` on Linux), `CLAUDE_CODE_ENABLE_TELEMETRY` in `settings.json`, sessions restarted after the setup |
-| "Unknown table cc.events" | `docker compose logs views-init`, then `docker compose run --rm views-init` |
-| Variable dropdowns are empty | Dashboard settings → Variables → open the variable → Run query → Save |
-| ClickHouse plugin does not load | no internet on first start; `docker compose restart grafana` |
-| `project = unknown` | the session has no explicit label (`settings.local.json` with `OTEL_RESOURCE_ATTRIBUTES`, folder must be trusted), no working directory from the session hook (see the session titles row below) and touched no file with an absolute path; `OTEL_LOG_TOOL_DETAILS` must be `1` for paths to be sent |
-| A project has an odd name (`data`, ...) | its folder sits in an unusual place; set the label with `-Project` / `--project` |
-| Session titles, git branch or `project` from the working directory do not appear | port 4318 is not reachable from the client (the client script prints `server <ip>:4318 (session titles) reachable: False`): re-run the server script (Windows: with `-EnableLan`, see 1a; Linux: `setup-server.sh` without `--local-only`), then re-run the client script. After a failed send the hook pauses for 10 minutes. A new session's title appears with the next prompt. The hook is missing if the client script ran with `-NoSessionMeta` / `--no-session-meta`; for sessions from before it, run `-ImportHistory` / `--import-history` |
-| `actor = agent?` | the subagent is still running and its name has not arrived yet, or Claude Code is older than 2.1.310 |
-| Stack in WSL is down from time to time | `wsl -l -v` shows `Stopped`: the keepalive is not running; re-run `setup-server.ps1` |
-| Port 4317 or 4318 closed from another PC but open on the server's `localhost` (Windows server) | `setup-server.ps1 -EnableLan` not run (a server from before the session hook needs a re-run for 4318), or the server's LAN IP changed (re-run it); network marked Public |
-| Port 4317 or 4318 closed from another PC but open on the server's `localhost` (Linux server) | `setup-server.sh` was run with `--local-only` (`OTLP_BIND=127.0.0.1` in `.env`; use `--lan`), or a firewall other than `ufw`/`firewalld` blocks it |
-| Remove the session hook | re-run the client script with `-NoSessionMeta` / `--no-session-meta` (deletes the `UserPromptSubmit` entry and the hook's files in the `cc-telemetry` folder next to `settings.json`, and the folder once it is empty) |
-| Grafana does not open from another PC (Linux server) | `GRAFANA_BIND=127.0.0.1` in `.env` (run `setup-server.sh --lan`), or a firewall other than `ufw`/`firewalld` blocks the Grafana port; use `http://<server-ip>:<GRAFANA_PORT>` (3000 by default) |
-| Linux server: "port is already allocated" / "address already in use" for Grafana | another program uses the port: `bash setup-server.sh --grafana-port 3001` |
-| Linux server: `clickhouse` restarts with `Illegal instruction` | the ARM CPU is too old for ClickHouse 22.10 and newer (Raspberry Pi 4): see "Raspberry Pi 4" in 1b; re-run `setup-server.sh` or set `CLICKHOUSE_VERSION=22.3.20.29` in `.env` |
-| Linux server: stack is down after a reboot | `systemctl is-enabled docker`; run `sudo systemctl enable docker` or re-run `setup-server.sh` |
-| Linux server: `permission denied` for `docker` | you are not in the `docker` group: `sudo usermod -aG docker $USER`, log in again |
-| `setup-client.ps1` cannot be run | run it as shown, via `powershell -ExecutionPolicy Bypass -File …` |
-| `setup-client.sh`: "jq or python3 is required" | install one of them, for example `sudo apt install jq` |
-
-## Verified on first deployment (2026-11-13, Docker Engine 29.9.3 in WSL2, Claude Code 2.1.323)
-
-- Images clickhouse 25.8, otel-collector-contrib 0.135.0, grafana 12.1.0 pull fine; `views-init` exits with 0.
-  The collector creates `otel.otel_logs` at startup, so the wait loop in `init-views.sh` usually does not trigger.
-- `otel.otel_logs`: `Timestamp DateTime64(9)`, `ServiceName LowCardinality(String)`,
-  `ResourceAttributes`/`LogAttributes Map(LowCardinality(String), String)`, as the views expect.
-- `grafana-clickhouse-datasource` (4.23.5) installs via `GF_PLUGINS_PREINSTALL_SYNC`; the deprecated `GF_INSTALL_PLUGINS` was removed.
-- All 4 variables and 19 panel queries run through `/api/ds/query` without errors; the plugin expands `$__timeFilter`,
-  `$__timeInterval`, `$__fromTime`, `$__toTime`. String `query` in variables is supported by the plugin.
-- The main session in the VS Code extension reports `query_source = sdk` (same as `claude -p`) and is counted as `main`.
-  Custom subagents report `agent:custom` with an `agent_id`. The value for the interactive terminal CLI has not been seen yet
-  (expected `repl_main_thread`).
-- Session titles (`/rename` → `custom-title`, auto `ai-title`) are **not** in telemetry: they live only in the local
-  transcripts `~/.claude/projects/*/<session>.jsonl`. The first version of the Sessions table therefore showed the first prompt;
-  the titles now come from the session hook (see "Session titles" in section 2), and the first prompt is the fallback.
-- `setup-server.ps1 -Yes` on a freshly installed WSL Ubuntu 26.04.1 LTS (systemd on by default, no Docker): installs
-  Docker Engine 29.9.3, starts the stack, all checks pass (2026-11-14). The data was then restored with `linux-server-tools/backup.sh`.
-- `.sh/.sql/.yaml` are pinned to LF in `.gitattributes`: with CRLF, `init-views.sh` fails inside the container.
-- `setup-server.sh` (health-check run with `--local-only`) and `setup-client.sh` (with `python3`) on Ubuntu 26.04 in WSL2
-  (2026-11-14): the stack answers on `localhost` from Windows with the ports bound to `127.0.0.1`. The Docker install, firewall
-  and `jq` paths of the Linux scripts are not verified on a physical Linux host.
-- ClickHouse 23.3.22.3 and 22.3.20.29 (x86, a separate compose project each): the collector creates `otel_logs` and the five
-  `otel_metrics_*` tables, `views-init` creates all `cc.*` views, they return rows for sample events (prompt, requests with a
-  subagent and a skill, tool calls, subagent end), all 23 dashboard queries pass (with all variables on All and with a project,
-  session, actor and skill set) and the Grafana datasource health check is OK. The Skills panel uses `ON` joins instead of
-  `USING` for 23.3. A Native dump of `otel_logs` and `otel_metrics_sum` from a newer ClickHouse was inserted into 23.3 and
-  22.3 unchanged; the views gave the same counts and cost as on the source. 23.3 does not run on a Raspberry Pi 4 (`Illegal
-  instruction`); 22.3.20.29 does (`SELECT version()` there), but the whole stack was not run on a real Pi 4 (arm64 image of the
-  same version).
-
-## What is sent
-
-Observed with Claude Code 2.1.323 and the client settings above:
-
-- **Text**: your prompts (`user_prompt.prompt`, needs `OTEL_LOG_USER_PROMPTS=1`). The same variable also makes clients send
-  the **full text of Claude's replies** (`assistant_response.response`; there is no separate switch). The dashboard does not use
-  it, so the collector deletes it before storage (`attributes/drop_response` in `otel-collector.yaml`); only `response_length` is kept.
-- **Tool arguments** (`OTEL_LOG_TOOL_DETAILS=1`): file paths, search patterns, Bash commands. Not file contents and not tool
-  output: only their size (`tool_result_size_bytes`).
-- **Usage**: model, tokens (incl. cache), cost, durations, time to first token, effort, subagent and skill names, permission
-  decisions, hook timings, API errors (HTTP status and the error message); plus metrics (tokens, cost, lines of code changed, active time).
-- **Identity**: account email, account/organization IDs, plan (`pro`, …), session and prompt IDs, OS version,
-  and the `host` (and optionally `project`) you set. The project guess sends nothing of its own: the server derives it from the
-  tool-call paths above and the hook's working directory below.
-
-- **Session hook** (to port 4318, installed by the client script): per session the title, the git branch, the working
-  directory (it contains your OS user name) and the Claude Code version, read from the local session files. Nothing of your
-  prompts or Claude's replies. To opt out, run the client script with `-NoSessionMeta` / `--no-session-meta`.
-
-Everything is stored only on the server PC, indefinitely. If you don't want prompts stored, remove `OTEL_LOG_USER_PROMPTS`:
-the `first_prompt` column will then be empty.
+Everything else is in the guide: <https://ilordash.github.io/cc-telemetry/> (Russian:
+<https://ilordash.github.io/cc-telemetry/ru/>).

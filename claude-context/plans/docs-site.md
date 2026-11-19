@@ -1,6 +1,6 @@
 # Plan: user guide on GitHub Pages (MkDocs)
 
-Status: approved 2026-11-19; stages 1–5 done; branch `docs-site` from `develop`; site publishes from `main`.
+Status: approved 2026-11-19; stages 1–6 implemented (stage 6 awaits the user's steps below); branch `docs-site` from `develop`; site publishes from `main`.
 
 ## Goal
 
@@ -122,3 +122,8 @@ project.
    features; README shortened with a link to the site. The user enables Pages
    (Settings → Pages → Source: GitHub Actions) and merges; result: the deploy job publishes and
    the site opens at the Pages URL.
+   Implemented: `docs/release-1-0-0.md` + `.ru.md` (dated 19 November 2026, no unreleased
+   marker), a "Release notes" nav section and its `nav_translations` entry, a row in the home
+   page's "Where to start", README cut to what it is / data flow / quick start / links to the
+   site (EN and `/ru/`). Left for the user: enable Pages (Settings → Pages → Source: GitHub
+   Actions), merge develop → main, check the deploy job and open the Pages URL.
