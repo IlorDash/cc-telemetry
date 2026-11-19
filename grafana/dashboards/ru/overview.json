@@ -62,7 +62,7 @@
     {
       "type": "link",
       "title": "EN",
-      "tooltip": "English version",
+      "tooltip": "Английская версия",
       "url": "/d/cc-usage",
       "keepTime": true,
       "includeVars": true
@@ -204,7 +204,7 @@
       "transparent": false,
       "options": {
         "mode": "html",
-        "content": "<a href=\"/d/cc-usage-ru?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid #F46800;background:#22252b\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Обзор</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">итоги и статус</span></a><a href=\"/d/cc-sessions-ru?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Сессии</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">список · таймлайн</span></a><a href=\"/d/cc-prompts?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Промпты</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">дорогие ходы</span></a><a href=\"/d/cc-efficiency?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Эффективность</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">советы и разбор затрат</span></a><a href=\"/d/cc-agents?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Агенты и навыки</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">субагенты, навыки</span></a><a href=\"/d/cc-tools?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Инструменты и файлы</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">вызовы, файлы, чтения</span></a><a href=\"/d/cc-health?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Состояние</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">задержки, хуки</span></a>"
+        "content": "<a href=\"/d/cc-usage-ru?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid #F46800;background:#22252b\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Обзор</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">итоги и статус</span></a><a href=\"/d/cc-sessions-ru?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Сессии</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">список · таймлайн</span></a><a href=\"/d/cc-prompts-ru?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Промпты</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">дорогие ходы</span></a><a href=\"/d/cc-efficiency-ru?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Эффективность</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">советы и разбор затрат</span></a><a href=\"/d/cc-agents-ru?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Агенты и навыки</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">субагенты, навыки</span></a><a href=\"/d/cc-tools-ru?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Инструменты и файлы</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">вызовы, файлы, чтения</span></a><a href=\"/d/cc-health-ru?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Состояние</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">задержки, хуки</span></a>"
       }
     },
     {
@@ -232,7 +232,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT\n    concat(if(t.label = '', '(no account)', t.label), '  ·  $', toString(round(t.h5, 2))) AS name,\n    round(100 * t.h5 / greatest(p.peak, t.h5, 0.000001)) AS pct\nFROM\n(\n    SELECT account_uuid,\n           argMax(account, ts) AS label,\n           sumIf(cost_usd, ts >= now() - INTERVAL 5 HOUR) AS h5,\n           sumIf(cost_usd, ts >= now() - INTERVAL 7 DAY) AS d7\n    FROM cc.api_requests\n    WHERE ts >= now() - INTERVAL 30 DAY\n    GROUP BY account_uuid\n) AS t\nLEFT JOIN\n(\n    SELECT account_uuid, max(w) AS peak\n    FROM\n    (\n        SELECT account_uuid,\n               sum(c) OVER (PARTITION BY account_uuid ORDER BY b RANGE BETWEEN 17999 PRECEDING AND CURRENT ROW) AS w\n        FROM\n        (\n            SELECT account_uuid, toUInt32(toStartOfInterval(ts, INTERVAL 10 MINUTE)) AS b, sum(cost_usd) AS c\n            FROM cc.api_requests\n            WHERE ts >= now() - INTERVAL 30 DAY\n            GROUP BY account_uuid, b\n        )\n    )\n    GROUP BY account_uuid\n) AS p ON p.account_uuid = t.account_uuid\nWHERE t.d7 > 0\nORDER BY t.h5 DESC, t.d7 DESC"
+          "rawSql": "SELECT\n    concat(if(t.label = '', '(нет аккаунта)', t.label), '  ·  $', toString(round(t.h5, 2))) AS name,\n    round(100 * t.h5 / greatest(p.peak, t.h5, 0.000001)) AS pct\nFROM\n(\n    SELECT account_uuid,\n           argMax(account, ts) AS label,\n           sumIf(cost_usd, ts >= now() - INTERVAL 5 HOUR) AS h5,\n           sumIf(cost_usd, ts >= now() - INTERVAL 7 DAY) AS d7\n    FROM cc.api_requests\n    WHERE ts >= now() - INTERVAL 30 DAY\n    GROUP BY account_uuid\n) AS t\nLEFT JOIN\n(\n    SELECT account_uuid, max(w) AS peak\n    FROM\n    (\n        SELECT account_uuid,\n               sum(c) OVER (PARTITION BY account_uuid ORDER BY b RANGE BETWEEN 17999 PRECEDING AND CURRENT ROW) AS w\n        FROM\n        (\n            SELECT account_uuid, toUInt32(toStartOfInterval(ts, INTERVAL 10 MINUTE)) AS b, sum(cost_usd) AS c\n            FROM cc.api_requests\n            WHERE ts >= now() - INTERVAL 30 DAY\n            GROUP BY account_uuid, b\n        )\n    )\n    GROUP BY account_uuid\n) AS p ON p.account_uuid = t.account_uuid\nWHERE t.d7 > 0\nORDER BY t.h5 DESC, t.d7 DESC"
         }
       ],
       "options": {
@@ -378,7 +378,7 @@
                 "value": [
                   {
                     "title": "Открыть все советы",
-                    "url": "/d/cc-efficiency?${__url_time_range}",
+                    "url": "/d/cc-efficiency-ru?${__url_time_range}",
                     "oneClick": true
                   }
                 ]
@@ -413,7 +413,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT if(tips = 0, 'none', concat(multiIf(top = 'cache', 'Cache rebuilds', top = 'repeated-read', 'Repeated reads', top = 'big-results', 'Big tool results', top = 'short-opus', 'Short Opus answers', top = 'agent-outlier', 'Costly agent run', top = 'denials', 'Denied tool calls', top = 'slow-hook', 'Slow hooks', top = 'slow-ttft', 'Slow first token', top), ' (', toString(n), ')')) AS most_frequent\nFROM\n(\n    SELECT sum(c) AS tips,\n           argMin(category, (-toInt64(c), category)) AS top,\n           max(c) AS n\n    FROM (SELECT category, count() AS c FROM cc.tips GROUP BY category)\n)"
+          "rawSql": "SELECT if(tips = 0, 'нет', concat(multiIf(top = 'cache', 'Пересборка кэша', top = 'repeated-read', 'Повтор чтений', top = 'big-results', 'Крупные выводы', top = 'short-opus', 'Opus на мелочи', top = 'agent-outlier', 'Дорогой агент', top = 'denials', 'Отклонения', top = 'slow-hook', 'Медленные хуки', top = 'slow-ttft', 'Долгий TTFT', top), ' (', toString(n), ')')) AS most_frequent\nFROM\n(\n    SELECT sum(c) AS tips,\n           argMin(category, (-toInt64(c), category)) AS top,\n           max(c) AS n\n    FROM (SELECT category, count() AS c FROM cc.tips GROUP BY category)\n)"
         }
       ],
       "options": {
@@ -436,7 +436,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "noValue": "none"
+          "noValue": "нет"
         },
         "overrides": [
           {
@@ -461,7 +461,7 @@
                 "value": [
                   {
                     "title": "Открыть все советы",
-                    "url": "/d/cc-efficiency?${__url_time_range}",
+                    "url": "/d/cc-efficiency-ru?${__url_time_range}",
                     "oneClick": true
                   }
                 ]
@@ -513,7 +513,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT sum(cost_usd) AS cost_usd, 'sum of api_request cost_usd' AS name\nFROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)"
+          "rawSql": "SELECT sum(cost_usd) AS cost_usd, 'сумма cost_usd у api_request' AS name\nFROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)"
         }
       ],
       "options": {
@@ -573,7 +573,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT 100 * sum(cache_read_tokens) / greatest(sum(cache_read_tokens + input_tokens + cache_creation_tokens), 1) AS hit_rate, '≥ 90% good · < 75% bad' AS name\nFROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)"
+          "rawSql": "SELECT 100 * sum(cache_read_tokens) / greatest(sum(cache_read_tokens + input_tokens + cache_creation_tokens), 1) AS hit_rate, '≥ 90% хорошо · < 75% плохо' AS name\nFROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)"
         }
       ],
       "options": {
@@ -711,7 +711,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT (SELECT 100 * countIf(success = 0) / greatest(count(), 1) FROM cc.tool_calls WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)) AS error_rate,\n       concat('p95 API latency ', toString(round((SELECT quantile(0.95)(duration_ms) FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)) / 1000, 1)), ' s') AS name"
+          "rawSql": "SELECT (SELECT 100 * countIf(success = 0) / greatest(count(), 1) FROM cc.tool_calls WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)) AS error_rate,\n       concat('p95 задержки API ', toString(round((SELECT quantile(0.95)(duration_ms) FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)) / 1000, 1)), ' с') AS name"
         }
       ],
       "options": {
@@ -1093,7 +1093,7 @@
               },
               {
                 "id": "custom.width",
-                "value": 80
+                "value": 100
               },
               {
                 "id": "custom.cellOptions",
@@ -1317,7 +1317,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][w.d] AS day,\n       round(100 * sumIf(c, b = 0) / greatest(max(mx), 1)) AS `00`, round(100 * sumIf(c, b = 1) / greatest(max(mx), 1)) AS `03`, round(100 * sumIf(c, b = 2) / greatest(max(mx), 1)) AS `06`, round(100 * sumIf(c, b = 3) / greatest(max(mx), 1)) AS `09`,\n       round(100 * sumIf(c, b = 4) / greatest(max(mx), 1)) AS `12`, round(100 * sumIf(c, b = 5) / greatest(max(mx), 1)) AS `15`, round(100 * sumIf(c, b = 6) / greatest(max(mx), 1)) AS `18`, round(100 * sumIf(c, b = 7) / greatest(max(mx), 1)) AS `21`\nFROM (SELECT arrayJoin([1, 2, 3, 4, 5, 6, 7]) AS d) AS w\nLEFT JOIN (\n  SELECT dd, b, c, max(c) OVER () AS mx\n  FROM (\n    SELECT toDayOfWeek(ts) AS dd, intDiv(toHour(ts), 3) AS b, count() AS c\n    FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\n    GROUP BY dd, b\n  )\n) AS t ON t.dd = w.d\nGROUP BY w.d ORDER BY w.d"
+          "rawSql": "SELECT ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'][w.d] AS day,\n       round(100 * sumIf(c, b = 0) / greatest(max(mx), 1)) AS `00`, round(100 * sumIf(c, b = 1) / greatest(max(mx), 1)) AS `03`, round(100 * sumIf(c, b = 2) / greatest(max(mx), 1)) AS `06`, round(100 * sumIf(c, b = 3) / greatest(max(mx), 1)) AS `09`,\n       round(100 * sumIf(c, b = 4) / greatest(max(mx), 1)) AS `12`, round(100 * sumIf(c, b = 5) / greatest(max(mx), 1)) AS `15`, round(100 * sumIf(c, b = 6) / greatest(max(mx), 1)) AS `18`, round(100 * sumIf(c, b = 7) / greatest(max(mx), 1)) AS `21`\nFROM (SELECT arrayJoin([1, 2, 3, 4, 5, 6, 7]) AS d) AS w\nLEFT JOIN (\n  SELECT dd, b, c, max(c) OVER () AS mx\n  FROM (\n    SELECT toDayOfWeek(ts) AS dd, intDiv(toHour(ts), 3) AS b, count() AS c\n    FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\n    GROUP BY dd, b\n  )\n) AS t ON t.dd = w.d\nGROUP BY w.d ORDER BY w.d"
         }
       ],
       "options": {
@@ -1510,7 +1510,7 @@
         "cellHeight": "sm",
         "sortBy": [
           {
-            "displayName": "Last prompt",
+            "displayName": "Посл. промпт",
             "desc": true
           }
         ]

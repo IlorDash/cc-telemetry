@@ -62,7 +62,7 @@
     {
       "type": "link",
       "title": "EN",
-      "tooltip": "English version",
+      "tooltip": "Английская версия",
       "url": "/d/cc-sessions",
       "keepTime": true,
       "includeVars": true
@@ -188,13 +188,13 @@
         "name": "extra_cols",
         "label": "Колонки",
         "type": "custom",
-        "query": "none : none,Session ID : id,Started : started,Account : account",
+        "query": "нет : none,ID сессии : id,Начало : started,Аккаунт : account",
         "multi": true,
         "includeAll": false,
         "current": {
           "selected": true,
           "text": [
-            "none"
+            "нет"
           ],
           "value": [
             "none"
@@ -203,22 +203,22 @@
         "options": [
           {
             "selected": true,
-            "text": "none",
+            "text": "нет",
             "value": "none"
           },
           {
             "selected": false,
-            "text": "Session ID",
+            "text": "ID сессии",
             "value": "id"
           },
           {
             "selected": false,
-            "text": "Started",
+            "text": "Начало",
             "value": "started"
           },
           {
             "selected": false,
-            "text": "Account",
+            "text": "Аккаунт",
             "value": "account"
           }
         ]
@@ -260,8 +260,8 @@
           "type": "grafana-clickhouse-datasource",
           "uid": "clickhouse"
         },
-        "query": "SELECT if(count() = 0, 'No session selected', any(h)) AS session_header\nFROM\n(\n  SELECT arrayStringConcat(arrayFilter(x -> x != '',\n           [concat(if(s.title != '', s.title, if(s.first_prompt != '', leftUTF8(replaceAll(s.first_prompt, '\\n', ' '), 80), '(untitled)')), if(s.git_branch != '', concat('  ', s.git_branch), '')),\n            s.project,\n            multiIf(positionCaseInsensitive(s.model, 'opus') > 0, 'Opus', positionCaseInsensitive(s.model, 'sonnet') > 0, 'Sonnet', positionCaseInsensitive(s.model, 'haiku') > 0, 'Haiku', s.model),\n            s.account,\n            left(s.session_id, 8),\n            if(intDiv(a.ms, 60000) >= 60,\n               concat(toString(intDiv(a.ms, 3600000)), ' h ', toString(intDiv(a.ms, 60000) % 60), ' min'),\n               if(a.ms < 60000, concat(toString(intDiv(a.ms, 1000)), ' s'), concat(toString(intDiv(a.ms, 60000)), ' min'))),\n            if(s.last_event >= now() - INTERVAL 10 MINUTE, 'LIVE', '')]), ' · ') AS h\n  FROM cc.sessions AS s\n  LEFT JOIN\n  (\n    SELECT session_id,\n           arraySum(arrayMap((c, x, y) -> if(c > 0, y - x, 0), arrayCumSum(arrayMap(q -> q.2, p)), arrayMap(q -> q.1, p), arrayPushBack(arrayPopFront(arrayMap(q -> q.1, p)), toInt64(0)))) AS ms\n    FROM\n    (\n      SELECT session_id, arraySort(arrayConcat(groupArray((a_s, toInt8(1))), groupArray((a_e, toInt8(-1))))) AS p\n      FROM\n      (\n        SELECT session_id, toUnixTimestamp64Milli(ts) - toInt64(duration_ms) AS a_s, toUnixTimestamp64Milli(ts) AS a_e\n        FROM cc.events_raw\n        WHERE event IN ('api_request', 'tool_result') AND session_id = '${session}'\n      )\n      GROUP BY session_id\n    )\n  ) AS a ON a.session_id = s.session_id\n  WHERE s.session_id = '${session}'\n)",
-        "definition": "SELECT if(count() = 0, 'No session selected', any(h)) AS session_header\nFROM\n(\n  SELECT arrayStringConcat(arrayFilter(x -> x != '',\n           [concat(if(s.title != '', s.title, if(s.first_prompt != '', leftUTF8(replaceAll(s.first_prompt, '\\n', ' '), 80), '(untitled)')), if(s.git_branch != '', concat('  ', s.git_branch), '')),\n            s.project,\n            multiIf(positionCaseInsensitive(s.model, 'opus') > 0, 'Opus', positionCaseInsensitive(s.model, 'sonnet') > 0, 'Sonnet', positionCaseInsensitive(s.model, 'haiku') > 0, 'Haiku', s.model),\n            s.account,\n            left(s.session_id, 8),\n            if(intDiv(a.ms, 60000) >= 60,\n               concat(toString(intDiv(a.ms, 3600000)), ' h ', toString(intDiv(a.ms, 60000) % 60), ' min'),\n               if(a.ms < 60000, concat(toString(intDiv(a.ms, 1000)), ' s'), concat(toString(intDiv(a.ms, 60000)), ' min'))),\n            if(s.last_event >= now() - INTERVAL 10 MINUTE, 'LIVE', '')]), ' · ') AS h\n  FROM cc.sessions AS s\n  LEFT JOIN\n  (\n    SELECT session_id,\n           arraySum(arrayMap((c, x, y) -> if(c > 0, y - x, 0), arrayCumSum(arrayMap(q -> q.2, p)), arrayMap(q -> q.1, p), arrayPushBack(arrayPopFront(arrayMap(q -> q.1, p)), toInt64(0)))) AS ms\n    FROM\n    (\n      SELECT session_id, arraySort(arrayConcat(groupArray((a_s, toInt8(1))), groupArray((a_e, toInt8(-1))))) AS p\n      FROM\n      (\n        SELECT session_id, toUnixTimestamp64Milli(ts) - toInt64(duration_ms) AS a_s, toUnixTimestamp64Milli(ts) AS a_e\n        FROM cc.events_raw\n        WHERE event IN ('api_request', 'tool_result') AND session_id = '${session}'\n      )\n      GROUP BY session_id\n    )\n  ) AS a ON a.session_id = s.session_id\n  WHERE s.session_id = '${session}'\n)",
+        "query": "SELECT if(count() = 0, 'Сессия не выбрана', any(h)) AS session_header\nFROM\n(\n  SELECT arrayStringConcat(arrayFilter(x -> x != '',\n           [concat(if(s.title != '', s.title, if(s.first_prompt != '', leftUTF8(replaceAll(s.first_prompt, '\\n', ' '), 80), '(без названия)')), if(s.git_branch != '', concat('  ', s.git_branch), '')),\n            s.project,\n            multiIf(positionCaseInsensitive(s.model, 'opus') > 0, 'Opus', positionCaseInsensitive(s.model, 'sonnet') > 0, 'Sonnet', positionCaseInsensitive(s.model, 'haiku') > 0, 'Haiku', s.model),\n            s.account,\n            left(s.session_id, 8),\n            if(intDiv(a.ms, 60000) >= 60,\n               concat(toString(intDiv(a.ms, 3600000)), ' ч ', toString(intDiv(a.ms, 60000) % 60), ' мин'),\n               if(a.ms < 60000, concat(toString(intDiv(a.ms, 1000)), ' с'), concat(toString(intDiv(a.ms, 60000)), ' мин'))),\n            if(s.last_event >= now() - INTERVAL 10 MINUTE, 'LIVE', '')]), ' · ') AS h\n  FROM cc.sessions AS s\n  LEFT JOIN\n  (\n    SELECT session_id,\n           arraySum(arrayMap((c, x, y) -> if(c > 0, y - x, 0), arrayCumSum(arrayMap(q -> q.2, p)), arrayMap(q -> q.1, p), arrayPushBack(arrayPopFront(arrayMap(q -> q.1, p)), toInt64(0)))) AS ms\n    FROM\n    (\n      SELECT session_id, arraySort(arrayConcat(groupArray((a_s, toInt8(1))), groupArray((a_e, toInt8(-1))))) AS p\n      FROM\n      (\n        SELECT session_id, toUnixTimestamp64Milli(ts) - toInt64(duration_ms) AS a_s, toUnixTimestamp64Milli(ts) AS a_e\n        FROM cc.events_raw\n        WHERE event IN ('api_request', 'tool_result') AND session_id = '${session}'\n      )\n      GROUP BY session_id\n    )\n  ) AS a ON a.session_id = s.session_id\n  WHERE s.session_id = '${session}'\n)",
+        "definition": "SELECT if(count() = 0, 'Сессия не выбрана', any(h)) AS session_header\nFROM\n(\n  SELECT arrayStringConcat(arrayFilter(x -> x != '',\n           [concat(if(s.title != '', s.title, if(s.first_prompt != '', leftUTF8(replaceAll(s.first_prompt, '\\n', ' '), 80), '(без названия)')), if(s.git_branch != '', concat('  ', s.git_branch), '')),\n            s.project,\n            multiIf(positionCaseInsensitive(s.model, 'opus') > 0, 'Opus', positionCaseInsensitive(s.model, 'sonnet') > 0, 'Sonnet', positionCaseInsensitive(s.model, 'haiku') > 0, 'Haiku', s.model),\n            s.account,\n            left(s.session_id, 8),\n            if(intDiv(a.ms, 60000) >= 60,\n               concat(toString(intDiv(a.ms, 3600000)), ' ч ', toString(intDiv(a.ms, 60000) % 60), ' мин'),\n               if(a.ms < 60000, concat(toString(intDiv(a.ms, 1000)), ' с'), concat(toString(intDiv(a.ms, 60000)), ' мин'))),\n            if(s.last_event >= now() - INTERVAL 10 MINUTE, 'LIVE', '')]), ' · ') AS h\n  FROM cc.sessions AS s\n  LEFT JOIN\n  (\n    SELECT session_id,\n           arraySum(arrayMap((c, x, y) -> if(c > 0, y - x, 0), arrayCumSum(arrayMap(q -> q.2, p)), arrayMap(q -> q.1, p), arrayPushBack(arrayPopFront(arrayMap(q -> q.1, p)), toInt64(0)))) AS ms\n    FROM\n    (\n      SELECT session_id, arraySort(arrayConcat(groupArray((a_s, toInt8(1))), groupArray((a_e, toInt8(-1))))) AS p\n      FROM\n      (\n        SELECT session_id, toUnixTimestamp64Milli(ts) - toInt64(duration_ms) AS a_s, toUnixTimestamp64Milli(ts) AS a_e\n        FROM cc.events_raw\n        WHERE event IN ('api_request', 'tool_result') AND session_id = '${session}'\n      )\n      GROUP BY session_id\n    )\n  ) AS a ON a.session_id = s.session_id\n  WHERE s.session_id = '${session}'\n)",
         "includeAll": false,
         "multi": false,
         "refresh": 2,
@@ -289,7 +289,7 @@
       "transparent": false,
       "options": {
         "mode": "html",
-        "content": "<a href=\"/d/cc-usage-ru?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Обзор</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">итоги и статус</span></a><a href=\"/d/cc-sessions-ru?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid #F46800;background:#22252b\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Сессии</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">список · таймлайн</span></a><a href=\"/d/cc-prompts?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Промпты</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">дорогие ходы</span></a><a href=\"/d/cc-efficiency?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Эффективность</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">советы и разбор затрат</span></a><a href=\"/d/cc-agents?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Агенты и навыки</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">субагенты, навыки</span></a><a href=\"/d/cc-tools?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Инструменты и файлы</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">вызовы, файлы, чтения</span></a><a href=\"/d/cc-health?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Состояние</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">задержки, хуки</span></a>"
+        "content": "<a href=\"/d/cc-usage-ru?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Обзор</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">итоги и статус</span></a><a href=\"/d/cc-sessions-ru?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid #F46800;background:#22252b\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Сессии</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">список · таймлайн</span></a><a href=\"/d/cc-prompts-ru?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Промпты</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">дорогие ходы</span></a><a href=\"/d/cc-efficiency-ru?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Эффективность</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">советы и разбор затрат</span></a><a href=\"/d/cc-agents-ru?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Агенты и навыки</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">субагенты, навыки</span></a><a href=\"/d/cc-tools-ru?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Инструменты и файлы</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">вызовы, файлы, чтения</span></a><a href=\"/d/cc-health-ru?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Состояние</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">задержки, хуки</span></a>"
       }
     },
     {
@@ -317,7 +317,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT\n    concat(if(t.label = '', '(no account)', t.label), '  ·  $', toString(round(t.h5, 2))) AS name,\n    round(100 * t.h5 / greatest(p.peak, t.h5, 0.000001)) AS pct\nFROM\n(\n    SELECT account_uuid,\n           argMax(account, ts) AS label,\n           sumIf(cost_usd, ts >= now() - INTERVAL 5 HOUR) AS h5,\n           sumIf(cost_usd, ts >= now() - INTERVAL 7 DAY) AS d7\n    FROM cc.api_requests\n    WHERE ts >= now() - INTERVAL 30 DAY\n    GROUP BY account_uuid\n) AS t\nLEFT JOIN\n(\n    SELECT account_uuid, max(w) AS peak\n    FROM\n    (\n        SELECT account_uuid,\n               sum(c) OVER (PARTITION BY account_uuid ORDER BY b RANGE BETWEEN 17999 PRECEDING AND CURRENT ROW) AS w\n        FROM\n        (\n            SELECT account_uuid, toUInt32(toStartOfInterval(ts, INTERVAL 10 MINUTE)) AS b, sum(cost_usd) AS c\n            FROM cc.api_requests\n            WHERE ts >= now() - INTERVAL 30 DAY\n            GROUP BY account_uuid, b\n        )\n    )\n    GROUP BY account_uuid\n) AS p ON p.account_uuid = t.account_uuid\nWHERE t.d7 > 0\nORDER BY t.h5 DESC, t.d7 DESC"
+          "rawSql": "SELECT\n    concat(if(t.label = '', '(нет аккаунта)', t.label), '  ·  $', toString(round(t.h5, 2))) AS name,\n    round(100 * t.h5 / greatest(p.peak, t.h5, 0.000001)) AS pct\nFROM\n(\n    SELECT account_uuid,\n           argMax(account, ts) AS label,\n           sumIf(cost_usd, ts >= now() - INTERVAL 5 HOUR) AS h5,\n           sumIf(cost_usd, ts >= now() - INTERVAL 7 DAY) AS d7\n    FROM cc.api_requests\n    WHERE ts >= now() - INTERVAL 30 DAY\n    GROUP BY account_uuid\n) AS t\nLEFT JOIN\n(\n    SELECT account_uuid, max(w) AS peak\n    FROM\n    (\n        SELECT account_uuid,\n               sum(c) OVER (PARTITION BY account_uuid ORDER BY b RANGE BETWEEN 17999 PRECEDING AND CURRENT ROW) AS w\n        FROM\n        (\n            SELECT account_uuid, toUInt32(toStartOfInterval(ts, INTERVAL 10 MINUTE)) AS b, sum(cost_usd) AS c\n            FROM cc.api_requests\n            WHERE ts >= now() - INTERVAL 30 DAY\n            GROUP BY account_uuid, b\n        )\n    )\n    GROUP BY account_uuid\n) AS p ON p.account_uuid = t.account_uuid\nWHERE t.d7 > 0\nORDER BY t.h5 DESC, t.d7 DESC"
         }
       ],
       "options": {
@@ -463,7 +463,7 @@
                 "value": [
                   {
                     "title": "Открыть все советы",
-                    "url": "/d/cc-efficiency?${__url_time_range}",
+                    "url": "/d/cc-efficiency-ru?${__url_time_range}",
                     "oneClick": true
                   }
                 ]
@@ -498,7 +498,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT if(tips = 0, 'none', concat(multiIf(top = 'cache', 'Cache rebuilds', top = 'repeated-read', 'Repeated reads', top = 'big-results', 'Big tool results', top = 'short-opus', 'Short Opus answers', top = 'agent-outlier', 'Costly agent run', top = 'denials', 'Denied tool calls', top = 'slow-hook', 'Slow hooks', top = 'slow-ttft', 'Slow first token', top), ' (', toString(n), ')')) AS most_frequent\nFROM\n(\n    SELECT sum(c) AS tips,\n           argMin(category, (-toInt64(c), category)) AS top,\n           max(c) AS n\n    FROM (SELECT category, count() AS c FROM cc.tips GROUP BY category)\n)"
+          "rawSql": "SELECT if(tips = 0, 'нет', concat(multiIf(top = 'cache', 'Пересборка кэша', top = 'repeated-read', 'Повтор чтений', top = 'big-results', 'Крупные выводы', top = 'short-opus', 'Opus на мелочи', top = 'agent-outlier', 'Дорогой агент', top = 'denials', 'Отклонения', top = 'slow-hook', 'Медленные хуки', top = 'slow-ttft', 'Долгий TTFT', top), ' (', toString(n), ')')) AS most_frequent\nFROM\n(\n    SELECT sum(c) AS tips,\n           argMin(category, (-toInt64(c), category)) AS top,\n           max(c) AS n\n    FROM (SELECT category, count() AS c FROM cc.tips GROUP BY category)\n)"
         }
       ],
       "options": {
@@ -521,7 +521,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "noValue": "none"
+          "noValue": "нет"
         },
         "overrides": [
           {
@@ -546,7 +546,7 @@
                 "value": [
                   {
                     "title": "Открыть все советы",
-                    "url": "/d/cc-efficiency?${__url_time_range}",
+                    "url": "/d/cc-efficiency-ru?${__url_time_range}",
                     "oneClick": true
                   }
                 ]
@@ -598,7 +598,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT count() AS sessions, concat(toString(countIf(s.last_event >= now() - INTERVAL 1 HOUR)), ' live in the last hour') AS name\nFROM cc.sessions AS s WHERE ('__all' IN (${account:singlequote}) OR s.account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR s.project = '${project}') AND s.requests > 0 AND s.last_prompt >= $__fromTime AND s.last_prompt <= $__toTime AND (('${actor}' = '__all' AND '${skill}' = '__all') OR s.session_id IN (SELECT session_id FROM cc.api_requests WHERE ('${actor}' != '__all' OR '${skill}' != '__all') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}')))"
+          "rawSql": "SELECT count() AS sessions, concat('активных за час: ', toString(countIf(s.last_event >= now() - INTERVAL 1 HOUR))) AS name\nFROM cc.sessions AS s WHERE ('__all' IN (${account:singlequote}) OR s.account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR s.project = '${project}') AND s.requests > 0 AND s.last_prompt >= $__fromTime AND s.last_prompt <= $__toTime AND (('${actor}' = '__all' AND '${skill}' = '__all') OR s.session_id IN (SELECT session_id FROM cc.api_requests WHERE ('${actor}' != '__all' OR '${skill}' != '__all') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}')))"
         }
       ],
       "options": {
@@ -658,7 +658,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT quantileExact(0.5)(a.ms) / 1000 AS seconds, concat(toString(toUInt64(round(quantileExact(0.5)(s.requests)))), ' turns') AS name\nFROM cc.sessions AS s\nLEFT JOIN\n(\n  SELECT session_id,\n         arraySum(arrayMap((c, x, y) -> if(c > 0, y - x, 0), arrayCumSum(arrayMap(q -> q.2, p)), arrayMap(q -> q.1, p), arrayPushBack(arrayPopFront(arrayMap(q -> q.1, p)), toInt64(0)))) AS ms\n  FROM\n  (\n    SELECT session_id, arraySort(arrayConcat(groupArray((a_s, toInt8(1))), groupArray((a_e, toInt8(-1))))) AS p\n    FROM\n    (\n      SELECT session_id, toUnixTimestamp64Milli(ts) - toInt64(duration_ms) AS a_s, toUnixTimestamp64Milli(ts) AS a_e\n      FROM cc.events_raw\n      WHERE event IN ('api_request', 'tool_result')\n        AND session_id IN (SELECT session_id FROM cc.sessions WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND requests > 0 AND last_prompt >= $__fromTime AND last_prompt <= $__toTime)\n    )\n    GROUP BY session_id\n  )\n) AS a ON a.session_id = s.session_id\nWHERE ('__all' IN (${account:singlequote}) OR s.account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR s.project = '${project}') AND s.requests > 0 AND s.last_prompt >= $__fromTime AND s.last_prompt <= $__toTime AND (('${actor}' = '__all' AND '${skill}' = '__all') OR s.session_id IN (SELECT session_id FROM cc.api_requests WHERE ('${actor}' != '__all' OR '${skill}' != '__all') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}')))"
+          "rawSql": "SELECT quantileExact(0.5)(a.ms) / 1000 AS seconds, concat('ходов: ', toString(toUInt64(round(quantileExact(0.5)(s.requests))))) AS name\nFROM cc.sessions AS s\nLEFT JOIN\n(\n  SELECT session_id,\n         arraySum(arrayMap((c, x, y) -> if(c > 0, y - x, 0), arrayCumSum(arrayMap(q -> q.2, p)), arrayMap(q -> q.1, p), arrayPushBack(arrayPopFront(arrayMap(q -> q.1, p)), toInt64(0)))) AS ms\n  FROM\n  (\n    SELECT session_id, arraySort(arrayConcat(groupArray((a_s, toInt8(1))), groupArray((a_e, toInt8(-1))))) AS p\n    FROM\n    (\n      SELECT session_id, toUnixTimestamp64Milli(ts) - toInt64(duration_ms) AS a_s, toUnixTimestamp64Milli(ts) AS a_e\n      FROM cc.events_raw\n      WHERE event IN ('api_request', 'tool_result')\n        AND session_id IN (SELECT session_id FROM cc.sessions WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND requests > 0 AND last_prompt >= $__fromTime AND last_prompt <= $__toTime)\n    )\n    GROUP BY session_id\n  )\n) AS a ON a.session_id = s.session_id\nWHERE ('__all' IN (${account:singlequote}) OR s.account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR s.project = '${project}') AND s.requests > 0 AND s.last_prompt >= $__fromTime AND s.last_prompt <= $__toTime AND (('${actor}' = '__all' AND '${skill}' = '__all') OR s.session_id IN (SELECT session_id FROM cc.api_requests WHERE ('${actor}' != '__all' OR '${skill}' != '__all') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}')))"
         }
       ],
       "options": {
@@ -778,7 +778,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT 100 * countIf(t.calls > 0 AND t.failed >= 0.05 * t.calls) / greatest(count(), 1) AS share, 'any tool error rate ≥ 5%' AS name\nFROM (SELECT s.session_id AS session_id FROM cc.sessions AS s WHERE ('__all' IN (${account:singlequote}) OR s.account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR s.project = '${project}') AND s.requests > 0 AND s.last_prompt >= $__fromTime AND s.last_prompt <= $__toTime AND (('${actor}' = '__all' AND '${skill}' = '__all') OR s.session_id IN (SELECT session_id FROM cc.api_requests WHERE ('${actor}' != '__all' OR '${skill}' != '__all') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}')))) AS x\nLEFT JOIN (SELECT session_id, count() AS calls, countIf(NOT success) AS failed FROM cc.tool_calls GROUP BY session_id) AS t ON t.session_id = x.session_id"
+          "rawSql": "SELECT 100 * countIf(t.calls > 0 AND t.failed >= 0.05 * t.calls) / greatest(count(), 1) AS share, 'ошибок инструментов ≥ 5% вызовов' AS name\nFROM (SELECT s.session_id AS session_id FROM cc.sessions AS s WHERE ('__all' IN (${account:singlequote}) OR s.account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR s.project = '${project}') AND s.requests > 0 AND s.last_prompt >= $__fromTime AND s.last_prompt <= $__toTime AND (('${actor}' = '__all' AND '${skill}' = '__all') OR s.session_id IN (SELECT session_id FROM cc.api_requests WHERE ('${actor}' != '__all' OR '${skill}' != '__all') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}')))) AS x\nLEFT JOIN (SELECT session_id, count() AS calls, countIf(NOT success) AS failed FROM cc.tool_calls GROUP BY session_id) AS t ON t.session_id = x.session_id"
         }
       ],
       "options": {
@@ -857,7 +857,7 @@
         "cellHeight": "sm",
         "sortBy": [
           {
-            "displayName": "Last prompt",
+            "displayName": "Посл. промпт",
             "desc": true
           }
         ]
@@ -1236,7 +1236,7 @@
               },
               {
                 "id": "custom.width",
-                "value": 70
+                "value": 85
               },
               {
                 "id": "custom.cellOptions",
@@ -1497,7 +1497,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT count() AS turns, concat(toString(uniqExact(prompt_id)), ' prompts') AS name\nFROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND '${session}' != '__all' AND $__timeFilter(ts)"
+          "rawSql": "SELECT count() AS turns, concat('промптов: ', toString(uniqExact(prompt_id))) AS name\nFROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND '${session}' != '__all' AND $__timeFilter(ts)"
         }
       ],
       "options": {
@@ -1557,7 +1557,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT 100 * sum(cache_read_tokens) / greatest(sum(cache_read_tokens + input_tokens + cache_creation_tokens), 1) AS hit_rate, '≥ 90% good' AS name\nFROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND '${session}' != '__all' AND $__timeFilter(ts)"
+          "rawSql": "SELECT 100 * sum(cache_read_tokens) / greatest(sum(cache_read_tokens + input_tokens + cache_creation_tokens), 1) AS hit_rate, '≥ 90% хорошо' AS name\nFROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND '${session}' != '__all' AND $__timeFilter(ts)"
         }
       ],
       "options": {
@@ -1635,7 +1635,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT 100 * countIf(NOT success) / greatest(count(), 1) AS error_rate, concat(toString(countIf(NOT success)), ' of ', toString(count()), ' calls') AS name\nFROM cc.tool_calls WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND '${session}' != '__all' AND $__timeFilter(ts)"
+          "rawSql": "SELECT 100 * countIf(NOT success) / greatest(count(), 1) AS error_rate, concat('ошибок: ', toString(countIf(NOT success)), ' из ', toString(count())) AS name\nFROM cc.tool_calls WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND '${session}' != '__all' AND $__timeFilter(ts)"
         }
       ],
       "options": {
@@ -1772,7 +1772,7 @@
                         "index": 0
                       },
                       "1": {
-                        "text": "prompt",
+                        "text": "промпт",
                         "color": "#ccccdc",
                         "index": 1
                       }
@@ -1811,7 +1811,7 @@
                         "index": 0
                       },
                       "1": {
-                        "text": "request",
+                        "text": "запрос",
                         "color": "#B877D9",
                         "index": 1
                       }
@@ -1850,7 +1850,7 @@
                         "index": 0
                       },
                       "1": {
-                        "text": "subagent",
+                        "text": "субагент",
                         "color": "#FF9830",
                         "index": 1
                       }
@@ -1889,12 +1889,12 @@
                         "index": 0
                       },
                       "1": {
-                        "text": "ok",
+                        "text": "ок",
                         "color": "#73BF69",
                         "index": 1
                       },
                       "2": {
-                        "text": "error",
+                        "text": "ошибка",
                         "color": "#F2495C",
                         "index": 2
                       }
@@ -2043,7 +2043,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT p.started AS started,\n       if(p.prompt IN ('', '<REDACTED>'), '(text not logged)', leftUTF8(replaceAll(p.prompt, '\\n', ' '), 200)) AS prompt,\n       p.session_id AS session_id,\n       p.input + p.output + p.cache_creation AS tokens, round(p.cost_usd, 3) AS cost_usd, p.tool_calls AS tools\nFROM cc.prompts AS p\nWHERE ('__all' IN (${account:singlequote}) OR p.account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR p.project = '${project}') AND ('${session}' = '__all' OR p.session_id = '${session}') AND p.requests > 0 AND p.started >= $__fromTime AND p.started <= $__toTime AND (('${actor}' = '__all' AND '${skill}' = '__all') OR (p.session_id, p.prompt_id) IN (SELECT session_id, prompt_id FROM cc.api_requests WHERE ('${actor}' != '__all' OR '${skill}' != '__all') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}'))) AND '${session}' != '__all'\nORDER BY p.started\nLIMIT 500"
+          "rawSql": "SELECT p.started AS started,\n       if(p.prompt IN ('', '<REDACTED>'), '(текст не записан)', leftUTF8(replaceAll(p.prompt, '\\n', ' '), 200)) AS prompt,\n       p.session_id AS session_id,\n       p.input + p.output + p.cache_creation AS tokens, round(p.cost_usd, 3) AS cost_usd, p.tool_calls AS tools\nFROM cc.prompts AS p\nWHERE ('__all' IN (${account:singlequote}) OR p.account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR p.project = '${project}') AND ('${session}' = '__all' OR p.session_id = '${session}') AND p.requests > 0 AND p.started >= $__fromTime AND p.started <= $__toTime AND (('${actor}' = '__all' AND '${skill}' = '__all') OR (p.session_id, p.prompt_id) IN (SELECT session_id, prompt_id FROM cc.api_requests WHERE ('${actor}' != '__all' OR '${skill}' != '__all') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}'))) AND '${session}' != '__all'\nORDER BY p.started\nLIMIT 500"
         }
       ],
       "options": {
@@ -2051,7 +2051,7 @@
         "cellHeight": "sm",
         "sortBy": [
           {
-            "displayName": "At",
+            "displayName": "Время",
             "desc": false
           }
         ]
@@ -2128,7 +2128,7 @@
                 "value": [
                   {
                     "title": "Открыть в Промптах",
-                    "url": "/d/cc-prompts?${__url_time_range}&${account:queryparam}&${project:queryparam}&var-session=${__data.fields.session_id:percentencode}&var-actor=$__all&var-skill=$__all"
+                    "url": "/d/cc-prompts-ru?${__url_time_range}&${account:queryparam}&${project:queryparam}&var-session=${__data.fields.session_id:percentencode}&var-actor=$__all&var-skill=$__all"
                   }
                 ]
               }
@@ -2210,7 +2210,7 @@
               },
               {
                 "id": "custom.width",
-                "value": 70
+                "value": 110
               }
             ]
           }

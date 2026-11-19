@@ -58,7 +58,16 @@
       "1h"
     ]
   },
-  "links": [],
+  "links": [
+    {
+      "type": "link",
+      "title": "RU",
+      "tooltip": "Russian version",
+      "url": "/d/cc-agents-ru",
+      "keepTime": true,
+      "includeVars": true
+    }
+  ],
   "templating": {
     "list": [
       {
