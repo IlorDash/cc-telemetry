@@ -60,25 +60,26 @@ the docker service at boot.
 
 | File | Setting | Value |
 | --- | --- | --- |
-| `config.d` | `asynchronous_metric_log`, `metric_log`, `query_thread_log`, `part_log`, `session_log`, `trace_log`, `text_log` | `remove="1"` (not written) |
-| `config.d` | `query_log` TTL | `event_date + INTERVAL 3 DAY DELETE` |
+| `config.d` | `asynchronous_metric_log`, `metric_log`, `query_thread_log`, `part_log`, `session_log`, `trace_log`, `text_log`, `query_log`, `query_views_log` | `remove="1"` (not written) |
 | `config.d` | `max_server_memory_usage` / `mark_cache_size` / `uncompressed_cache_size` | 3 GB / 256 MiB / 0 |
 | `config.d` | `max_concurrent_queries` | 8 |
 | `config.d` | `merge_tree`: `number_of_free_entries_in_pool_to_lower_max_size_of_merge`, `..._to_execute_mutation` | 2 (defaults 8 / 20 exceed the smaller pool) |
 | `users.d` | `max_threads` / `max_memory_usage` (per query) | 3 / 1.5 GB |
-| `users.d` | `query_profiler_real_time_period_ns`, `query_profiler_cpu_time_period_ns`, `log_query_threads` | 0 |
+| `users.d` | `query_profiler_real_time_period_ns`, `query_profiler_cpu_time_period_ns`, `log_query_threads`, `log_queries`, `log_query_views` | 0 |
 | `users.d` | `background_pool_size` | 2 (profile-level: see `pending-bugs.md`) |
 
 - On 22.3.20.29 all `users.d` values and both `merge_tree` thresholds show as changed in
-  `system.settings` / `system.merge_tree_settings`, `query_log` carries the TTL, `trace_log`
-  stays as an empty table (observed 2026-11-17).
+  `system.settings` / `system.merge_tree_settings`, `trace_log` stays as an empty table
+  (observed 2026-11-17); `log_queries` / `log_query_views` = 0 (observed 2026-11-19).
+- Leftover `system.query_log*` / `system.query_views_log*` tables of a server that logged queries
+  before are not dropped by anything: `setup-server.sh` prints the `DROP` command (`modules/server-update.md`).
 - A dashboard query needing more than 1.5 GB fails instead of slowing the server down; the
   backfill runs per month of data for the same reason.
 
 ## Collector pipeline
 
 ```
-logs:    otlp → memory_limiter(512 MiB) → attributes/drop_response → batch(2 s, 1000) → clickhouse
+logs:    otlp → memory_limiter(512 MiB) → attributes/drop_response → batch(30 s, 1000) → clickhouse
 metrics: otlp → memory_limiter → batch → clickhouse
 ```
 - `attributes/drop_response` deletes `response` (Claude's reply text, which clients send together
@@ -87,15 +88,24 @@ metrics: otlp → memory_limiter → batch → clickhouse
 - clickhouse exporter: `tcp://clickhouse:9000`, `create_schema: true` → creates `otel.otel_logs`
   and `otel.otel_metrics_{sum,gauge,histogram,exponential_histogram,summary}` at collector start;
   retry up to 300 s and a 10000-item queue, then data is dropped.
+- `ttl: 4320h` (180 days) goes into the DDL only when the exporter creates a table; existing
+  tables get the TTL from `setup-server.sh` (`migrate_storage`) or by hand (README).
+- Batch 30 s: an event shows on the dashboard up to ~30 s late (fewer, larger inserts → fewer
+  parts and merges on the SD card).
 - Receivers have **no authentication**.
 
 ## Storage
 
 - `otel.otel_logs`: `Timestamp DateTime64(9)`, `ServiceName LowCardinality(String)`,
   `ResourceAttributes` / `LogAttributes Map(LowCardinality(String), String)`, `Body`, `ScopeName`, …
-  No TTL: kept indefinitely in volume `clickhouse-data`. `ServiceName` = `claude-code` (Claude
+  `PARTITION BY toDate(TimestampTime)`, `TTL TimestampTime + toIntervalDay(180)` (metrics:
+  `toDateTime(TimeUnix)`), in volume `clickhouse-data`. `ServiceName` = `claude-code` (Claude
   Code events) or `cc-session-meta` (client hook); the views filter it.
-- `cc.events_t` (MergeTree, `PARTITION BY toYYYYMM(ts)`, `ORDER BY (event, ts)`): the `claude-code`
+- Retention 180 days, written twice — keep in step: `TTL ... INTERVAL 180 DAY` of `cc.events_t`
+  (`schema.sql`; `setup-server.sh` reads its days as `RETENTION_DAYS`, default 180) and `ttl: 4320h`
+  (`otel-collector.yaml`).
+- `cc.events_t` (MergeTree, `PARTITION BY toDate(ts)`, `ORDER BY (event, ts)`,
+  `TTL toDateTime(ts) + INTERVAL 180 DAY`, `ttl_only_drop_parts = 1`): the `claude-code`
   rows again, flattened — data is stored twice. `cc.session_project_t`, `cc.tips_t`: small, rebuilt
   by `cc-refresh`. Columns and rules: `modules/telemetry-data.md`.
 - `backup.sh` dumps only `otel.*`; `cc.events_t` holds nothing extra. A `restore` into

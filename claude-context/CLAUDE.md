@@ -16,7 +16,7 @@ for each OS: server `setup-server.ps1` / `setup-server.sh` (also `--update` on L
 1. `claude-context/context-claude.md` — hub (glossary, data flow, module map, conventions,
    ledger). Always read first.
 2. The module file of your area in `claude-context/modules/`: `stack`, `telemetry-data`,
-   `materialization`, `dashboard`, `setup-scripts`.
+   `materialization`, `dashboard`, `setup-scripts`, `server-update`.
 3. Source last.
 
 Ledger: `claude-context/pending-bugs.md` (suspected bugs and unverified behaviour).

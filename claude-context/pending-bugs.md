@@ -36,6 +36,11 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
   `clickhouse` running on the old values (its service definition is unchanged, so `compose up -d`
   does not recreate it). Both are single-file bind mounts: git replaces the file, the running
   container likely keeps the old inode until a restart (unverified).
+- **?** `migrate_storage` was never exercised by a real `--update` run (dump → `ttl-expected.tsv` →
+  migration → `finish_update` with the TTL tolerance).
+- **M** `finish_update` lowers the bar per table by its `ttl-expected.tsv` count (rows older than
+  the retention): a loss of recent rows up to that count is reported `OK` ("removed by the retention
+  TTL") instead of `LOST`.
 
 ## setup-client.ps1
 
@@ -56,6 +61,8 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
   A plain `setup-server.sh --update` (`compose up -d`) recreates only changed containers, so the
   collector restarts only when its service definition (image tag, environment, ports) changes,
   or when the pulled commits changed `otel-collector.yaml` (`reload_changed_config`).
+- **?** The exporter's `ttl: 4320h` in the `CREATE TABLE` of `otel.*` on a fresh install is not
+  verified (the live tables got their TTL by `ALTER ... MODIFY TTL`).
 
 ## ClickHouse config (`clickhouse/config.d/`, `clickhouse/users.d/`)
 
@@ -63,8 +70,10 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
   (shows as changed in `system.settings`, observed 2026-11-17; the actual pool size was not
   measured); in 25.8 it is a server-level setting, so in a profile it is likely ignored and the
   2-thread merge limit does not apply on 25.8 servers. Unverified on 25.8.
-- **L** On 22.3 adding the `query_log` TTL renamed the old table to `system.query_log_0` (~78k rows
-  2026-11-14..16, observed 2026-11-17); it has no TTL and stays until dropped (`DROP`: user's "yes").
+- **L** Stale `system.query_log*` / `system.query_views_log*` tables (e.g. `query_log_0`, left on 22.3 by
+  the old `query_log` TTL, ~78k rows observed 2026-11-17) stay on servers that had them, as the log is
+  now off. `setup-server.sh` only warns with the `DROP TABLE ... SYNC` command; dropping needs the
+  user's "yes".
 
 ## AI setup (`claude-context/settings.json`)
 
@@ -93,6 +102,9 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
 
 - **?** Run only on ClickHouse 22.3.20.29 (2026-11-18): `schema.sql`, the backfill, `refresh.sql`
   (`EXCHANGE TABLES`) and the new views never ran on 23.3 or 25.8.
+- **?** The day-partitioned `cc.events_t` (`PARTITION BY toDate(ts)`, TTL, `ttl_only_drop_parts`)
+  and `cc.events_mv` writing to the new table by name after `EXCHANGE TABLES` (`migrate_storage`)
+  are proven only on 22.3.20.29; ClickHouse 25.8 untested.
 - **?** The `throwIf` abort path of `refresh.sql` (duplicate `session_id` → no swap, old table
   kept, next run drops the leftover `_new`) was never triggered.
 - **?** A very large first backfill (upgrade over a big history) was not timed against the setup

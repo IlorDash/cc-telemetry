@@ -21,6 +21,7 @@ ClickHouse and shows them in Grafana. Everything stays on the LAN. Single branch
 | update | `setup-server.sh --update`: safety dump + row counts, `git pull --ff-only`, re-run, restart of collector/Grafana when their config changed, row-count check |
 | backfill | `clickhouse/backfill.sql`: copies `otel.otel_logs` rows missing from `cc.events_t` (not a backfill from transcripts) |
 | refresh | `cc-refresh` service rebuilding `cc.session_project_t` and `cc.tips_t` every 300 s; the inferred project of a new session and the tips lag ≤ 5 min |
+| retention | 180-day TTL on `otel.*` and `cc.events_t` (day partitions); older installs get it from `setup-server.sh` `migrate_storage` (every run), Windows by hand |
 | old ARM | `aarch64` without `lrcpc` (Raspberry Pi 4): only ClickHouse ≤ 22.3 runs → `CLICKHOUSE_VERSION=22.3.20.29` |
 
 ## Data flow
@@ -79,7 +80,8 @@ Grafana :3000 (host port GRAFANA_PORT)  7 dashboards, shared variables + links b
 | `modules/telemetry-data.md` | events and attributes Claude Code sends, session-meta records of the client hook, the `cc.*` views (`clickhouse/views.sql`) and `cc.tips` rules (`clickhouse/refresh.sql`) |
 | `modules/materialization.md` | `cc.events_t` + `cc.events_mv` (`clickhouse/schema.sql`), backfill (`backfill.sql`, `init-views.sh`), `cc-refresh` (`refresh.sql`, `refresh-loop.sh`), migration rule, health checks |
 | `modules/dashboard.md` | `grafana/dashboards/*.json` (7 dashboards): uids, shared variables and links bar, panels, fixed panel ids, drill-down links, `check-dashboard.js` |
-| `modules/setup-scripts.md` | `setup-server.ps1`, `setup-server.sh` (incl. `--update`), `client/setup-client.{ps1,sh}` (incl. the session-meta hook), `client/*.json`, `linux-server-tools/*.sh`, keepalive, LAN access |
+| `modules/setup-scripts.md` | `setup-server.ps1`, `setup-server.sh` (steps, `.env` keys, LAN), `client/setup-client.{ps1,sh}` (incl. the session-meta hook), `client/*.json`, `linux-server-tools/*.sh`, keepalive, LAN access |
+| `modules/server-update.md` | `setup-server.sh --update` (safety dump, pull, re-run, `reload_changed_config`, row-count check) and `migrate_storage` (retention TTL, day partitions; runs on every `setup-server.sh` run, not only `--update`) |
 
 ## Key conventions (details in `guides/`, index in CLAUDE.md)
 

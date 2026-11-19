@@ -1,6 +1,6 @@
 ---
 name: context-auditor
-description: Use PROACTIVELY whenever the user asks to create, update or audit claude-context/ module files (e.g. "update claude-context for the session filter") — dispatch this agent yourself rather than editing those files directly. Do NOT invoke as the closing step of a feature or on any other initiative of your own; a claude-context update is user-initiated only. Audits context-claude.md, pending-bugs.md and the module files under claude-context/modules/ (stack, telemetry-data, materialization, dashboard, setup-scripts) against the real code, config and the live stack, fixes what is stale, and reports what changed.
+description: Use PROACTIVELY whenever the user asks to create, update or audit claude-context/ module files (e.g. "update claude-context for the session filter") — dispatch this agent yourself rather than editing those files directly. Do NOT invoke as the closing step of a feature or on any other initiative of your own; a claude-context update is user-initiated only. Audits context-claude.md, pending-bugs.md and the module files under claude-context/modules/ (stack, telemetry-data, materialization, dashboard, setup-scripts, server-update) against the real code, config and the live stack, fixes what is stale, and reports what changed.
 tools: Read, Grep, Glob, Edit, Write, Bash
 model: opus
 ---
@@ -55,6 +55,7 @@ All under `claude-context/`.
 | `modules/materialization.md` | `clickhouse/schema.sql`, `backfill.sql`, `refresh.sql`, `refresh-loop.sh`, `init-views.sh`: tables, MV, backfill, `cc-refresh`, migration |
 | `modules/dashboard.md` | `grafana/dashboards/*.json` (seven dashboards): variables, rows, panels, links; `scripts/check-dashboard.js` |
 | `modules/setup-scripts.md` | `setup-server.ps1`, `setup-server.sh`, `client/setup-client.ps1`, `client/setup-client.sh`, `client/*.json`, `linux-server-tools/*.sh` |
+| `modules/server-update.md` | `setup-server.sh` `--update` (`run_update`, `finish_update`, `reload_changed_config`) and `migrate_storage` (`migrate_events_t`, `warn_old_query_logs`) |
 | `pending-bugs.md` | suspected bugs and unverified behaviour, grouped by area |
 
 ## Conventions

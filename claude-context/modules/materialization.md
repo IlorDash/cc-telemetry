@@ -24,7 +24,7 @@ cc.api_requests, cc.tool_calls, cc.events, cc.events_raw ──refresh.sql──
 
 | Object | Engine / key | Content |
 | --- | --- | --- |
-| `cc.events_t` | MergeTree, `PARTITION BY toYYYYMM(ts)`, `ORDER BY (event, ts)` | the 36 columns of `cc.events_raw` (low-cardinality text as `LowCardinality(String)`, `tool_input`/`tool_parameters`/`prompt` `ZSTD(1)`) + `seq`, `abs_path`, `path_cand`, `bash_cmd`; no `project` column |
+| `cc.events_t` | MergeTree, `PARTITION BY toDate(ts)`, `ORDER BY (event, ts)`, `TTL toDateTime(ts) + INTERVAL 180 DAY`, `ttl_only_drop_parts = 1` (whole days dropped) | the 36 columns of `cc.events_raw` (low-cardinality text as `LowCardinality(String)`, `tool_input`/`tool_parameters`/`prompt` `ZSTD(1)`) + `seq`, `abs_path`, `path_cand`, `bash_cmd`; no `project` column |
 | `cc.session_project_t` | MergeTree `ORDER BY session_id` | `session_id`, `project` (inferred) |
 | `cc.tips_t` | MergeTree `ORDER BY tuple()` | the `cc.tips` columns |
 
@@ -46,6 +46,14 @@ Insert-time columns (`tool_result` only, else `''`):
 them: `IF NOT EXISTS` skips the change and stored rows keep the old values. Needs a migration by
 hand (header of `schema.sql`): dump → `DROP VIEW cc.events_mv` → new table filled from
 `otel.otel_logs` + `EXCHANGE TABLES` → new MV → backfill for rows that arrived in between.
+
+**Exception — layout only** (partition key, TTL; same columns): `setup-server.sh` `migrate_storage`
+migrates an old-layout `cc.events_t` on every run after views-init (`modules/server-update.md`):
+copy from the old table month by month (not from `otel.otel_logs`) into `cc.events_t_new` (DDL cut
+from `schema.sql`) → `EXCHANGE TABLES` (`cc.events_mv` keeps writing to `cc.events_t` by name, no
+MV rebuild) → anti-join top-up → per-month check → `DROP` old. Windows / other setups: by hand (README).
+- One `INSERT` over > 100 daily partitions is refused (`max_partitions_per_insert_block`):
+  copies into `cc.events_t` go per month.
 
 ## views-init (`init-views.sh`, `set -euo pipefail`)
 
