@@ -50,7 +50,7 @@ with Windows clients.
 | --- | --- |
 | Install the server | [Server](server.md) |
 | Connect a PC | [Clients](clients.md) |
-| Read a dashboard | Dashboards (not written yet) |
+| Read a dashboard | [Dashboards](dashboards.md) |
 | Fix a failed step | Troubleshooting (not written yet) |
 | Know what is collected | What is sent (not written yet) |
 

@@ -97,9 +97,15 @@ plugins:
             Installation: Установка
             Server: Сервер
             Clients: Клиенты
+            Using the dashboards: Работа с дашбордами
+            Dashboards: Дашборды
+            Tips: Подсказки
 
 nav:
   - Overview: index.md
   - Installation:
       - Server: server.md
       - Clients: clients.md
+  - Using the dashboards:
+      - Dashboards: dashboards.md
+      - Tips: tips.md
