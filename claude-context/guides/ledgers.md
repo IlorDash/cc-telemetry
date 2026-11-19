@@ -3,7 +3,7 @@
 Who edits `pending-bugs.md`, and how ledger work is done from a `cc-telemetry-<name>` worktree.
 
 ## Ownership
-- `pending-bugs.md` — reviewer **adds**, developer **removes** the entries it fixes,
+- `pending-bugs.md` — reviewer and mr-reviewer **add**, developer **removes** the entries it fixes,
   context-auditor **prunes** on a requested audit. Nobody else edits it.
 - Fixing a `pending-bugs.md` entry is a normal "fix Y"; never fix ledger bugs unasked.
 

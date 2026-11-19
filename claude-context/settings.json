@@ -32,6 +32,7 @@
       "Bash(git -C * branch --show-current)",
       "Bash(node claude-context/scripts/check-dashboard.js*)",
       "Bash(py -3 claude-context/skills/commit-message/scripts/check-msg.py *)",
+      "Bash(py -3 claude-context/skills/docs-update/scripts/check-readme.py*)",
       "Bash(git worktree list*)"
     ],
     "deny": [

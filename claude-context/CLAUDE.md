@@ -91,6 +91,8 @@ it as `model` on the Agent call.
 | `developer` | sonnet | implements features/fixes in views, dashboard, scripts, config, README; verifies on the live stack | code, README; removes `pending-bugs.md` entries it fixes |
 | `reviewer` | sonnet | reviews the diff vs `HEAD`; "review only" and "bug hunt in <area>" | only appends to `pending-bugs.md` |
 | `context-auditor` | opus | keeps `context-claude.md`, `modules/*.md` and the ledger in sync with the code | `claude-context/` docs only |
+| `docs-auditor` | sonnet | user-initiated README update/audit (skill `docs-update`) | `README.md` only |
+| `mr-reviewer` | opus | whole-branch review `<base>...<source>` before a PR; never in the feature chain | only appends to `pending-bugs.md` |
 
 **Plan first** (`guides/feature-planning.md`): every non-trivial "implement X" / "fix Y" starts
 with a plan the main session writes itself (chat or `claude-context/plans/<name>.md`) and the
@@ -109,10 +111,14 @@ firewall, WSL, `.env` or user settings files, or more than ~10 lines. In doubt �
 "в отдельном worktree" / the main folder already holds someone's uncommitted work →
 `parallel-task` skill (`start`; "фича закончена" → `finish`). "review only" → reviewer. "find bugs in X" /
 "bug hunt" → reviewer in bug-hunt mode (ledger only). Never fix ledger bugs unasked.
+"update / audit the README" → docs-auditor (after context-auditor when both are asked; pass its
+report). "review the branch / PR" → mr-reviewer. "PR description" → `mr-description` skill, which
+runs mr-reviewer first as the **PR review gate**: BLOCKED → no description.
 
 **Context updates are user-initiated only** — never as the closing step of a feature; pass the
 developer's "Docs impact" to the user instead. "update claude-context / context" →
-context-auditor. Never edit module files directly.
+context-auditor. Never edit module files directly. The same holds for docs-auditor: never as the
+closing step of a feature (the developer keeps README in step inside its own change).
 
 **Parallel-task worktree** (`..\cc-telemetry-<name>`, `skills/parallel-task`): `claude-context/`
 is locked there for the session and every subagent (hook `guard-worktree-context.py`) — ledger

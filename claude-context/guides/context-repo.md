@@ -11,12 +11,13 @@ claude-context/                 .claude  ── directory junction ──> claud
 ├── CLAUDE.md                   (so .claude/CLAUDE.md, .claude/settings.json,
 ├── settings.json                .claude/agents/<name>.md, .claude/skills/<name>,
 ├── .gitignore                   .claude/hooks/... all resolve to the files on the left)
-├── agents/*.md                 developer, reviewer, context-auditor
-├── skills/<name>/              commit-message, parallel-task
+├── agents/*.md                 developer, reviewer, context-auditor, docs-auditor, mr-reviewer
+├── skills/<name>/              commit-message, parallel-task, docs-update, mr-description
 ├── hooks/                      guard-secrets.py, guard-worktree-context.py (PreToolUse, wired in settings.json)
 ├── guides/*.md                 rules moved out of CLAUDE.md, read on demand
 ├── scripts/                    check-dashboard.js (verification helper)
 ├── plans/                      feature plans (guides/feature-planning.md)
+├── pull-requests/              git-ignored: PR descriptions drafted by mr-description
 ├── context-claude.md
 ├── modules/*.md
 ├── pending-bugs.md
