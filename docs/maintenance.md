@@ -85,6 +85,14 @@ when you no longer need them. If Docker runs through `sudo`, the dump files belo
 An update also publishes port `4318` and opens it in the firewall on a LAN server, so an older
 server gets it too.
 
+!!! warning "Grafana on an older server"
+    When `.env` has `OTLP_BIND=0.0.0.0` but no `GRAFANA_BIND` (written by an older version of
+    the script), the update publishes Grafana on `0.0.0.0` as well and prints `WARN GRAFANA_BIND
+    was missing and OTLP_BIND=0.0.0.0: Grafana is now published on 0.0.0.0, reachable from the
+    LAN (it was local-only before) ...`. To keep Grafana on this PC, set `GRAFANA_BIND=127.0.0.1` in
+    `.env` and run `bash setup-server.sh` again, or pass `--local-only` to close the OTLP ports
+    too. See [the server page](server.md#ports-and-access-on-linux).
+
 ### Windows
 
 The Windows script has no `--update`. Pull the new version and run the script again:
@@ -214,7 +222,7 @@ Deleting data is described on [the Data and privacy page](data.md#delete-data).
 | Use another Grafana port (Linux) | `bash setup-server.sh --grafana-port 3001`. The port is kept as `GRAFANA_PORT` in `.env` |
 | Use another Grafana port (Windows) | Not supported: the script checks and prints port `3000` only |
 | Use other OTLP ports | Not supported: `4317` and `4318` are fixed |
-| Keep the server on this PC only, or open it to the LAN (Linux) | `bash setup-server.sh --local-only` or `--lan`. See [the server page](server.md#ports-and-access-on-linux) |
+| Keep the server on this PC only, or open it to the LAN (Linux) | `bash setup-server.sh --local-only` or `--lan`. To change only Grafana, set `GRAFANA_BIND` in `.env` (`127.0.0.1` or `0.0.0.0`) and run the script again; it keeps the value. See [the server page](server.md#ports-and-access-on-linux) |
 | Open the server to the LAN (Windows) | `setup-server.ps1 -EnableLan` |
 | Use another ClickHouse version (Linux) | `bash setup-server.sh --clickhouse-version <tag>`. A data volume written by a newer ClickHouse does not start with an older one |
 | Change the Grafana admin password | The repo has no switch for it. `GRAFANA_ADMIN_PASSWORD` in `.env` is read by Grafana when it creates its database on the first start, so editing `.env` later does not change the password. Change it in Grafana (your profile), or reset it with `grafana cli admin reset-admin-password` inside the grafana container |

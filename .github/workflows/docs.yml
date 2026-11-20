@@ -67,6 +67,11 @@ jobs:
   build:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    # configure-pages reads the Pages site (GET /repos/{owner}/{repo}/pages), which needs
+    # pages: read. Without `enablement` it never writes, so write is not needed here.
+    permissions:
+      contents: read
+      pages: read
     steps:
       - uses: actions/checkout@v4
       - id: pages

@@ -127,9 +127,28 @@ lines `OTLP_BIND` (ports 4317 and 4318) and `GRAFANA_BIND` (Grafana) in `.env`, 
 (every PC that can reach this host) or `127.0.0.1` (this PC only). The firewall rules only let
 the traffic in; they do not limit who can connect.
 
-A re-run without `--lan` or `--local-only` keeps the values already in `.env`. `--local-only`
-does not remove firewall rules added earlier: remove them yourself with
-`ufw delete allow <port>/tcp` or `firewall-cmd --remove-port=<port>/tcp`.
+A re-run without `--lan` or `--local-only` keeps the values already in `.env`, so it does not
+change who can connect. `--local-only` does not remove firewall rules added earlier: remove them
+yourself with `ufw delete allow <port>/tcp` or `firewall-cmd --remove-port=<port>/tcp`.
+
+!!! warning "An older `.env` without `GRAFANA_BIND`"
+    The one case where a re-run (or `--update`) changes the exposure: `.env` from an older
+    version of the script has `OTLP_BIND` but no `GRAFANA_BIND`. The script then copies
+    `OTLP_BIND` into `GRAFANA_BIND`. With `OTLP_BIND=0.0.0.0`, Grafana, which was local-only
+    before, becomes reachable from the LAN, and the script prints
+    `WARN GRAFANA_BIND was missing and OTLP_BIND=0.0.0.0: Grafana is now published on 0.0.0.0,
+    reachable from the LAN (it was local-only before). To keep it on this PC: re-run with
+    --local-only.`
+
+    To keep Grafana on this PC and leave the OTLP ports as they are, set `GRAFANA_BIND=127.0.0.1`
+    in `.env` and run the script again: it keeps the value. `--local-only` also closes 4317 and
+    4318.
+
+!!! note "Starting the stack without the script"
+    With a plain `docker compose up -d`, the values missing from `.env` fall back to the compose
+    defaults: with no `OTLP_BIND`, ports 4317 and 4318 are published on `0.0.0.0` (`ufw` and
+    `firewalld` do not stop it), and with no `GRAFANA_BIND`, Grafana is published on `127.0.0.1`.
+    To keep the OTLP ports on this PC, add `OTLP_BIND=127.0.0.1` to `.env` first.
 
 !!! warning "Trusted network only"
     Grafana is plain HTTP behind the `admin` login. OTLP (4317 and 4318) has no authentication.

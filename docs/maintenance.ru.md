@@ -86,6 +86,14 @@ bash setup-server.sh --update
 Обновление также публикует порт `4318` и открывает его в брандмауэре на сервере в сети, так что
 порт получит и более старый сервер.
 
+!!! warning "Grafana на старом сервере"
+    Если в `.env` есть `OTLP_BIND=0.0.0.0`, но нет `GRAFANA_BIND` (его записывала старая версия
+    скрипта), обновление публикует на `0.0.0.0` и Grafana и печатает `WARN GRAFANA_BIND was
+    missing and OTLP_BIND=0.0.0.0: Grafana is now published on 0.0.0.0, reachable from the LAN
+    (it was local-only before) ...`. Чтобы оставить Grafana на этом ПК, задайте `GRAFANA_BIND=127.0.0.1`
+    в `.env` и снова запустите `bash setup-server.sh` либо передайте `--local-only`, чтобы
+    закрыть и порты OTLP. См. [страницу сервера](server.md#порты-и-доступ-на-linux).
+
 ### Windows
 
 В Windows-скрипте нет `--update`. Скачайте новую версию и запустите скрипт ещё раз:
@@ -214,7 +222,7 @@ echo "SELECT table, formatReadableSize(sum(bytes_on_disk)) AS size, sum(rows) AS
 | Другой порт Grafana (Linux) | `bash setup-server.sh --grafana-port 3001`. Порт сохраняется как `GRAFANA_PORT` в `.env` |
 | Другой порт Grafana (Windows) | Не поддерживается: скрипт проверяет и печатает только порт `3000` |
 | Другие порты OTLP | Не поддерживается: `4317` и `4318` зафиксированы |
-| Оставить сервер только на этом ПК или открыть его для сети (Linux) | `bash setup-server.sh --local-only` или `--lan`. См. [страницу сервера](server.md#порты-и-доступ-на-linux) |
+| Оставить сервер только на этом ПК или открыть его для сети (Linux) | `bash setup-server.sh --local-only` или `--lan`. Чтобы изменить только Grafana, задайте `GRAFANA_BIND` в `.env` (`127.0.0.1` или `0.0.0.0`) и снова запустите скрипт: он сохранит значение. См. [страницу сервера](server.md#порты-и-доступ-на-linux) |
 | Открыть сервер для сети (Windows) | `setup-server.ps1 -EnableLan` |
 | Другая версия ClickHouse (Linux) | `bash setup-server.sh --clickhouse-version <tag>`. Том данных, записанный более новым ClickHouse, со старым не запускается |
 | Сменить пароль администратора Grafana | Для этого в репозитории нет параметра. Grafana читает `GRAFANA_ADMIN_PASSWORD` из `.env` при создании своей базы при первом запуске, поэтому правка `.env` позже пароль не меняет. Смените его в самой Grafana (ваш профиль) или сбросьте командой `grafana cli admin reset-admin-password` внутри контейнера grafana |
