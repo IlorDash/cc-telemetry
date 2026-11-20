@@ -58,7 +58,6 @@ OLD_CH_TAG_WRONG=23.3.22.3   # what earlier versions of this script wrote on old
 # that cannot be removed by the TTL while the script runs (the data checks compare only those).
 RETENTION_DAYS=365
 WINDOW_DAYS=364
-CHECK_WINDOW=364   # set by apply_retention: min(WINDOW_DAYS, the shortest TTL the tables have now - 1)
 
 usage() {
   cat <<'EOF'
@@ -596,7 +595,6 @@ apply_retention() {
   if [ -n "$UPDATE_DIR" ] && [ ! -e "$UPDATE_DIR/ttl-recent.tsv" ]; then
     save_retention_baseline "$UPDATE_DIR" || fail 'Could not count the rows younger than the retention.'
   fi
-  CHECK_WINDOW="$(check_window_days)" || fail 'Could not read the TTL of the tables.'
   # Tables whose TTL is not RETENTION_DAYS days: no TTL, a shorter one (lengthening deletes nothing and needs
   # no question) or a longer one (shortening deletes the rows older than the new retention, like no TTL does).
   # A TTL this script did not write is left alone.
