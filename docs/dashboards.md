@@ -5,9 +5,11 @@ time range do, and what a click opens. The screens are laid out for Full HD (192
 wider; narrower screens are not supported.
 
 !!! note "Panel titles"
-    Grafana is English only, so dashboard and panel titles are the same on the English and the
-    Russian pages. Some titles end in a hint such as `· click a type to filter by it`; the tables
-    below leave that tail out and describe the click in their own column.
+    The tables on this page use the titles of the English dashboards; the Russian page uses the
+    titles of the Russian copies, see
+    [Russian dashboards](#russian-dashboards). Some titles end in a hint such as
+    `· click a type to filter by it`; the tables below leave that tail out and describe the click
+    in their own column.
 
 The screenshots on this page show made-up demo data.
 
@@ -20,6 +22,24 @@ your `GRAFANA_PORT` if you changed it). Log in as `admin`; the password is
 `GRAFANA_ADMIN_PASSWORD` in the `.env` file of the `cc-telemetry` folder, see
 [the server page](server.md#check-that-it-works). **Overview** is the home page. It is empty until
 the first events arrive.
+
+---
+
+## Russian dashboards
+
+Every dashboard has a Russian copy with the same panels, in the Grafana folder `ru`. The English
+dashboards stay in the General folder, and the home page stays the English **Overview**.
+
+| What | Behaviour |
+| --- | --- |
+| Switch | The **RU** button in the controls row at the top opens the Russian copy; **EN** on the copy leads back. Both keep the time range and all variables |
+| Links | The rail, the drill-down clicks and the tip links stay in the language you are in |
+| Translated | The rail, variable labels and **Columns** options, panel and tile titles, descriptions, column headers, "no data" and value texts, and labels built in SQL |
+| Not translated | Session titles and other collected data; Grafana's own interface (`All`, menus, units); tip titles and texts, which come from `cc.tips`; terms such as `cost_usd`, TTFT and p95; tool and model names |
+
+The copies are generated from the English files; do not edit them in Grafana. After you update an
+older server, Grafana must restart once to pick up the `ru` folder: `--update` on Linux does it,
+on Windows follow [the update steps](maintenance.md#windows).
 
 ---
 

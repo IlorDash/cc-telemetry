@@ -1,6 +1,10 @@
 # Version 1.0.0
 
-*Released 19 November 2026.*
+!!! info "In preparation"
+    Version 1.0.0 is not released yet. This page lists what it will contain and changes until the
+    release.
+
+<!-- unreleased: before the PR into main, put the date line back and remove this marker and the banner above it -->
 
 This is the first release. It is the whole stack as the guide describes it: a server that stores
 Claude Code telemetry, a script for every PC that sends it, and seven Grafana dashboards that
@@ -35,6 +39,13 @@ and [Project](clients.md#project).
 Tools & files and Health show cost, cache use, prompts, tools, subagents and API health. The rail
 on the left switches between them and keeps the time range and the variables. See
 [Read the dashboards](dashboards.md).
+
+**Dashboards in Russian.** Every dashboard has a Russian copy in the Grafana folder `ru`. The
+**RU** / **EN** button in the controls row switches between a dashboard and its copy and keeps
+the time range and the variables. The rail, panel, variable and column titles and the
+descriptions are translated. Collected data (for example session names), Grafana's own
+interface, tip titles and texts, and terms such as `cost_usd` and TTFT are not. See
+[Russian dashboards](dashboards.md#russian-dashboards).
 
 **Tips.** Eight rules look at the last 7 days and name what is worth a look, for example a low
 cache hit rate or a file read many times. A tip opens the panel that shows the evidence. See

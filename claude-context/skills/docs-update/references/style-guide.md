@@ -98,8 +98,12 @@ minimal commands), links to the site in English and Russian. No details that liv
 - Same page set, same headings in the same order, so the language switcher lands in the same
   place and a missing update shows as a structural difference. Idiomatic Russian, same level of
   detail — not a word-by-word rendering.
-- Grafana titles, options and script messages stay in English verbatim (Grafana is not
-  localized); the explanation next to them is in Russian.
+- Dashboard, panel, rail, column and variable titles and options are quoted exactly as on the
+  **Russian copy** of the dashboard (`grafana/dashboards/ru/*.json`, built from
+  `grafana/i18n/ru.json`) — the reader of a Russian page uses the Russian dashboards. Screenshots
+  on Russian pages come from the Russian copies (`assets/ru/<name>.png`).
+- Grafana's own UI (`All`, menus, the time picker), script options and script messages stay in
+  English verbatim; the explanation next to them is in Russian.
 - Links into Russian pages use the Russian anchors (`--strict` catches a wrong one).
 - Russian typography: «…» for quoted names, em dash — with spaces, `ё` where it is written.
 - Both files change together, in the same commit.

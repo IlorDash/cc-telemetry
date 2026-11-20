@@ -1,10 +1,10 @@
 // Screenshots for the guide, taken from the demo stack (demo.sh up, http://localhost:13000).
 // A Playwright function: run it with a Playwright runner that passes `page`, for example the
 // Playwright MCP tool "run code" with filename tools/docs-demo/screenshots.js, from the repo root.
-// Writes docs/assets/<name>.png at 1920 px, Grafana's dark theme, the Grafana menu undocked.
+// Writes docs/assets/<name>.png (English dashboards) and docs/assets/ru/<name>.png (the Russian
+// copies, uid <uid>-ru, same names and ranges) at 1920 px, Grafana's dark theme, the menu undocked.
 async (page) => {
   const base = 'http://localhost:13000';
-  const out = 'docs/assets/';
   await page.setViewportSize({ width: 1920, height: 1080 });
 
   // Log in with the demo password set in demo.sh (skipped when the browser is logged in).
@@ -28,24 +28,28 @@ async (page) => {
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.waitForTimeout(4000);
   };
-  const shot = async (name, url) => {
+  const shot = async (out, name, url) => {
     await page.goto(base + url);
     await settle();
     await page.screenshot({ path: out + name + '.png', fullPage: true });
   };
 
-  await shot('overview', '/d/cc-usage?from=now-30d&to=now&refresh=');
-  await shot('sessions', '/d/cc-sessions?from=now-7d&to=now&refresh=');
-  await shot('prompts', '/d/cc-prompts?from=now-7d&to=now&refresh=');
-  await shot('efficiency', '/d/cc-efficiency?from=now-7d&to=now&refresh=');
-  await shot('agents', '/d/cc-agents?from=now-7d&to=now&refresh=');
-  await shot('tools', '/d/cc-tools?from=now-7d&to=now&refresh=');
-  await shot('health', '/d/cc-health?from=now-7d&to=now&refresh=');
+  // English dashboards, then the Russian copies (uid + '-ru', translated "Open session" link).
+  for (const [out, suffix, openTitle] of [['docs/assets/', '', 'Open session'],
+                                         ['docs/assets/ru/', '-ru', 'Открыть сессию']]) {
+    await shot(out, 'overview', '/d/cc-usage' + suffix + '?from=now-30d&to=now&refresh=');
+    await shot(out, 'sessions', '/d/cc-sessions' + suffix + '?from=now-7d&to=now&refresh=');
+    await shot(out, 'prompts', '/d/cc-prompts' + suffix + '?from=now-7d&to=now&refresh=');
+    await shot(out, 'efficiency', '/d/cc-efficiency' + suffix + '?from=now-7d&to=now&refresh=');
+    await shot(out, 'agents', '/d/cc-agents' + suffix + '?from=now-7d&to=now&refresh=');
+    await shot(out, 'tools', '/d/cc-tools' + suffix + '?from=now-7d&to=now&refresh=');
+    await shot(out, 'health', '/d/cc-health' + suffix + '?from=now-7d&to=now&refresh=');
 
-  // One session opened from the Sessions table: the link zooms the range to that session.
-  await page.goto(base + '/d/cc-sessions?from=now-7d&to=now&refresh=');
-  await page.waitForTimeout(8000);
-  const href = await page.locator('a[title="Open session"]').first().getAttribute('href');
-  await shot('session-selected', href + '&refresh=');
+    // One session opened from the Sessions table: the link zooms the range to that session.
+    await page.goto(base + '/d/cc-sessions' + suffix + '?from=now-7d&to=now&refresh=');
+    await page.waitForTimeout(8000);
+    const href = await page.locator('a[title="' + openTitle + '"]').first().getAttribute('href');
+    await shot(out, 'session-selected', href + '&refresh=');
+  }
   return 'done';
 }

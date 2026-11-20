@@ -10,7 +10,8 @@ makes its screenshots.
 | `mkdocs.yml` | site config: Material theme, i18n plugin (suffix mode), `nav` + `nav_translations`, `validation`, hook list; `site_url: !ENV [SITE_URL, ""]` |
 | `docs/<page>.md`, `docs/<page>.ru.md` | English page and its Russian twin (suffix mode: `/` and `/ru/`) |
 | `docs/stylesheets/extra.css` | brand colours (`primary`/`accent: custom`; muted Grafana orange `#C27C57`), both schemes |
-| `docs/assets/*.png` | screenshots, one copy for both languages; taken from demo data only |
+| `docs/assets/*.png` | screenshots of the English dashboards (EN pages); taken from demo data only |
+| `docs/assets/ru/*.png` | same names, the Russian copies (`<uid>-ru`); used by the RU pages (`dashboards.ru.md`, `index.ru.md`) |
 | `docs/requirements.txt` | pinned `mkdocs==1.6.1`, `mkdocs-material==9.5.49`, `mkdocs-static-i18n==1.2.3`; excluded from the site (`exclude_docs`) |
 | `VERSION` | single source of the version (`1.0.0`) |
 | `hooks/app_version.py` | MkDocs hook: version on the title, `{{ app_version }}`, copyright |
@@ -57,6 +58,10 @@ feature branch ──PR──► develop ──PR──► main ──push──
   newest first; also a row in `index`'s "Where to start". A version still in preparation carries an
   "in preparation" banner tagged `<!-- unreleased` instead of a date — allowed on `develop`,
   blocks the PR into `main` and the `main` build. Set the date and remove both before the merge.
+- Now: only `release-1-0-0` (`.md` + `.ru.md`), unreleased: no date line; `!!! info "In
+  preparation"` / `"В подготовке"`, then the `<!-- unreleased: ... -->` marker below it. Fine on
+  `develop`; the marker check exits 1, so the PR into `main` is blocked until the date line is
+  back and banner + marker are removed.
 
 ## Page → source of truth
 
@@ -65,9 +70,9 @@ feature branch ──PR──► develop ──PR──► main ──push──
 | `index` | what it is, data flow, dashboard table, platforms, "Where to start" | whole repo; dashboard titles |
 | `server` | Windows / Linux install, options, what the script does, failures | `setup-server.ps1`, `setup-server.sh` |
 | `clients` | install, what the script changes (env keys), session titles, project | `client/setup-client.{ps1,sh}`, `client/*.json` |
-| `dashboards` | rail, variables, time range, clicks, one section per dashboard | `grafana/dashboards/*.json`, `grafana/rail/rail.json` |
+| `dashboards` | Grafana login, "Russian dashboards" (RU «Русские дашборды»: RU/EN switch, what is translated), rail, variables, time range, clicks, one section per dashboard | `grafana/dashboards/*.json`, `grafana/rail/rail.json`; RU twin: titles from `grafana/dashboards/ru/*.json` (built from `grafana/i18n/ru.json`) |
 | `tips` | what a tip is, rules table, affected tokens/cost, links | `cc.tips` in `clickhouse/views.sql` |
-| `maintenance` | check, `--update`, backup/restore, views-init, retention, settings, removal | `setup-server.*`, `linux-server-tools/*.sh`, `docker-compose.yml`, `.env.example` |
+| `maintenance` | check, `--update`, backup/restore, views-init, retention, settings, removal; the `ru` folder appears on an older server after a Grafana restart | `setup-server.*`, `linux-server-tools/*.sh`, `docker-compose.yml`, `.env.example`, `grafana/provisioning/` |
 | `troubleshooting` | one table per step: `Message` (or `Symptom`) / `Cause` / `What to do` | the scripts' messages |
 | `data` | what is sent / dropped, where it lives, prompt logging, deleting data | `otel-collector.yaml`, `client/*.json`, `clickhouse/views.sql` |
 | `release-X-Y-Z` | features of that version | — |
@@ -81,9 +86,9 @@ quick start (commands, requirements, ports) changes.
 | --- | --- |
 | `generate.py` | made-up `otel.otel_logs` rows (JSONEachRow, stdout), fixed seed; `--now`, `--days 30`; stdlib only |
 | `otel_logs.sql` | DDL of `otel.otel_logs` (the collector creates it on the real server) |
-| `demo.sh up\|down` | containers `cc-demo-clickhouse`, `cc-demo-grafana`, network `cc-demo-net`; ClickHouse in tmpfs, not published; Grafana on `127.0.0.1:13000`; loads `clickhouse/views.sql` and the repo's dashboards; `down` removes exactly those |
+| `demo.sh up\|down` | containers `cc-demo-clickhouse`, `cc-demo-grafana`, network `cc-demo-net`; ClickHouse in tmpfs, not published; Grafana on `127.0.0.1:13000`; loads `clickhouse/views.sql`, mounts the whole `grafana/dashboards/` read-only (EN + `ru/` copies), home `overview.json`; `down` removes exactly those |
 | `check.js` | runs `check-dashboard.js` against the demo (temp copy with the fixed demo password) |
-| `screenshots.js` | Playwright function (needs a runner passing `page`): 1920 px, dark theme, writes `docs/assets/*.png` |
+| `screenshots.js` | Playwright function (needs a runner passing `page`): 1920 px, dark theme; one run, two passes: EN uids → `docs/assets/*.png`, then `<uid>-ru` → `docs/assets/ru/*.png` (same names and ranges); `session-selected` follows the first session link by title (`Open session` / `Открыть сессию`) |
 
 - Run from the repo root: `wsl -d Ubuntu -- bash tools/docs-demo/demo.sh up`.
 - The demo passwords in `demo.sh` are fixed throwaway values; it never touches the live stack.
@@ -101,7 +106,12 @@ quick start (commands, requirements, ports) changes.
 - List continuation inside a list item: indent **4** spaces (3 breaks the list in Python-Markdown).
 - Trust a long-running `mkdocs serve` after adding a page: it may not pick up new files — restart
   it (observed 2026-11-19).
-- RU pages: same headings in the same order as EN; Grafana dashboard / panel titles, options and
-  script messages stay in English verbatim (Grafana is not localized).
+- RU pages: same headings in the same order as EN; dashboard, panel, rail, column and variable
+  titles and options quoted exactly as on the Russian copy (`grafana/dashboards/ru/*.json`, from
+  `grafana/i18n/ru.json`); Grafana's own UI (`All`, menus, time picker), script options and script
+  messages stay in English verbatim. Images from `assets/ru/`.
+- RU pages naming the Grafana home page: it stays the English **Overview** (demo and server set
+  `GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH` → `overview.json`); say **Overview**, at most add
+  the copy's name **Обзор** (as `dashboards.ru.md` does).
 - No personal data on any page or image (e-mails, PC names, IPs, the user's projects, prompts);
   screenshots only from `tools/docs-demo/` data. The site is public, like the README.

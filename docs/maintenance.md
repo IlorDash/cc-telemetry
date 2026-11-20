@@ -75,7 +75,7 @@ The command goes through these steps and stops at the first problem:
 | Checks | Looks for `.env`, asks ClickHouse a test question and checks the git working tree | `.env` is missing (this folder is not a configured server yet); ClickHouse does not answer; tracked files have local changes (`.env` and `backup/` are git-ignored and do not count) |
 | Safety dump | Writes every `otel.*` table to `backup/pre-update-<date>-<time>/` and the row count of each table next to it. Earlier dumps stay | The free disk space is less than the uncompressed size of the data (the dump is that large); it warns when there is less than 1.5 times that. It also stops when it cannot create the folder or the dump fails |
 | Code | Runs `git pull --ff-only`. It never merges or rebases | The pull fails (a diverged branch, no network): nothing on the stack has changed. With no upstream branch or no git repository it only warns and goes on with the files as they are |
-| Server script | Runs `setup-server.sh` again from the updated file with your other options: starts changed containers, recreates the `cc.*` views, repeats the checks. If `otel-collector.yaml` or `grafana/provisioning/` changed, it restarts that service. Dashboard files are re-read by Grafana by itself | The usual install errors, see [the server page](server.md#if-it-fails) |
+| Server script | Runs `setup-server.sh` again from the updated file with your other options: starts changed containers, recreates the `cc.*` views, repeats the checks. If `otel-collector.yaml` or `grafana/provisioning/` changed, it restarts that service; a changed `grafana/provisioning/` is also what makes the `ru` folder with the Russian dashboard copies appear on an older server. Dashboard files are re-read by Grafana by itself | The usual install errors, see [the server page](server.md#if-it-fails) |
 | Data check | Compares the row counts with the ones from before. Every table must have at least as many rows | A table has fewer rows: a `FAIL` banner with the dump folder, exit status 1 |
 
 On success it prints `update finished, no data lost` with the dump folder and the rollback
@@ -104,7 +104,7 @@ powershell -ExecutionPolicy Bypass -File .\setup-server.ps1
 
 The script starts changed containers and recreates the `cc.*` views. It does not restart a
 service whose bind-mounted config changed, so after a pull that changed `otel-collector.yaml`
-or `grafana/provisioning/`, restart that service (add the WSL prefix when Docker runs in WSL):
+or `grafana/provisioning/`, restart that service (add the WSL prefix when Docker runs in WSL). On a server set up before the Russian dashboards existed, the restart is what makes Grafana show the folder `ru` with their copies:
 
 ```bash
 docker compose restart otel-collector grafana

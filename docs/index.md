@@ -61,5 +61,7 @@ with Windows clients.
 | See what the current version offers | [Release notes](release-1-0-0.md) |
 
 !!! note "Languages"
-    This guide comes in English and Russian; switch the language in the header. Grafana itself
-    is English only, so dashboard and panel titles stay in English on the Russian pages.
+    This guide comes in English and Russian; switch the language in the header. Every
+    dashboard also has a Russian copy, opened with the **RU** button, see
+    [Russian dashboards](dashboards.md#russian-dashboards). The Russian pages of this guide quote
+    dashboard and panel titles in English.

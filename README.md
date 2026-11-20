@@ -2,7 +2,7 @@
 
 cc-telemetry shows how you use Claude Code: cost, tokens, sessions, prompts, tools, subagents and
 errors. Claude Code sends its telemetry to a server PC on your LAN, where it is stored in
-ClickHouse and shown in seven Grafana dashboards.
+ClickHouse and shown in seven Grafana dashboards (each also in Russian).
 
 **Guide: <https://ilordash.github.io/cc-telemetry/>** · **Руководство на русском:
 <https://ilordash.github.io/cc-telemetry/ru/>**

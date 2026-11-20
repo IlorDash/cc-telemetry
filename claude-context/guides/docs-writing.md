@@ -29,8 +29,11 @@ owns which code: the page → source map in `modules/docs-site.md`.
 - Tables over prose; titled admonitions (`!!! note "Title"`); ~95-column wrap; list
   continuations indented **4** spaces (3 breaks the list).
 - Dashboard and panel titles in **bold**, exactly as in the JSON.
-- The `.ru.md` twin has the same headings in the same order, idiomatic Russian; Grafana titles,
-  options and script messages stay in English verbatim. Russian links point at Russian anchors.
+- The `.ru.md` twin has the same headings in the same order, idiomatic Russian; dashboard, panel,
+  rail and variable titles and options are quoted as on the **Russian copy**
+  (`grafana/dashboards/ru/*.json`), screenshots come from the Russian copies
+  (`docs/assets/ru/`). Grafana's own UI (`All`, menus), script options and messages stay in
+  English verbatim. Russian links point at Russian anchors.
 - A change to collected or dropped attributes always updates `data`; a new failure the reader
   can hit gets a row in `troubleshooting`; a new page gets a `nav` entry and, when its title
   differs in Russian, a `nav_translations` entry.
