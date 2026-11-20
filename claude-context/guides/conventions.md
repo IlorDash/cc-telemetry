@@ -17,7 +17,7 @@ re-run and must keep existing data, `.env` and foreign settings keys).
   The one exception: `cc.session_meta` reads the client hook's records (`ServiceName = 'cc-session-meta'`)
   straight from `otel.otel_logs`.
 - New attribute → add a column to `cc.events_raw` (reaches `cc.events` via `e.*`), document it in
-  `modules/telemetry-data.md` (via context-auditor) and, if it is collected text, on the `data` page (`docs/data.md` + `docs/data.ru.md`).
+  `modules/telemetry-data.md` (via context-auditor) and, if it is collected text, in README "What is sent".
 - Explicit column aliases in joins (`e.ts AS ts`): ClickHouse keeps the `e.` prefix otherwise.
 - Target ClickHouse 22.3 (old ARM servers) through 25.8: never several `USING` joins in one query
   (22.3/23.3 reject them) — join with `ON`. Applies to dashboard queries too.
@@ -26,11 +26,8 @@ re-run and must keep existing data, `.env` and foreign settings keys).
 - Edit the files, keep their 2-space formatting; panel `id`s and `gridPos` stay unique within a
   file. Never reuse the retired ids 6, 12, 25.
 - Variables, `timepicker`, `tags` and `links` are shared: change them in all seven files alike.
-- Every query honours all five shared variables and the time range (`$__timeFilter(ts)`, or
-  `$__fromTime`/`$__toTime` when filtering an aggregate): Account (multi-value, its All value is
-  `'__all'` with quotes) with `('__all' IN (${account:singlequote}) OR account_uuid IN
-  (${account:singlequote}))`, Project, Session, Actor and Skill with `('${v}' = '__all' OR col =
-  '${v}')`. Documented exceptions: `claude-context/modules/dashboard.md`.
+- Every query honours all four variables with `('${v}' = '__all' OR col = '${v}')` and the time
+  range (`$__timeFilter(ts)`, or `$__fromTime`/`$__toTime` when filtering an aggregate).
 - Variable queries are plain strings; keep `query` and `definition` identical.
 - `rawSql` is one JSON string with `\n` — edit it with exact replacements, then validate the JSON.
 

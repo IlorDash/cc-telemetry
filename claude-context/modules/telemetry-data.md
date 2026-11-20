@@ -70,9 +70,7 @@ parent `session.id`.
 | `api_request` | `model`, `input/output/cache_read/cache_creation_tokens`, `cost_usd`, `duration_ms`, `ttft_ms`, `effort`, `query_source`, `request_id`, `agent_id`, `agent.name`, `skill.name` |
 | `assistant_response` | `response` (dropped by the collector), `response_length`, `model`, `request_id` |
 | `tool_result` | `tool_name`, `success`, `duration_ms`, `tool_input` (JSON: `file_path`/`notebook_path`/`path`/`pattern`/`command`), `tool_parameters` (`bash_command`: first word only, e.g. `git`; reported 2026-11-15), `tool_result_size_bytes`, `request_id`, `tool_use_id`, `agent_id` |
-| `tool_decision` | `decision`, `source`, `tool_name`, `permission_mode`, `request_id`, `tool_use_id`, `agent_id` (subagent decisions), `tool_parameters`; `source` values `config`, `hook`, `user_reject`, `user_temporary`, `request_id` always set (observed on Claude Code 2.1.327, 2026-11-19) |
-| `api_error` | `model`, `error`, `status_code`, `duration_ms`, `attempt`, `request_id`, `speed`, `query_source`, `effort` (list supplied for the redesign, 2026-11-19); one event per failed attempt, retries included. Not yet in the live data — see pending-bugs.md |
-| `compaction` | `trigger` (`auto` seen), `pre_tokens`, `post_tokens`, `duration_ms`, `success` (observed on Claude Code 2.1.327, 2026-11-19); unused by the views |
+| `tool_decision` | `decision`, `source` (config/hook/user), `tool_name`, `permission_mode` |
 | `at_mention` | `mention_type`, `success`; **no path**: an `@` file is inlined without a tool call, so it never feeds project inference |
 | `subagent_completed` | `agent_type`, `agent_id`, `total_tokens`, `total_tool_uses`, `duration_ms`, `model` |
 | `skill_activated` | `skill.name`, `skill.source`, `invocation_trigger` |
@@ -103,10 +101,8 @@ cc.tips ◄── cc.api_requests, cc.tool_calls, cc.events, cc.events_raw   (la
   `cc.session_meta` (`cc-session-meta`); every other view reads one of them.
 - `cc.events_raw`: one row per Claude Code event; `project_label` lower-cased, `unknown` when
   missing; attributes flattened to typed
-  columns (`toUInt64OrZero` etc.); `account_uuid` (`user.account_uuid`), `account` (display label:
-  `user.email`, else the first 8 characters of the uuid, else `''`); last four `result_bytes`
-  (`tool_result_size_bytes`), `ttft_ms`, `status_code` (`api_error`, `toUInt32OrZero`: 0 without an
-  HTTP status) and `error` (`api_error` text), passed on to `cc.events` via `e.*`.
+  columns (`toUInt64OrZero` etc.); last two `result_bytes` (`tool_result_size_bytes`) and
+  `ttft_ms`, passed on to `cc.events` via `e.*`.
 - `cc.session_meta` (defined right after `events_raw`, because `path_roots` reads it): per
   `session_id` the latest value (`argMax(…, Timestamp)`) of `title`, `title_source`, `git_branch`,
   `cwd`, `host`, `cc_version`, plus `updated`; only `event.name = 'session_meta'`, non-empty id.
@@ -129,20 +125,14 @@ cc.tips ◄── cc.api_requests, cc.tool_calls, cc.events, cc.events_raw   (la
 - `cc.agents`: name = `agent_type` (at completion) → `agent.name` (first request) → `query_source`
   without `agent:<kind>:` → `agent?`.
 - `cc.api_requests.actor`: agent name if `agent_id`; `main` if `query_source` is `sdk`, `main` or
-  starts with `repl_main`; else `aux:<query_source>`. Also `account`, `account_uuid`, `ttft_ms`
-  (0 when not streamed) and `request_id` (one response; its `tool_result` events carry the same
-  id — the Efficiency work phase joins on it, `modules/dashboard.md`).
-- `cc.api_requests`, `cc.tool_calls`, `cc.sessions`, `cc.prompts` all carry `account` /
-  `account_uuid` (the Account variable filters on `account_uuid`); `cc.sessions` / `cc.prompts` take
-  them from the latest event that has an account.
+  starts with `repl_main`; else `aux:<query_source>`.
 - `cc.tool_calls`: `actor` (`main` / agent), `skill` via `request_id`, `op`
   (read/write/search/other), path normalisation: `\` → `/`, lower case, `/c/` → `c:/`; relative to
   the first `/<project>` in the path; worktree folders `<project>-<name>/` fold into the same
   relative path; `area` = first path segment, `claude-context` for `claude-context/` and
   `.claude/`, `external` outside the project.
 - `cc.sessions`: per `session_id`: first prompt, prompt/tool/agent/skill/`requests` counts, cost,
-  tokens, start/last event, `last_prompt` (latest `user_prompt`, else `started`), `model` (highest
-  `api_request` cost, `''` without requests); `title`, `title_source`, `git_branch`, `cwd` from `cc.session_meta`
+  tokens, start/last event; `title`, `title_source`, `git_branch`, `cwd` from `cc.session_meta`
   (`''` when the client sent none). Empty sessions (no request) exist; the dashboard keeps
   `requests > 0`.
 - `cc.prompts`: per (`session_id`, `prompt_id`): the prompt text and everything it triggered
@@ -154,24 +144,20 @@ cc.tips ◄── cc.api_requests, cc.tool_calls, cc.events, cc.events_raw   (la
 `UNION ALL` of rules over `now() - INTERVAL 7 DAY` (fixed; ignores the dashboard range and
 variables). Columns: `category`, `title`, `body`, `scope` (project / agent type / hook), `metric`
 (Float64), `link` (relative, no slug, one evidence panel full-screen via `viewPanel=panel-<id>`,
-variables preset; always has a query string — the dashboards append `&` + the time range),
-`affected` (Nullable UInt64, tokens the tip is about; NULL for the time tips `denials`,
-`slow-hook`, `slow-ttft`), `cost_usd` (Nullable Float64; only `cache`, `short-opus`,
-`agent-outlier`). Rows ordered by `affected` desc, NULLs last. Shown in the Tips section of
-Efficiency and the rail tiles (`modules/dashboard.md`). Thresholds are first guesses, meant to be tuned.
+variables preset; always has a query string — the dashboards append `&` + the time range).
+Shown on the Tips dashboard and the Overview tiles 58/59 (`modules/dashboard.md`). Thresholds
+are first guesses, meant to be tuned.
 
-| category | link target | `affected` | `cost_usd` |
-| --- | --- | --- | --- |
-| `cache` | `/d/cc-efficiency` panel 226, `var-project` | cache-creation tokens | all the project's requests in 7 days |
-| `repeated-read` | `/d/cc-tools` panel 24, `var-project` | avg result bytes / 4 × (n − 1) | NULL |
-| `big-results` | `/d/cc-tools` panel 140, `var-project` | sum of the big results' bytes / 4 | NULL |
-| `short-opus` | `/d/cc-prompts` panel 180, `var-project` | input + output + cache-creation tokens of the short answers | their cost |
-| `agent-outlier` | `/d/cc-sessions` panel 100, `var-session` (biggest run), `var-actor`, `from`/`to` = the session zoom (`modules/dashboard.md`) | tokens of the biggest run | that run's requests (by `agent_id`); NULL if unmatched |
-| `denials` | `/d/cc-tools` panel 19, `var-project` | NULL | NULL |
-| `slow-hook` | `/d/cc-health` panel 26 | NULL | NULL |
-| `slow-ttft` | `/d/cc-health` panel 161, `var-project` | NULL | NULL |
-
-- bytes / 4 is a rule of thumb (the telemetry has result sizes in bytes only).
+| category | link target |
+| --- | --- |
+| `cache` | `/d/cc-usage` panel 57, `var-project` |
+| `repeated-read` | `/d/cc-tools` panel 24, `var-project` |
+| `big-results` | `/d/cc-tools` panel 140, `var-project` |
+| `short-opus` | `/d/cc-prompts` panel 180, `var-project` |
+| `agent-outlier` | `/d/cc-sessions` panel 100, `var-session` (biggest run), `var-actor` |
+| `denials` | `/d/cc-tools` panel 19, `var-project` |
+| `slow-hook` | `/d/cc-health` panel 26 |
+| `slow-ttft` | `/d/cc-health` panel 161, `var-project` |
 
 These panel ids are fixed: renumbering one breaks its tip link.
 
