@@ -58,7 +58,16 @@
       "1h"
     ]
   },
-  "links": [],
+  "links": [
+    {
+      "type": "link",
+      "title": "RU",
+      "tooltip": "Russian version",
+      "url": "/d/cc-efficiency-ru",
+      "keepTime": true,
+      "includeVars": true
+    }
+  ],
   "templating": {
     "list": [
       {
@@ -1332,6 +1341,10 @@
             },
             "properties": [
               {
+                "id": "displayName",
+                "value": "Explore"
+              },
+              {
                 "id": "color",
                 "value": {
                   "mode": "fixed",
@@ -1346,6 +1359,10 @@
               "options": "Edit"
             },
             "properties": [
+              {
+                "id": "displayName",
+                "value": "Edit"
+              },
               {
                 "id": "color",
                 "value": {
@@ -1362,6 +1379,10 @@
             },
             "properties": [
               {
+                "id": "displayName",
+                "value": "Run"
+              },
+              {
                 "id": "color",
                 "value": {
                   "mode": "fixed",
@@ -1376,6 +1397,10 @@
               "options": "Delegate"
             },
             "properties": [
+              {
+                "id": "displayName",
+                "value": "Delegate"
+              },
               {
                 "id": "color",
                 "value": {
@@ -1392,6 +1417,10 @@
             },
             "properties": [
               {
+                "id": "displayName",
+                "value": "Talk"
+              },
+              {
                 "id": "color",
                 "value": {
                   "mode": "fixed",
@@ -1406,6 +1435,10 @@
               "options": "Other"
             },
             "properties": [
+              {
+                "id": "displayName",
+                "value": "Other"
+              },
               {
                 "id": "color",
                 "value": {
@@ -1492,26 +1525,32 @@
                     "type": "value",
                     "options": {
                       "Explore": {
+                        "text": "Explore",
                         "color": "#5794F2",
                         "index": 0
                       },
                       "Edit": {
+                        "text": "Edit",
                         "color": "#B877D9",
                         "index": 1
                       },
                       "Run": {
+                        "text": "Run",
                         "color": "#FF9830",
                         "index": 2
                       },
                       "Delegate": {
+                        "text": "Delegate",
                         "color": "#2DBFB1",
                         "index": 3
                       },
                       "Talk": {
+                        "text": "Talk",
                         "color": "#8e8e9e",
                         "index": 4
                       },
                       "Other": {
+                        "text": "Other",
                         "color": "#D8D9DA",
                         "index": 5
                       }
