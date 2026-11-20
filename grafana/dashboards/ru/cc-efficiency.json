@@ -826,6 +826,10 @@
             },
             "properties": [
               {
+                "id": "displayName",
+                "value": "Категория"
+              },
+              {
                 "id": "custom.cellOptions",
                 "value": {
                   "type": "color-background"
@@ -881,6 +885,10 @@
             },
             "properties": [
               {
+                "id": "displayName",
+                "value": "Заголовок"
+              },
+              {
                 "id": "custom.width",
                 "value": 360
               },
@@ -901,6 +909,10 @@
               "options": "body"
             },
             "properties": [
+              {
+                "id": "displayName",
+                "value": "Текст"
+              },
               {
                 "id": "custom.minWidth",
                 "value": 300
@@ -931,6 +943,10 @@
             },
             "properties": [
               {
+                "id": "displayName",
+                "value": "Объект"
+              },
+              {
                 "id": "custom.width",
                 "value": 160
               }
@@ -942,6 +958,10 @@
               "options": "metric"
             },
             "properties": [
+              {
+                "id": "displayName",
+                "value": "Метрика"
+              },
               {
                 "id": "custom.align",
                 "value": "right"
@@ -961,7 +981,7 @@
               },
               {
                 "id": "custom.width",
-                "value": 90
+                "value": 100
               }
             ]
           },
@@ -1123,6 +1143,10 @@
             },
             "properties": [
               {
+                "id": "displayName",
+                "value": "Категория"
+              },
+              {
                 "id": "custom.cellOptions",
                 "value": {
                   "type": "color-background"
@@ -1170,6 +1194,10 @@
             },
             "properties": [
               {
+                "id": "displayName",
+                "value": "Заголовок"
+              },
+              {
                 "id": "custom.width",
                 "value": 360
               },
@@ -1190,6 +1218,10 @@
               "options": "body"
             },
             "properties": [
+              {
+                "id": "displayName",
+                "value": "Текст"
+              },
               {
                 "id": "custom.minWidth",
                 "value": 300
@@ -1220,6 +1252,10 @@
             },
             "properties": [
               {
+                "id": "displayName",
+                "value": "Объект"
+              },
+              {
                 "id": "custom.width",
                 "value": 160
               }
@@ -1231,6 +1267,10 @@
               "options": "metric"
             },
             "properties": [
+              {
+                "id": "displayName",
+                "value": "Метрика"
+              },
               {
                 "id": "custom.align",
                 "value": "right"
@@ -1250,7 +1290,7 @@
               },
               {
                 "id": "custom.width",
-                "value": 90
+                "value": 100
               }
             ]
           },
@@ -1509,7 +1549,7 @@
               },
               {
                 "id": "custom.width",
-                "value": 80
+                "value": 130
               },
               {
                 "id": "color",
@@ -1663,7 +1703,7 @@
               },
               {
                 "id": "custom.width",
-                "value": 80
+                "value": 90
               }
             ]
           }
@@ -1881,7 +1921,7 @@
               },
               {
                 "id": "custom.width",
-                "value": 80
+                "value": 100
               }
             ]
           },
@@ -1909,7 +1949,7 @@
               },
               {
                 "id": "custom.width",
-                "value": 100
+                "value": 120
               },
               {
                 "id": "custom.cellOptions",

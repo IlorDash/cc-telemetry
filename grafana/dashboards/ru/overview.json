@@ -1093,7 +1093,7 @@
               },
               {
                 "id": "custom.width",
-                "value": 100
+                "value": 120
               },
               {
                 "id": "custom.cellOptions",
@@ -1149,7 +1149,7 @@
               },
               {
                 "id": "custom.width",
-                "value": 80
+                "value": 90
               }
             ]
           }
@@ -1596,7 +1596,7 @@
               },
               {
                 "id": "custom.width",
-                "value": 130
+                "value": 140
               },
               {
                 "id": "custom.cellOptions",

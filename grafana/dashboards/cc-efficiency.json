@@ -826,6 +826,10 @@
             },
             "properties": [
               {
+                "id": "displayName",
+                "value": "Category"
+              },
+              {
                 "id": "custom.cellOptions",
                 "value": {
                   "type": "color-background"
@@ -881,6 +885,10 @@
             },
             "properties": [
               {
+                "id": "displayName",
+                "value": "Title"
+              },
+              {
                 "id": "custom.width",
                 "value": 360
               },
@@ -901,6 +909,10 @@
               "options": "body"
             },
             "properties": [
+              {
+                "id": "displayName",
+                "value": "Text"
+              },
               {
                 "id": "custom.minWidth",
                 "value": 300
@@ -931,6 +943,10 @@
             },
             "properties": [
               {
+                "id": "displayName",
+                "value": "Scope"
+              },
+              {
                 "id": "custom.width",
                 "value": 160
               }
@@ -942,6 +958,10 @@
               "options": "metric"
             },
             "properties": [
+              {
+                "id": "displayName",
+                "value": "Metric"
+              },
               {
                 "id": "custom.align",
                 "value": "right"
@@ -1123,6 +1143,10 @@
             },
             "properties": [
               {
+                "id": "displayName",
+                "value": "Category"
+              },
+              {
                 "id": "custom.cellOptions",
                 "value": {
                   "type": "color-background"
@@ -1170,6 +1194,10 @@
             },
             "properties": [
               {
+                "id": "displayName",
+                "value": "Title"
+              },
+              {
                 "id": "custom.width",
                 "value": 360
               },
@@ -1190,6 +1218,10 @@
               "options": "body"
             },
             "properties": [
+              {
+                "id": "displayName",
+                "value": "Text"
+              },
               {
                 "id": "custom.minWidth",
                 "value": 300
@@ -1220,6 +1252,10 @@
             },
             "properties": [
               {
+                "id": "displayName",
+                "value": "Scope"
+              },
+              {
                 "id": "custom.width",
                 "value": 160
               }
@@ -1231,6 +1267,10 @@
               "options": "metric"
             },
             "properties": [
+              {
+                "id": "displayName",
+                "value": "Metric"
+              },
               {
                 "id": "custom.align",
                 "value": "right"

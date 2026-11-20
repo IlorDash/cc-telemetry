@@ -24,7 +24,8 @@
 //   "fragments": { "<exact SQL text>": "<replacement SQL text>" }  for what a literal cannot do
 //                (plurals: reorder to "label: N"; the tips link rewrite to /d/<uid>-ru); applied first
 //   Strict: a literal or fragment that no RU file uses -> exit 1 (stale entry or changed SQL).
-// A fixed-width table column whose header got longer in Russian is widened to fit it (8 px per letter + 20).
+// A fixed-width table column whose header or value-mapping text got longer in Russian is widened to fit
+// it (8 px per letter + 40 for a header, + 25 for a cell).
 // RU copy: uid <uid>-ru, same panel ids; every /d/<uid> link to a dashboard that has a RU copy
 // becomes /d/<uid>-ru; the EN/RU switch link (links[]) points back to the English dashboard.
 const fs = require("fs");
@@ -131,6 +132,18 @@ function trMappings(list) {
   }
 }
 
+// display texts of value mappings (the same places trMappings translates)
+function mappingTexts(list) {
+  const out = [];
+  for (const m of list || []) {
+    const o = m.options || {};
+    if (m.type === "value") {
+      for (const k of Object.keys(o)) if (o[k] && o[k].text) out.push(o[k].text);
+    } else if (o.result && o.result.text) out.push(o.result.text);
+  }
+  return out;
+}
+
 function trLinks(list) {
   for (const l of list || []) {
     if (l.title) l.title = tr(l.title);
@@ -155,19 +168,28 @@ function trPanel(p) {
     }
     for (const o of fc.overrides || []) {
       let before = null; // the English column name, to see whether the header got longer
+      const mapTexts = []; // mapping texts that changed in translation (cells can get longer too)
       for (const prop of o.properties || []) {
         if (prop.id === "displayName") {
           before = prop.value;
           prop.value = tr(prop.value);
         } else if (prop.id === "noValue") prop.value = tr(prop.value);
-        else if (prop.id === "mappings") trMappings(prop.value);
+        else if (prop.id === "mappings") {
+          const en = JSON.stringify(prop.value);
+          trMappings(prop.value);
+          if (JSON.stringify(prop.value) !== en) mapTexts.push(...mappingTexts(prop.value));
+        }
         else if (prop.id === "links") trLinks(prop.value);
       }
-      // table column with a fixed width: widen it when the translated header would be cut (~8 px per letter + padding)
+      // table column with a fixed width: widen it when the translated header or a translated mapping text
+      // would be cut (~8 px per letter; a header also needs the sort arrow and padding, a cell only padding)
       const dn = (o.properties || []).find((x) => x.id === "displayName");
       const w = (o.properties || []).find((x) => x.id === "custom.width");
-      if (p.type === "table" && dn && w && dn.value !== before) {
-        const need = Math.ceil((dn.value.length * 8 + 20) / 5) * 5;
+      if (p.type === "table" && w) {
+        let need = 0;
+        if (dn && dn.value !== before) need = dn.value.length * 8 + 40;
+        for (const t of mapTexts) need = Math.max(need, t.length * 8 + 25);
+        need = Math.ceil(need / 5) * 5;
         if (w.value < need) w.value = need;
       }
     }

@@ -836,7 +836,7 @@
               },
               {
                 "id": "custom.width",
-                "value": 80
+                "value": 100
               }
             ]
           },
@@ -864,7 +864,7 @@
               },
               {
                 "id": "custom.width",
-                "value": 90
+                "value": 105
               }
             ]
           },
@@ -892,7 +892,7 @@
               },
               {
                 "id": "custom.width",
-                "value": 100
+                "value": 120
               }
             ]
           },
@@ -920,7 +920,7 @@
               },
               {
                 "id": "custom.width",
-                "value": 90
+                "value": 100
               },
               {
                 "id": "custom.cellOptions",
@@ -1183,7 +1183,7 @@
               },
               {
                 "id": "custom.width",
-                "value": 95
+                "value": 115
               }
             ]
           },
@@ -1239,7 +1239,7 @@
               },
               {
                 "id": "custom.width",
-                "value": 90
+                "value": 100
               }
             ]
           },
@@ -1313,7 +1313,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT r.session_id AS sid,\n       if(w.t1 = 0, r.ms, w.t0) - greatest(intDiv(3 * (if(w.t1 = 0, r.ms, w.t1) - if(w.t1 = 0, r.ms, w.t0)), 100), 5000) AS from_ms,\n       if(w.t1 = 0, r.ms, w.t1) + greatest(intDiv(3 * (if(w.t1 = 0, r.ms, w.t1) - if(w.t1 = 0, r.ms, w.t0)), 100), 5000) AS to_ms,\n       left(r.session_id, 8) AS session, r.agent_type AS type, r.agent_total_tokens AS tokens,\n       if(r.agent_total_tokens > 6 * r.mean_tokens AND r.agent_total_tokens > 50000, concat(toString(round(r.agent_total_tokens / r.mean_tokens, 1)), '× среднего'), '') AS outlier,\n       ifNull(c.cost, 0) AS cost_usd\nFROM\n(\n    SELECT session_id, agent_id, agent_type, agent_total_tokens, toUnixTimestamp64Milli(ts) AS ms,\n           avg(agent_total_tokens) OVER (PARTITION BY agent_type) AS mean_tokens\n    FROM cc.events WHERE event = 'subagent_completed' AND agent_type != '' AND ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR agent_type = '${actor}') AND ('${skill}' = '__all' OR agent_id IN (SELECT agent_id FROM cc.events_raw WHERE '${skill}' != '__all' AND skill_name = '${skill}' AND agent_id != '')) AND $__timeFilter(ts)\n    ORDER BY agent_total_tokens DESC LIMIT 5\n) AS r\nLEFT JOIN\n(\n    SELECT agent_id, sum(cost_usd) AS cost\n    FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND $__timeFilter(ts) AND agent_id != ''\n    GROUP BY agent_id\n) AS c ON c.agent_id = r.agent_id\nLEFT JOIN\n(\n    SELECT session_id, min(a_s) AS t0, max(a_e) AS t1\n    FROM\n    (\n        SELECT session_id, toUnixTimestamp64Milli(ts) - if(event = 'user_prompt', toInt64(0), toInt64(duration_ms)) AS a_s, toUnixTimestamp64Milli(ts) AS a_e\n        FROM cc.events_raw\n        WHERE event IN ('user_prompt', 'api_request', 'tool_result')\n          AND session_id IN (SELECT session_id FROM cc.events_raw WHERE event = 'subagent_completed' AND $__timeFilter(ts))\n    )\n    GROUP BY session_id\n) AS w ON w.session_id = r.session_id\nORDER BY r.agent_total_tokens DESC"
+          "rawSql": "SELECT r.session_id AS sid,\n       if(w.t1 = 0, r.ms, w.t0) - greatest(intDiv(3 * (if(w.t1 = 0, r.ms, w.t1) - if(w.t1 = 0, r.ms, w.t0)), 100), 5000) AS from_ms,\n       if(w.t1 = 0, r.ms, w.t1) + greatest(intDiv(3 * (if(w.t1 = 0, r.ms, w.t1) - if(w.t1 = 0, r.ms, w.t0)), 100), 5000) AS to_ms,\n       left(r.session_id, 8) AS session, r.agent_type AS type, r.agent_total_tokens AS tokens,\n       if(r.agent_total_tokens > 6 * r.mean_tokens AND r.agent_total_tokens > 50000, concat(toString(round(r.agent_total_tokens / r.mean_tokens, 1)), '× ср.'), '') AS outlier,\n       ifNull(c.cost, 0) AS cost_usd\nFROM\n(\n    SELECT session_id, agent_id, agent_type, agent_total_tokens, toUnixTimestamp64Milli(ts) AS ms,\n           avg(agent_total_tokens) OVER (PARTITION BY agent_type) AS mean_tokens\n    FROM cc.events WHERE event = 'subagent_completed' AND agent_type != '' AND ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR agent_type = '${actor}') AND ('${skill}' = '__all' OR agent_id IN (SELECT agent_id FROM cc.events_raw WHERE '${skill}' != '__all' AND skill_name = '${skill}' AND agent_id != '')) AND $__timeFilter(ts)\n    ORDER BY agent_total_tokens DESC LIMIT 5\n) AS r\nLEFT JOIN\n(\n    SELECT agent_id, sum(cost_usd) AS cost\n    FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND $__timeFilter(ts) AND agent_id != ''\n    GROUP BY agent_id\n) AS c ON c.agent_id = r.agent_id\nLEFT JOIN\n(\n    SELECT session_id, min(a_s) AS t0, max(a_e) AS t1\n    FROM\n    (\n        SELECT session_id, toUnixTimestamp64Milli(ts) - if(event = 'user_prompt', toInt64(0), toInt64(duration_ms)) AS a_s, toUnixTimestamp64Milli(ts) AS a_e\n        FROM cc.events_raw\n        WHERE event IN ('user_prompt', 'api_request', 'tool_result')\n          AND session_id IN (SELECT session_id FROM cc.events_raw WHERE event = 'subagent_completed' AND $__timeFilter(ts))\n    )\n    GROUP BY session_id\n) AS w ON w.session_id = r.session_id\nORDER BY r.agent_total_tokens DESC"
         }
       ],
       "options": {
@@ -1436,7 +1436,7 @@
               },
               {
                 "id": "custom.width",
-                "value": 80
+                "value": 90
               }
             ]
           },
