@@ -78,7 +78,7 @@ The command goes through these steps and stops at the first problem:
 | Checks | Looks for `.env`, asks ClickHouse a test question and checks the git working tree | `.env` is missing (this folder is not a configured server yet); ClickHouse does not answer; tracked files have local changes (`.env` and `backup/` are git-ignored and do not count) |
 | Safety dump | Writes every `otel.*` table to `backup/pre-update-<date>-<time>/` and the row count of each table next to it. Earlier dumps stay | The free disk space is less than the uncompressed size of the data (the dump is that large); it warns when there is less than 1.5 times that. It also stops when it cannot create the folder or the dump fails |
 | Code | Runs `git pull --ff-only`. It never merges or rebases | The pull fails (a diverged branch, no network): nothing on the stack has changed. With no upstream branch or no git repository it only warns and goes on with the files as they are |
-| Server script | Runs `setup-server.sh` again from the updated file with your other options: starts changed containers, recreates the `cc.*` views (and copies the events missing from `cc.events_t`), migrates the storage of an older install (see [Disk use and retention](#disk-use-and-retention)), repeats the checks. If `otel-collector.yaml` or `grafana/provisioning/` changed, it restarts that service; a changed `grafana/provisioning/` is also what makes the `ru` folder with the Russian dashboard copies appear on an older server. Dashboard files are re-read by Grafana by itself | The usual install errors, see [the server page](server.md#if-it-fails) |
+| Server script | Runs `setup-server.sh` again from the updated file with your other options: starts changed containers, recreates the `cc.*` views (and copies the events missing from `cc.events_t`), applies the retention TTL (see [Disk use and retention](#disk-use-and-retention)), repeats the checks. If `otel-collector.yaml` or `grafana/provisioning/` changed, it restarts that service; a changed `grafana/provisioning/` is also what makes the `ru` folder with the Russian dashboard copies appear on an older server. Dashboard files are re-read by Grafana by itself | The usual install errors, see [the server page](server.md#if-it-fails) |
 | Data check | Before the dump it fixes a cutoff, the retention minus one day ago (179 days for 180), and counts the rows younger than that in every table; after the update it counts them again with the same cutoff. Older rows may be removed by the retention TTL: it only reports how many | A table has fewer rows younger than the cutoff: a `FAIL` banner with the dump folder, exit status 1 |
 
 On success it prints `update finished, no data lost` with the dump folder and the rollback
@@ -105,8 +105,8 @@ git pull
 powershell -ExecutionPolicy Bypass -File .\setup-server.ps1
 ```
 
-The script starts changed containers and recreates the `cc.*` views. It does not migrate the
-storage of an older install: see [Disk use and retention](#disk-use-and-retention) for the
+The script starts changed containers and recreates the `cc.*` views. It does not change the
+retention TTL of existing tables: see [Change the retention](#change-the-retention) for the
 manual steps. It does not restart a
 service whose bind-mounted config changed, so after a pull that changed `otel-collector.yaml`
 or `grafana/provisioning/`, restart that service (add the WSL prefix when Docker runs in WSL). On a server set up before the Russian dashboards existed, the restart is what makes Grafana show the folder `ru` with their copies:
@@ -218,10 +218,7 @@ server scripts print its log.
     `views-init` creates them with `CREATE ... IF NOT EXISTS`, so a change to them is skipped on
     an existing server, and the stored rows keep the old values. Such a change needs a migration:
     dump first, then rebuild `cc.events_t` from `otel.otel_logs`, one month at a time (one insert
-    over more than 100 days is refused). `views-init` does this once by itself for the columns
-    `account_uuid`, `status_code` and `error`, which the account filter and the **Health**
-    dashboard need: it copies the table with them, checks rows, tokens and cost month by month,
-    swaps the tables and drops the old one.
+    over more than 100 days is refused).
 
 Do not run `clickhouse/refresh.sql` by hand while `cc-refresh` is running.
 
@@ -256,6 +253,9 @@ Edit `RETENTION_DAYS` in `.env`, then run the server script again.
 | Linux | `setup-server.sh` changes the TTL of the existing tables. A longer period needs no question. A shorter one deletes the rows older than the new period: a plain run asks at the terminal (default no; `--yes` does not answer it; without a terminal it skips the step with a warning), `--update` goes ahead after its dump |
 | Windows | `views-init` sets the TTL only on `otel.*` tables that have none and have no rows older than the period. Change an existing TTL yourself (below) |
 
+On Linux, `setup-server.sh` also lists the old `system.query_log*` and `system.query_views_log*`
+tables, which are no longer written, with a `DROP TABLE` command for each; it does not delete them.
+
 To change it by hand, run the SQL through `ch.sh` (replace `180`; dump first when the period gets
 shorter):
 
@@ -264,42 +264,6 @@ ALTER TABLE cc.events_t MODIFY TTL toDateTime(ts) + INTERVAL 180 DAY;
 ALTER TABLE otel.otel_logs MODIFY TTL TimestampTime + toIntervalDay(180);
 ALTER TABLE otel.otel_metrics_sum MODIFY TTL toDateTime(TimeUnix) + toIntervalDay(180);  -- also _gauge, _histogram, _exponential_histogram, _summary
 ```
-
-### A server set up before the retention
-
-Older servers keep every row and have `cc.events_t` partitioned by month: every merge then rewrites
-the whole month, which writes a lot to an SD card.
-
-On Linux, `setup-server.sh` (and `--update`) migrates the server by itself and does nothing once it
-is done. It copies `cc.events_t` into a table partitioned by day, month by month, while the stack
-keeps running; swaps the tables; copies the events that arrived meanwhile; compares rows, tokens
-and cost month by month; and drops the old table only when they match. Then it sets the TTL on
-the `otel.*` tables. When rows older than `RETENTION_DAYS` exist, the same rules apply as for a
-shorter retention (above). An interrupted run continues where it stopped. The script also lists
-the old `system.query_log*` and `system.query_views_log*` tables, which are no longer written,
-with a `DROP TABLE` command for each; it does not delete them.
-
-On Windows, do the same by hand. Run the SQL through `ch.sh`, and dump first:
-
-1. Copy the `CREATE TABLE IF NOT EXISTS cc.events_t (...) ... ;` statement from
-   `clickhouse/schema.sql`, rename the table to `cc.events_t_new`, replace `__RETENTION_DAYS__` with
-   your number of days, and run it.
-2. List the months: `SELECT DISTINCT toYYYYMM(ts) FROM cc.events_t ORDER BY 1`. For each month,
-   for example `202611`:
-   `INSERT INTO cc.events_t_new SELECT * FROM cc.events_t WHERE toYYYYMM(ts) = 202611;`
-3. Swap: `EXCHANGE TABLES cc.events_t_new AND cc.events_t;`. New events go to the new table from
-   now on; `cc.events_t_new` is the old one.
-4. Copy the events that arrived between steps 2 and 3, for each month:
-   `INSERT INTO cc.events_t SELECT * FROM cc.events_t_new WHERE toYYYYMM(ts) = 202611 AND (session_id, seq, ts) NOT IN (SELECT session_id, seq, ts FROM cc.events_t WHERE toYYYYMM(ts) = 202611);`
-5. Compare the old table with the same rows of the new one. Only rows younger than the retention
-   minus one day count (179 for 180 days): the TTL of the new table may already remove older ones.
-   Add `AND toYYYYMM(ts) = 202611` on both sides for a large table. Counts and tokens must be
-   equal, and the cost rounded to 6 digits:
-   `SELECT count(), sum(input_tokens + output_tokens), round(sum(cost_usd), 6) FROM cc.events_t_new WHERE ts >= now() - INTERVAL 179 DAY;`
-   `SELECT count(), sum(input_tokens + output_tokens), round(sum(cost_usd), 6) FROM cc.events_t WHERE ts >= now() - INTERVAL 179 DAY AND (session_id, seq, ts) IN (SELECT session_id, seq, ts FROM cc.events_t_new WHERE ts >= now() - INTERVAL 179 DAY);`
-6. Only when they are equal: `DROP TABLE cc.events_t_new SYNC;`. Otherwise swap back with the same
-   `EXCHANGE TABLES`.
-7. Set the TTL of the `otel.*` tables with the statements above.
 
 ---
 

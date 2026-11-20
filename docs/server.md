@@ -171,7 +171,7 @@ yourself with `ufw delete allow <port>/tcp` or `firewall-cmd --remove-port=<port
 | --- | --- | --- |
 | 1. Docker | Finds Docker Desktop, or Docker Engine in WSL; offers to install it in WSL | Checks that `docker`, the compose plugin and the daemon answer; offers to install them on Debian and Ubuntu |
 | 2. `.env` | Creates it with random passwords; an existing `.env` is kept | The same, and writes `OTLP_BIND`, `GRAFANA_BIND` and `GRAFANA_PORT`, and the keys `RETENTION_DAYS`, `CLICKHOUSE_LIMITS` and `CLICKHOUSE_CPUS` when they are missing |
-| 3. Stack | Starts it and waits until the `cc.*` views are created | Stops if the Grafana port is taken (a busy 4317 or 4318 is only a warning), then starts the stack, waits for the views and migrates the storage of an older install (see [Disk use and retention](maintenance.md#disk-use-and-retention)) |
+| 3. Stack | Starts it and waits until the `cc.*` views are created | Stops if the Grafana port is taken (a busy 4317 or 4318 is only a warning), then starts the stack, waits for the views and applies the retention TTL (see [Disk use and retention](maintenance.md#disk-use-and-retention)) |
 | 4. Checks | Grafana on `localhost:3000`, OTLP on `localhost:4317` and `localhost:4318` | The same on the published addresses; also checks that the `docker` service starts at boot |
 | 5. After that | WSL only: starts a hidden keepalive and adds it to the Startup folder (`cc-telemetry-keepalive.vbs`), so WSL does not stop the stack | LAN mode: firewall rules and the server's LAN address |
 | 6. `-EnableLan` | Firewall rules for TCP 4317 and 4318 (Private networks) and, for WSL, a port forward of both from the LAN address | (part of step 5) |

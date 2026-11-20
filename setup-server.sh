@@ -9,9 +9,8 @@
 #     180 days and the small-server limits (CLICKHOUSE_LIMITS=small, 2 CPUs), otherwise 365 days and no limits.
 #     A value already in .env is kept.
 #  3. Starts the stack and waits until the cc.* views are created.
-#     After the views are ready: storage migration of an older install (retention TTL on otel.* and
-#     cc.events_t, daily partitions of cc.events_t; a no-op when already done; a changed RETENTION_DAYS is
-#     applied to the existing tables) and a hint about leftover system.query_log tables.
+#     After the views are ready: the retention TTL on otel.* and cc.events_t (a no-op when already in place;
+#     a changed RETENTION_DAYS is applied to the existing tables) and a hint about leftover system.query_log tables.
 #  4. Checks Grafana and the OTLP ports (:4317, :4318) on this PC; checks that Docker starts at boot.
 #  5. LAN (the default, Linux servers are usually headless): 4317, 4318 and Grafana are published on
 #     all interfaces and opened in ufw / firewalld; prints the server address and the client commands.
@@ -55,11 +54,11 @@ OLD_CH_TAG=22.3.20.29   # last release of ClickHouse 22.3, the newest tag known 
 OLD_CH_TAG_WRONG=23.3.22.3   # what earlier versions of this script wrote on old ARM: dies there with "Illegal instruction"
 # Retention in days: RETENTION_DAYS in .env is the one source (load_retention; the default follows the ClickHouse
 # version: 22.3 = 180, else 365). It reaches cc.events_t (the placeholder of clickhouse/schema.sql), otel.*
-# (init-views.sh, migrate_storage) and the --update check. WINDOW_DAYS = RETENTION_DAYS - 1: rows younger than
+# (init-views.sh, apply_retention) and the --update check. WINDOW_DAYS = RETENTION_DAYS - 1: rows younger than
 # that cannot be removed by the TTL while the script runs (the data checks compare only those).
 RETENTION_DAYS=365
 WINDOW_DAYS=364
-CHECK_WINDOW=364   # set by migrate_storage: min(WINDOW_DAYS, the shortest TTL the tables have now - 1)
+CHECK_WINDOW=364   # set by apply_retention: min(WINDOW_DAYS, the shortest TTL the tables have now - 1)
 
 usage() {
   cat <<'EOF'
@@ -539,128 +538,36 @@ reload_changed_config() {
   if [ "${#restart[@]}" -eq 0 ]; then ok 'no collector or Grafana provisioning change: nothing to restart'; fi
 }
 
-# ---- storage migration: retention TTL and daily partitions of an install made by an older version -----------
-# Older installs have no TTL on otel.* and a cc.events_t partitioned by month (every merge rewrote the whole
-# month, a lot of SD-card writes); the target layout is the CREATE TABLE of cc.events_t in clickhouse/schema.sql.
-# Every part detects its own state from system.tables, so a re-run is a no-op once done and an interrupted run
-# continues. Runs after views-init (which has just copied every missing row into cc.events_t, and does not run
-# again meanwhile), so the backfill cannot copy the same rows a second time.
+# ---- retention: TTL of the otel.* tables and of cc.events_t --------------------------------------------------
+# Every part reads its own state from system.tables, so a re-run is a no-op once the TTL is in place. Runs after
+# views-init, which creates cc.events_t with the TTL of clickhouse/schema.sql and sets the TTL of otel.* tables
+# that have none; here a changed RETENTION_DAYS is applied to the existing tables.
 
-# The CREATE TABLE of cc.events_t from schema.sql, named cc.events_t_new (no second copy of the definition),
-# with the retention placeholder replaced like init-views.sh does.
-events_ddl() {
-  awk '/^CREATE TABLE IF NOT EXISTS cc\.events_t$/ { p = 1; $0 = $0 "_new" } p { print } p && /;[[:space:]]*$/ { exit }' "$ROOT/clickhouse/schema.sql" \
+# The TTL expression of cc.events_t from schema.sql (no second copy of the definition), with the retention
+# placeholder replaced like init-views.sh does.
+events_ttl_expr() {
+  awk '/^CREATE TABLE IF NOT EXISTS cc\.events_t$/ { p = 1 } p && /^TTL / { sub(/^TTL /, ""); print } p && /;[[:space:]]*$/ { exit }' "$ROOT/clickhouse/schema.sql" \
     | sed "s/__RETENTION_DAYS__/$RETENTION_DAYS/g"
 }
 
-# "<first day><TAB><first day of the next month>" for every month that has rows in the table.
-event_months() { # table
-  chq "SELECT toString(m), toString(addMonths(m, 1)) FROM (SELECT DISTINCT toStartOfMonth(toDate(ts)) AS m FROM $1) ORDER BY m"
-}
-
-# One table of the day-partitioned layout replaces the monthly one. A month at a time: one INSERT over more than
-# 100 daily partitions is refused (max_partitions_per_insert_block), and the per-query memory limit is 1.5 GB.
-migrate_events_t() {
-  local ddl want_pk ttl_expr cur_pk new_pk cur_ttl cutoff w p lo hi months res resume=0
-  local n_a t_a c_a n_b t_b c_b ok_cost bad=0
-  ddl="$(events_ddl)"
-  want_pk="$(printf '%s\n' "$ddl" | sed -n 's/^PARTITION BY //p')"
-  ttl_expr="$(printf '%s\n' "$ddl" | sed -n 's/^TTL //p')"
-  [ -n "$want_pk" ] || fail 'Could not read the definition of cc.events_t from clickhouse/schema.sql.'
-  [ "$(chq 'EXISTS TABLE cc.events_t')" = 1 ] || { warn 'cc.events_t does not exist: nothing to migrate.'; return 0; }
-  cur_pk="$(chq "SELECT partition_key FROM system.tables WHERE database = 'cc' AND name = 'events_t'")" || fail 'Could not read the partition key of cc.events_t.'
-  new_pk=''
-  if [ "$(chq 'EXISTS TABLE cc.events_t_new')" = 1 ]; then
-    new_pk="$(chq "SELECT partition_key FROM system.tables WHERE database = 'cc' AND name = 'events_t_new'")" || fail 'Could not read the partition key of cc.events_t_new.'
-    if [ "$cur_pk" = "$want_pk" ] && [ "$new_pk" != "$want_pk" ]; then
-      # Interrupted after EXCHANGE TABLES: cc.events_t is the new table, cc.events_t_new still the old one.
-      resume=1
-      warn 'a previous migration stopped after the table swap: continuing with the copy check.'
-    elif [ "$cur_pk" != "$want_pk" ] && [ "$new_pk" = "$want_pk" ]; then
-      # Interrupted while copying: cc.events_t_new is our own half-filled copy; cc.events_t still holds everything.
-      warn 'dropping the half-filled copy cc.events_t_new of a previous migration and starting again.'
-      chq 'DROP TABLE cc.events_t_new SYNC' >/dev/null || fail 'Could not drop cc.events_t_new.'
-    else
-      fail "cc.events_t (partitioned by $cur_pk) and cc.events_t_new (partitioned by $new_pk) both exist and this script cannot tell which one is the old table. Look at them (docker compose exec clickhouse clickhouse-client, SHOW CREATE TABLE) and drop the leftover one yourself, then re-run."
+# Sets or changes the TTL of cc.events_t when it differs from RETENTION_DAYS; a TTL this script did not write stays.
+apply_events_t_ttl() {
+  local ttl_expr cur_ttl
+  ttl_expr="$(events_ttl_expr)"
+  [ -n "$ttl_expr" ] || fail 'Could not read the TTL of cc.events_t from clickhouse/schema.sql.'
+  [ "$(chq 'EXISTS TABLE cc.events_t')" = 1 ] || { warn 'cc.events_t does not exist: nothing to change.'; return 0; }
+  cur_ttl="$(ttl_state cc events_t)" || fail 'Could not read the TTL of cc.events_t.'
+  if [ "$cur_ttl" = "$RETENTION_DAYS" ]; then
+    ok "cc.events_t: TTL $RETENTION_DAYS days, nothing to change"
+  elif [ "$cur_ttl" = other ]; then
+    warn 'cc.events_t has a TTL that this script did not write: left as it is.'
+  else
+    chq "ALTER TABLE cc.events_t MODIFY TTL $ttl_expr" >/dev/null || fail 'Could not set the TTL of cc.events_t.'
+    [ "$cur_ttl" != none ] || chq 'ALTER TABLE cc.events_t MODIFY SETTING ttl_only_drop_parts = 1' >/dev/null || fail 'Could not set ttl_only_drop_parts of cc.events_t.'
+    if [ "$cur_ttl" = none ]; then ok "cc.events_t: TTL $RETENTION_DAYS days set"
+    else ok "cc.events_t: TTL changed from $cur_ttl to $RETENTION_DAYS days"
     fi
-  elif [ "$cur_pk" = "$want_pk" ]; then
-    cur_ttl="$(ttl_state cc events_t)" || fail 'Could not read the TTL of cc.events_t.'
-    if [ "$cur_ttl" = "$RETENTION_DAYS" ]; then
-      ok "cc.events_t: partitioned by $cur_pk, TTL $RETENTION_DAYS days, nothing to migrate"
-    elif [ "$cur_ttl" = other ]; then
-      warn 'cc.events_t has a TTL that this script did not write: left as it is.'
-    else
-      chq "ALTER TABLE cc.events_t MODIFY TTL $ttl_expr" >/dev/null || fail 'Could not set the TTL of cc.events_t.'
-      [ "$cur_ttl" != none ] || chq 'ALTER TABLE cc.events_t MODIFY SETTING ttl_only_drop_parts = 1' >/dev/null || fail 'Could not set ttl_only_drop_parts of cc.events_t.'
-      if [ "$cur_ttl" = none ]; then ok "cc.events_t: TTL $RETENTION_DAYS days set"
-      else ok "cc.events_t: TTL changed from $cur_ttl to $RETENTION_DAYS days"
-      fi
-    fi
-    return 0
   fi
-
-  cutoff="$(chq "SELECT toString(now() - INTERVAL $CHECK_WINDOW DAY)")" || fail 'Could not read the time from ClickHouse.'
-  w="ts >= toDateTime64('$cutoff', 9)"   # the check ignores rows the TTL may remove meanwhile
-
-  if [ "$resume" -eq 0 ]; then
-    echo "   cc.events_t: partitioned by $cur_pk, new layout: $want_pk, TTL $RETENTION_DAYS days. Copying month by month (the stack keeps running)."
-    chq "$ddl" >/dev/null || fail 'Could not create cc.events_t_new.'
-    # A server that reports the key differently from schema.sql would migrate again on every run: stop before copying.
-    new_pk="$(chq "SELECT partition_key FROM system.tables WHERE database = 'cc' AND name = 'events_t_new'")" || fail 'Could not read the partition key of cc.events_t_new.'
-    if [ "$new_pk" != "$want_pk" ]; then
-      chq 'DROP TABLE cc.events_t_new SYNC' >/dev/null || true
-      fail "ClickHouse reports the partition key of the new table as '$new_pk', schema.sql says '$want_pk': cannot tell the layouts apart. Nothing was changed."
-    fi
-    months="$(event_months cc.events_t)" || fail 'Could not list the months of cc.events_t.'
-    while IFS=$'\t' read -r lo hi; do
-      [ -n "$lo" ] || continue
-      printf '   copy %s\n' "${lo%-*}"
-      p="toDate(ts) >= toDate('$lo') AND toDate(ts) < toDate('$hi')"
-      chq "INSERT INTO cc.events_t_new SELECT * FROM cc.events_t WHERE $p" || fail "Copying $lo failed (see above). cc.events_t is untouched; re-run this script to start again."
-    done <<<"$months"
-    # The materialized view writes to cc.events_t by name: from here on new events go to the new table.
-    chq 'EXCHANGE TABLES cc.events_t_new AND cc.events_t' || fail 'EXCHANGE TABLES failed (see above). cc.events_t is untouched.'
-    ok 'tables swapped: cc.events_t has the new layout, cc.events_t_new holds the old one until the check passes'
-  fi
-
-  # From here cc.events_t is the new table and cc.events_t_new the old one.
-  # 1. Events that arrived in the old table after its month had been copied (before the swap).
-  months="$(event_months cc.events_t_new)" || fail 'Could not list the months of cc.events_t_new.'
-  while IFS=$'\t' read -r lo hi; do
-    [ -n "$lo" ] || continue
-    p="toDate(ts) >= toDate('$lo') AND toDate(ts) < toDate('$hi')"
-    chq "INSERT INTO cc.events_t SELECT * FROM cc.events_t_new WHERE $p AND (session_id, seq, ts) NOT IN (SELECT session_id, seq, ts FROM cc.events_t WHERE $p)" \
-      || fail 'Copying the events that arrived meanwhile failed (see above). Re-run this script: it continues from here.'
-  done <<<"$months"
-  # 2. Check, month by month: every row of the old table is in the new one (count) with the same tokens and cost.
-  #    The new table may hold more rows (events that arrived after the swap): only the rows of the old one are compared.
-  #    The months are read again (into a variable: a failed query must stop the script before the DROP).
-  months="$(event_months cc.events_t_new)" || fail 'Could not list the months of cc.events_t_new.'
-  while IFS=$'\t' read -r lo hi; do
-    [ -n "$lo" ] || continue
-    p="toDate(ts) >= toDate('$lo') AND toDate(ts) < toDate('$hi')"
-    res="$(chq "SELECT a.n, a.tok, a.cost, b.n, b.tok, b.cost
-FROM (SELECT count() AS n, sum(input_tokens + output_tokens + cache_read_tokens + cache_creation_tokens) AS tok, sum(cost_usd) AS cost
-      FROM cc.events_t_new WHERE $p AND $w) AS a
-CROSS JOIN (SELECT count() AS n, sum(input_tokens + output_tokens + cache_read_tokens + cache_creation_tokens) AS tok, sum(cost_usd) AS cost
-      FROM cc.events_t WHERE $p AND $w AND (session_id, seq, ts) IN (SELECT session_id, seq, ts FROM cc.events_t_new WHERE $p AND $w)) AS b")" \
-      || fail 'The copy check could not run (see above). Re-run this script: it continues from here.'
-    IFS=$'\t' read -r n_a t_a c_a n_b t_b c_b <<<"$res"
-    ok_cost=0
-    awk -v a="${c_a:-0}" -v b="${c_b:-1}" 'BEGIN { d = a - b; if (d < 0) d = -d; m = (a > b) ? a : b; exit !(d <= m * 1e-9 + 1e-9) }' && ok_cost=1
-    if [ "${n_a:-x}" != "${n_b:-y}" ] || [ "${t_a:-x}" != "${t_b:-y}" ] || [ "$ok_cost" -ne 1 ]; then
-      bad=1
-      printf '   MISMATCH %s: old table rows/tokens/cost %s/%s/%s, new table %s/%s/%s\n' "${lo%-*}" "$n_a" "$t_a" "$c_a" "$n_b" "$t_b" "$c_b" >&2
-    fi
-  done <<<"$months"
-  if [ "$bad" -ne 0 ]; then
-    fail "The new cc.events_t does not match the old table, so the old one was NOT dropped: it is cc.events_t_new. Re-run this script (it copies what is missing and checks again). If it fails again, swap back: echo 'EXCHANGE TABLES cc.events_t AND cc.events_t_new' | bash linux-server-tools/ch.sh, drop the new copy (cc.events_t_new) and report the mismatch above."
-  fi
-  # Dropping the old table is acceptable here: cc.events_t_new is only a copy of otel.otel_logs (cc.events_t holds
-  # nothing else), it has just been checked row by row against the new table, and otel.otel_logs stays; the
-  # --update safety dump was taken before this step.
-  chq 'DROP TABLE cc.events_t_new SYNC' >/dev/null || fail 'The check passed but cc.events_t_new could not be dropped: drop it yourself (DROP TABLE cc.events_t_new SYNC), it is a copy.'
-  ok "cc.events_t migrated: $(chq 'SELECT count() FROM cc.events_t') rows, partitioned by $want_pk, TTL $RETENTION_DAYS days; the old table is dropped"
 }
 
 # Old system.query_log tables are not written any more once ClickHouse runs with the current config. Deleting
@@ -681,9 +588,9 @@ warn_old_query_logs() {
   done <<<"$rows"
 }
 
-migrate_storage() {
+apply_retention() {
   local list db t col n old=0 todo=() tbl answer st
-  step "Storage: retention ($RETENTION_DAYS days) and partitions"
+  step "Storage: retention ($RETENTION_DAYS days)"
   # The baseline of the --update data check: taken before any TTL is applied (an update that started from an
   # older script has not written it).
   if [ -n "$UPDATE_DIR" ] && [ ! -e "$UPDATE_DIR/ttl-recent.tsv" ]; then
@@ -722,13 +629,13 @@ migrate_storage() {
       case "$answer" in
         [Yy]*) ;;
         *)
-          warn "retention and partition migration skipped: $old rows are older than $RETENTION_DAYS days and the TTL would delete them (--yes does not agree to that, and a terminal is needed to ask). Run: bash setup-server.sh --update (dumps first, then migrates), or dump (bash linux-server-tools/backup.sh dump) and re-run in a terminal."
+          warn "retention skipped: $old rows are older than $RETENTION_DAYS days and the TTL would delete them (--yes does not agree to that, and a terminal is needed to ask). Run: bash setup-server.sh --update (dumps first, then applies the retention), or dump (bash linux-server-tools/backup.sh dump) and re-run in a terminal."
           warn_old_query_logs
           return 0 ;;
       esac
     fi
   fi
-  migrate_events_t
+  apply_events_t_ttl
   for tbl in "${todo[@]+"${todo[@]}"}"; do
     case "$tbl" in otel.*) ;; *) continue ;; esac
     t="${tbl#otel.}"
@@ -880,7 +787,7 @@ done
 if [ "$state" = 'exited 0' ]; then ok 'cc.* views are ready'
 else compose logs views-init || true; fail "views-init did not finish cleanly ($state)"
 fi
-migrate_storage
+apply_retention
 reload_changed_config
 
 # ---------------------------------------------------------------- 4. checks

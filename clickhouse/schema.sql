@@ -16,13 +16,12 @@
 -- The expressions are written twice, here and in backfill.sql: keep them in step (and the path rules also
 -- in cc.path_roots, views.sql).
 --
--- The layout of cc.events_t (PARTITION BY, TTL, SETTINGS) is different: setup-server.sh migrates it
--- (migrate_storage, on every run; Windows servers: README, manual migration). It takes the CREATE TABLE of
--- cc.events_t below as the target. So keep the lines "CREATE TABLE IF NOT EXISTS cc.events_t",
--- "PARTITION BY ..." and "TTL ..." as they are written.
--- The retention is not written here: __RETENTION_DAYS__ is replaced by init-views.sh (and by migrate_storage)
+-- setup-server.sh (apply_retention, on every run) reads the TTL line of the CREATE TABLE of cc.events_t
+-- below to change the TTL when RETENTION_DAYS changes. So keep the lines "CREATE TABLE IF NOT EXISTS
+-- cc.events_t" and "TTL ..." as they are written.
+-- The retention is not written here: __RETENTION_DAYS__ is replaced by init-views.sh (and by apply_retention)
 -- with RETENTION_DAYS from .env (setup-server.sh writes 180 for ClickHouse 22.3, else 365; docker-compose.yml
--- defaults to 365). The same number is the TTL of the otel.* tables (init-views.sh, migrate_storage). So this
+-- defaults to 365). The same number is the TTL of the otel.* tables (init-views.sh, apply_retention). So this
 -- file cannot be piped to clickhouse-client as it is: replace the placeholder first.
 
 CREATE DATABASE IF NOT EXISTS cc;
@@ -36,8 +35,7 @@ CREATE DATABASE IF NOT EXISTS cc;
 --                 lower case, `\` -> `/`, `/c/` -> `c:/`
 --      path_cand  tool_result: candidate project folder of that path (rules in cc.path_roots, views.sql)
 --      bash_cmd   tool_parameters.bash_command (first word of the command only)
---    account_uuid, status_code, error come last: they were added later (init-views.sh adds them to an older
---    table by rebuilding it from otel.otel_logs). The column order is the order of the backfill SELECT.
+--    account_uuid, status_code, error come last. The column order is the order of the backfill SELECT.
 CREATE TABLE IF NOT EXISTS cc.events_t
 (
     ts                    DateTime64(9),
