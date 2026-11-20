@@ -31,7 +31,9 @@
       "Bash(git -C * rev-parse*)",
       "Bash(git -C * branch --show-current)",
       "Bash(node claude-context/scripts/check-dashboard.js*)",
-      "Bash(py -3 claude-context/skills/commit-message/scripts/check-msg.py *)"
+      "Bash(py -3 claude-context/skills/commit-message/scripts/check-msg.py *)",
+      "Bash(py -3 claude-context/skills/docs-update/scripts/check-readme.py*)",
+      "Bash(git worktree list*)"
     ],
     "deny": [
       "Bash(git add*)",
@@ -56,7 +58,12 @@
       "Bash(git am*)",
       "Bash(git apply*)",
       "Bash(git init*)",
-      "Bash(git worktree*)",
+      "Bash(git worktree remove*)",
+      "Bash(git worktree prune*)",
+      "Bash(git worktree move*)",
+      "Bash(git worktree lock*)",
+      "Bash(git worktree unlock*)",
+      "Bash(git worktree repair*)",
       "Bash(git branch -d*)",
       "Bash(git branch -D*)",
       "Bash(git branch -m*)",
@@ -109,6 +116,10 @@
       "Edit(**/.env)",
       "Edit(**/settings.json)",
       "Edit(**/settings.local.json)"
+    ],
+    "ask": [
+      "Bash(git worktree add -b *)",
+      "Bash(MSYS_NO_PATHCONV=1 cmd /c mklink /J *)"
     ]
   },
   "hooks": {
@@ -121,7 +132,19 @@
             "command": "if command -v py >/dev/null 2>&1; then py -3 \"${CLAUDE_PROJECT_DIR}/.claude/hooks/guard-secrets.py\"; else python3 \"${CLAUDE_PROJECT_DIR}/.claude/hooks/guard-secrets.py\"; fi"
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write|NotebookEdit|MultiEdit|Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "py -3 \"${CLAUDE_PROJECT_DIR}/.claude/hooks/guard-worktree-context.py\""
+          }
+        ]
       }
     ]
+  },
+  "enabledPlugins": {
+    "context7@anthropic-plugin-directory": true
   }
 }

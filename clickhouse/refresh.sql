@@ -53,7 +53,16 @@ DROP TABLE cc.session_project_new;
 --    Columns: category, title, body, scope (project / agent / hook), metric (the number behind the tip),
 --    link (relative Grafana URL: one evidence panel full-screen via viewPanel=panel-<id>, variables preset;
 --    it always has a query string, the dashboards append '&' + the time range).
---    Savings are estimated only from our own cost_usd (no price table).
+--    affected (Nullable UInt64): tokens the tip refers to; NULL for time tips (denials, slow-hook, slow-ttft).
+--      cache = cache_creation tokens; repeated-read / big-results = result bytes / 4, i.e. "~ tokens"
+--      (an APPROXIMATION: the telemetry carries result size in bytes only, 4 bytes per token is a rule of thumb);
+--      short-opus = input + output + cache_creation tokens of the short answers (cache reads excluded);
+--      agent-outlier = tokens of the biggest run.
+--    cost_usd (Nullable Float64): sum of cost_usd of the requests the tip is about; only cache, short-opus,
+--      agent-outlier, NULL otherwise. cache: the cost of ALL the project's requests in 7 days.
+--      agent-outlier: NULL when the biggest run has no agent_id or no matching api_request.
+--      Money comes only from api_request cost_usd (no price table).
+--    The order of the rows is set by the view cc.tips (views.sql).
 DROP TABLE IF EXISTS cc.tips_new;
 CREATE TABLE cc.tips_new AS cc.tips_t;
 INSERT INTO cc.tips_new
@@ -65,11 +74,15 @@ SELECT
            ' requests in 7 days (below 40 %). A stable prefix (CLAUDE.md, tools) and fewer /clear or model switches keep the cache warm.') AS body,
     project AS scope,
     toFloat64(round(hit * 100, 1)) AS metric,
-    concat('/d/cc-usage?viewPanel=panel-57&var-project=', encodeURLComponent(project)) AS link
+    concat('/d/cc-efficiency?viewPanel=panel-226&var-project=', encodeURLComponent(project)) AS link,
+    toNullable(created) AS affected,
+    toNullable(proj_cost) AS cost_usd
 FROM
 (
     SELECT project, count() AS n,
-           sum(cache_read_tokens) / (sum(cache_read_tokens) + sum(input_tokens) + sum(cache_creation_tokens)) AS hit
+           sum(cache_read_tokens) / (sum(cache_read_tokens) + sum(input_tokens) + sum(cache_creation_tokens)) AS hit,
+           sum(cache_creation_tokens) AS created,
+           sum(cost_usd) AS proj_cost
     FROM cc.api_requests
     WHERE ts >= now() - INTERVAL 7 DAY
     GROUP BY project
@@ -83,10 +96,12 @@ SELECT
     concat('Read ', toString(n), ' times in 7 days in ', project, '. Consider keeping the key facts in CLAUDE.md or a note instead of rereading.'),
     project,
     toFloat64(n),
-    concat('/d/cc-tools?viewPanel=panel-24&var-project=', encodeURLComponent(project))
+    concat('/d/cc-tools?viewPanel=panel-24&var-project=', encodeURLComponent(project)),
+    toNullable(toUInt64(round(avg_bytes / 4 * (n - 1)))),
+    CAST(NULL AS Nullable(Float64))
 FROM
 (
-    SELECT project, path, count() AS n
+    SELECT project, path, count() AS n, avg(result_bytes) AS avg_bytes
     FROM cc.tool_calls
     WHERE ts >= now() - INTERVAL 7 DAY AND op = 'read' AND path != ''
     GROUP BY project, path
@@ -102,10 +117,12 @@ SELECT
     concat('Largest result: ', toString(round(biggest / 1048576, 2)), ' MB. Big outputs fill the context; narrow the search or limit the read range.'),
     project,
     toFloat64(n),
-    concat('/d/cc-tools?viewPanel=panel-140&var-project=', encodeURLComponent(project))
+    concat('/d/cc-tools?viewPanel=panel-140&var-project=', encodeURLComponent(project)),
+    toNullable(toUInt64(round(big_bytes / 4))),
+    CAST(NULL AS Nullable(Float64))
 FROM
 (
-    SELECT project, count() AS n, max(result_bytes) AS biggest
+    SELECT project, count() AS n, max(result_bytes) AS biggest, sum(result_bytes) AS big_bytes
     FROM cc.events
     WHERE ts >= now() - INTERVAL 7 DAY AND event = 'tool_result' AND result_bytes > 200000
     GROUP BY project
@@ -120,10 +137,13 @@ SELECT
            toString(round(short_cost, 2)), ' together. A smaller model could handle such turns for less.'),
     project,
     toFloat64(round(short_cost, 4)),
-    concat('/d/cc-prompts?viewPanel=panel-180&var-project=', encodeURLComponent(project))
+    concat('/d/cc-prompts?viewPanel=panel-180&var-project=', encodeURLComponent(project)),
+    toNullable(short_tokens),
+    toNullable(short_cost)
 FROM
 (
-    SELECT project, count() AS total, countIf(output_tokens < 500) AS short, sumIf(cost_usd, output_tokens < 500) AS short_cost
+    SELECT project, count() AS total, countIf(output_tokens < 500) AS short, sumIf(cost_usd, output_tokens < 500) AS short_cost,
+           sumIf(input_tokens + output_tokens + cache_creation_tokens, output_tokens < 500) AS short_tokens
     FROM cc.api_requests
     WHERE ts >= now() - INTERVAL 7 DAY AND positionCaseInsensitive(model, 'opus') > 0
     GROUP BY project
@@ -138,15 +158,49 @@ SELECT
     agent_type,
     toFloat64(biggest),
     concat('/d/cc-sessions?viewPanel=panel-100&var-session=', encodeURLComponent(session),
-           '&var-actor=', encodeURLComponent(agent_type))
+           '&var-actor=', encodeURLComponent(agent_type),
+           -- zoom to the session: its activity span, padded by 3 % (at least 5 s), as the Sessions table does
+           if(t1 = 0, '', concat('&from=', toString(t0 - greatest(intDiv(3 * (t1 - t0), 100), 5000)),
+                                 '&to=', toString(t1 + greatest(intDiv(3 * (t1 - t0), 100), 5000))))),
+    toNullable(biggest),
+    if(matched_agent = '', CAST(NULL AS Nullable(Float64)), toNullable(run_cost))
 FROM
 (
-    SELECT agent_type, count() AS n, avg(agent_total_tokens) AS mean, max(agent_total_tokens) AS biggest,
-           argMax(session_id, agent_total_tokens) AS session, argMax(project, agent_total_tokens) AS project
-    FROM cc.events
-    WHERE ts >= now() - INTERVAL 7 DAY AND event = 'subagent_completed' AND agent_type != ''
-    GROUP BY agent_type
-    HAVING n >= 3 AND biggest > 6 * mean AND biggest > 50000
+    SELECT o.agent_type AS agent_type, o.n AS n, o.mean AS mean, o.biggest AS biggest,
+           o.session AS session, o.project AS project, c.agent_id AS matched_agent, c.run_cost AS run_cost,
+           w.t0 AS t0, w.t1 AS t1
+    FROM
+    (
+        SELECT agent_type, count() AS n, avg(agent_total_tokens) AS mean, max(agent_total_tokens) AS biggest,
+               argMax(session_id, agent_total_tokens) AS session, argMax(project, agent_total_tokens) AS project,
+               argMax(agent_id, agent_total_tokens) AS run_agent
+        FROM cc.events
+        WHERE ts >= now() - INTERVAL 7 DAY AND event = 'subagent_completed' AND agent_type != ''
+        GROUP BY agent_type
+        HAVING n >= 3 AND biggest > 6 * mean AND biggest > 50000
+    ) AS o
+    LEFT JOIN
+    (
+        -- cost of the requests of the biggest run (its agent_id)
+        SELECT agent_id, sum(cost_usd) AS run_cost
+        FROM cc.api_requests
+        WHERE agent_id != ''
+        GROUP BY agent_id
+    ) AS c ON c.agent_id = o.run_agent
+    LEFT JOIN
+    (
+        -- activity span of the session in ms (0 when none): first start to last end of its prompts, requests and tool calls
+        SELECT session_id, min(a_s) AS t0, max(a_e) AS t1
+        FROM
+        (
+            SELECT session_id, toUnixTimestamp64Milli(ts) - if(event = 'user_prompt', toInt64(0), toInt64(duration_ms)) AS a_s,
+                   toUnixTimestamp64Milli(ts) AS a_e
+            FROM cc.events_raw
+            WHERE event IN ('user_prompt', 'api_request', 'tool_result')
+              AND session_id IN (SELECT session_id FROM cc.events_raw WHERE event = 'subagent_completed' AND ts >= now() - INTERVAL 7 DAY)
+        )
+        GROUP BY session_id
+    ) AS w ON w.session_id = o.session
 )
 UNION ALL
 -- Frequent permission denials for one tool: an allow-list or deny-list candidate.
@@ -157,7 +211,9 @@ SELECT
            '). If the rule is intended, ignore this; otherwise review the permission rules for it.'),
     project,
     toFloat64(n),
-    concat('/d/cc-tools?viewPanel=panel-19&var-project=', encodeURLComponent(project))
+    concat('/d/cc-tools?viewPanel=panel-19&var-project=', encodeURLComponent(project)),
+    CAST(NULL AS Nullable(UInt64)),
+    CAST(NULL AS Nullable(Float64))
 FROM
 (
     SELECT project, tool_name, count() AS n, topK(1)(decision_source)[1] AS top_source
@@ -174,7 +230,9 @@ SELECT
     concat('Mean ', toString(round(mean)), ' ms over ', toString(n), ' runs in 7 days. Hooks run synchronously and delay every matching tool call.'),
     hook_name,
     toFloat64(round(mean)),
-    '/d/cc-health?viewPanel=panel-26'
+    '/d/cc-health?viewPanel=panel-26',
+    CAST(NULL AS Nullable(UInt64)),
+    CAST(NULL AS Nullable(Float64))
 FROM
 (
     SELECT hook_name, count() AS n, avg(hook_duration_ms) AS mean
@@ -191,7 +249,9 @@ SELECT
     concat('Mean ', toString(round(mean)), ' ms over ', toString(n), ' requests in 7 days. Long contexts and a busy provider slow the first token.'),
     project,
     toFloat64(round(mean)),
-    concat('/d/cc-health?viewPanel=panel-161&var-project=', encodeURLComponent(project))
+    concat('/d/cc-health?viewPanel=panel-161&var-project=', encodeURLComponent(project)),
+    CAST(NULL AS Nullable(UInt64)),
+    CAST(NULL AS Nullable(Float64))
 FROM
 (
     SELECT project, model, count() AS n, avg(ttft_ms) AS mean

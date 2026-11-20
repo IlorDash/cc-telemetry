@@ -25,7 +25,9 @@ FROM
         LogAttributes['event.name']                                 AS event,
         LogAttributes['session.id']                                 AS session_id,
         LogAttributes['prompt.id']                                  AS prompt_id,
-        LogAttributes['user.email']                                 AS account,
+        -- display label: email, else the first 8 characters of the account uuid, else ''
+        if(LogAttributes['user.email'] != '', LogAttributes['user.email'],
+           left(LogAttributes['user.account_uuid'], 8))             AS account,
         LogAttributes['agent_id']                                   AS agent_id,
         LogAttributes['request_id']                                 AS request_id,
         LogAttributes['query_source']                               AS query_source,
@@ -67,7 +69,11 @@ FROM
                   'downloads', 'onedrive', 'appdata', 'tmp', 'temp', 'var', 'etc', 'usr', 'proc', 'sys', 'windows', 'programdata',
                   'program files', 'program files (x86)', 'node_modules', '$recycle.bin')
               OR startsWith(c0, 'onedrive - '), '', c0) AS path_cand,
-        JSONExtractString(tool_parameters, 'bash_command')          AS bash_cmd
+        JSONExtractString(tool_parameters, 'bash_command')          AS bash_cmd,
+        LogAttributes['user.account_uuid']                          AS account_uuid,
+        -- api_error events: HTTP status (0 when there is none, e.g. a network error) and the error text
+        toUInt32OrZero(LogAttributes['status_code'])                AS status_code,
+        LogAttributes['error']                                      AS error
     FROM otel.otel_logs
     WHERE ServiceName = 'claude-code'
       -- TimestampTime = toDateTime(Timestamp): the first two conditions let ClickHouse skip whole days

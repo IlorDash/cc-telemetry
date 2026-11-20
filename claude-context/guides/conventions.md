@@ -22,25 +22,41 @@ Layers: `schema.sql` (tables `cc.events_t`, `cc.session_project_t`, `cc.tips_t` 
   (attributes are strings; missing → `''`).
 - `ServiceName` is filtered in the MV and `backfill.sql` (`claude-code`) and in `cc.session_meta`
   (`cc-session-meta`, a plain view straight over `otel.otel_logs`). Every other view reads the
-  `*_t` tables or other views, never `otel.otel_logs`.
-- New attribute → a column in `schema.sql`, the MV, `backfill.sql` and `cc.events_raw` (reaches
-  `cc.events` via `e.*`) — a migration (above); old rows get it only by re-backfill. Document it in
-  `modules/telemetry-data.md` (via context-auditor) and, if it is collected text, in README "What is sent".
+  `*_t` tables or other views, never `otel.otel_logs`. Views build on `cc.events` (effective
+  project) or, when they feed it or need no project, on `cc.events_raw`.
+- New attribute → a column at the end of `cc.events_t` in `schema.sql`, the MV, `backfill.sql`
+  (same position: the backfill inserts by position) and `cc.events_raw` (reaches `cc.events` via
+  `e.*`) — a migration (above); old rows get it only by a rebuild from `otel.otel_logs` (as
+  `init-views.sh` does for `account_uuid`, `status_code`, `error`). Document it in
+  `modules/telemetry-data.md` (via context-auditor) and, if it is collected text, on the `data`
+  page (`docs/data.md` + `docs/data.ru.md`).
 - `refresh.sql` rebuilds a table as `*_new` → INSERT → check → `EXCHANGE TABLES` → `DROP *_new`;
-  never run it by hand while `cc-refresh` is up.
+  never run it by hand while `cc-refresh` is up. A new column of a `*_t` table it fills also needs
+  an `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` in `schema.sql` (`CREATE ... AS` copies the old one).
 - `views-init` must stay idempotent: a re-run inserts nothing (anti-join on `(session_id, seq, ts)`).
 - Explicit column aliases in joins (`e.ts AS ts`): ClickHouse keeps the `e.` prefix otherwise.
 - Target ClickHouse 22.3 (old ARM servers) through 25.8: never several `USING` joins in one query
   (22.3/23.3 reject them) — join with `ON`. Applies to dashboard queries too.
 
-## Dashboards (`grafana/dashboards/*.json`, seven files)
+## Dashboards (`grafana/dashboards/*.json`, seven files, plus their generated `ru/` copies)
 - Edit the files, keep their 2-space formatting; panel `id`s and `gridPos` stay unique within a
   file. Never reuse the retired ids 6, 12, 25.
 - Variables, `timepicker`, `tags` and `links` are shared: change them in all seven files alike.
-- Every query honours all four variables with `('${v}' = '__all' OR col = '${v}')` and the time
-  range (`$__timeFilter(ts)`, or `$__fromTime`/`$__toTime` when filtering an aggregate).
+- Every query honours all five shared variables and the time range (`$__timeFilter(ts)`, or
+  `$__fromTime`/`$__toTime` when filtering an aggregate): Account (multi-value, its All value is
+  `'__all'` with quotes) with `('__all' IN (${account:singlequote}) OR account_uuid IN
+  (${account:singlequote}))`, Project, Session, Actor and Skill with `('${v}' = '__all' OR col =
+  '${v}')`. Documented exceptions: `claude-context/modules/dashboard.md`.
 - Variable queries are plain strings; keep `query` and `definition` identical.
 - `rawSql` is one JSON string with `\n` — edit it with exact replacements, then validate the JSON.
+- **Russian copies are generated:** never edit `grafana/dashboards/ru/*.json` by hand. After any
+  change to an English file, to `grafana/rail/` or to `grafana/i18n/` — and after merging another
+  branch that touched them — run `node grafana/rail/sync-rail.js`, then
+  `node grafana/i18n/build-ru.js`, and commit the regenerated copies with the change. New static
+  English text needs a `grafana/i18n/ru.json` entry (`grafana-style.md`, "Russian copies").
+- `isSwitch()` (the EN/RU link matcher) exists in both `sync-rail.js` and `build-ru.js`: change
+  both alike.
+- `.json` files are LF (`.gitattributes`): the scripts write LF and `--check` compares bytes.
 
 ## PowerShell (`*.ps1`) — Windows PowerShell 5.1
 - ASCII only (5.1 reads BOM-less files as ANSI); write JSON/text with

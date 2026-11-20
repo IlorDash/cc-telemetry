@@ -14,8 +14,18 @@ You do not write application code, and you do not touch `claude-context/CLAUDE.m
 `claude-context/guides/` (the working agreement), `claude-context/agents/`,
 `claude-context/skills/`, `claude-context/hooks/`, `claude-context/settings.json`,
 `claude-context/server-state.local.md` (the user's private notes), `.claude` (a junction or
-symlink to claude-context) or `README.md` — those are out of scope even if they look stale; list them under
+symlink to claude-context), `README.md` or the site pages `docs/*.md` — those are out of scope even if they look stale; list them under
 "Needs your input".
+
+Never run from a parallel-task worktree (`cc-telemetry-<name>`): `claude-context/` is locked there
+by the hook `guard-worktree-context.py`; stop and tell the caller.
+
+**Buffer transfer** (dispatched by `parallel-task finish` from the main folder): merge
+`<wt>/.wt-ledger/pending-bugs.md` into `claude-context/pending-bugs.md` — `## Add` entries under
+their area unless already listed (then merge the wording), `## Remove` lines delete the named entry
+after checking the code in the main folder really fixes it (the branch may not be merged yet: then
+keep the entry and say so). Report each entry moved, merged, removed or skipped. Do not delete the
+buffer — the worktree removal does. No other audit in this mode.
 
 ## What to do
 
@@ -56,6 +66,7 @@ All under `claude-context/`.
 | `modules/dashboard.md` | `grafana/dashboards/*.json` (seven dashboards): variables, rows, panels, links; `scripts/check-dashboard.js` |
 | `modules/setup-scripts.md` | `setup-server.ps1`, `setup-server.sh`, `client/setup-client.ps1`, `client/setup-client.sh`, `client/*.json`, `linux-server-tools/*.sh` |
 | `modules/server-update.md` | `setup-server.sh` `--update` (`run_update`, `finish_update`, `reload_changed_config`) and `migrate_storage` (`migrate_events_t`, `warn_old_query_logs`) |
+| `modules/docs-site.md` | `mkdocs.yml`, `docs/` (structure, page → source map; not the page text), `VERSION`, `hooks/app_version.py`, `ci/`, `.github/workflows/docs.yml`, `tools/docs-demo/` |
 | `pending-bugs.md` | suspected bugs and unverified behaviour, grouped by area |
 
 ## Conventions

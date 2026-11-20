@@ -36,6 +36,8 @@ CREATE DATABASE IF NOT EXISTS cc;
 --                 lower case, `\` -> `/`, `/c/` -> `c:/`
 --      path_cand  tool_result: candidate project folder of that path (rules in cc.path_roots, views.sql)
 --      bash_cmd   tool_parameters.bash_command (first word of the command only)
+--    account_uuid, status_code, error come last: they were added later (init-views.sh adds them to an older
+--    table by rebuilding it from otel.otel_logs). The column order is the order of the backfill SELECT.
 CREATE TABLE IF NOT EXISTS cc.events_t
 (
     ts                    DateTime64(9),
@@ -77,7 +79,10 @@ CREATE TABLE IF NOT EXISTS cc.events_t
     seq                   UInt64,
     abs_path              String,
     path_cand             String,
-    bash_cmd              String
+    bash_cmd              String,
+    account_uuid          LowCardinality(String),
+    status_code           UInt32,
+    error                 String CODEC(ZSTD(1))
 )
 ENGINE = MergeTree
 PARTITION BY toDate(ts)
@@ -103,10 +108,15 @@ CREATE TABLE IF NOT EXISTS cc.tips_t
     body     String,
     scope    String,
     metric   Float64,
-    link     String
+    link     String,
+    affected Nullable(UInt64),
+    cost_usd Nullable(Float64)
 )
 ENGINE = MergeTree
 ORDER BY tuple();
+-- affected and cost_usd were added later: a table from before gets them here (refresh.sql copies the structure).
+ALTER TABLE cc.tips_t ADD COLUMN IF NOT EXISTS affected Nullable(UInt64);
+ALTER TABLE cc.tips_t ADD COLUMN IF NOT EXISTS cost_usd Nullable(Float64);
 
 -- Insert-time flattening of every new claude-code row of otel.otel_logs into cc.events_t.
 -- Path rules (normalisation, the container-folder regex and the IN stop list) are written three times:
@@ -124,7 +134,9 @@ FROM
         LogAttributes['event.name']                                 AS event,
         LogAttributes['session.id']                                 AS session_id,
         LogAttributes['prompt.id']                                  AS prompt_id,
-        LogAttributes['user.email']                                 AS account,
+        -- display label: email, else the first 8 characters of the account uuid, else ''
+        if(LogAttributes['user.email'] != '', LogAttributes['user.email'],
+           left(LogAttributes['user.account_uuid'], 8))             AS account,
         LogAttributes['agent_id']                                   AS agent_id,
         LogAttributes['request_id']                                 AS request_id,
         LogAttributes['query_source']                               AS query_source,
@@ -166,7 +178,11 @@ FROM
                   'downloads', 'onedrive', 'appdata', 'tmp', 'temp', 'var', 'etc', 'usr', 'proc', 'sys', 'windows', 'programdata',
                   'program files', 'program files (x86)', 'node_modules', '$recycle.bin')
               OR startsWith(c0, 'onedrive - '), '', c0) AS path_cand,
-        JSONExtractString(tool_parameters, 'bash_command')          AS bash_cmd
+        JSONExtractString(tool_parameters, 'bash_command')          AS bash_cmd,
+        LogAttributes['user.account_uuid']                          AS account_uuid,
+        -- api_error events: HTTP status (0 when there is none, e.g. a network error) and the error text
+        toUInt32OrZero(LogAttributes['status_code'])                AS status_code,
+        LogAttributes['error']                                      AS error
     FROM otel.otel_logs
     WHERE ServiceName = 'claude-code'
 );

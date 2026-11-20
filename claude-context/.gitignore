@@ -9,3 +9,5 @@ settings.local.json
 merge-requests/
 # Python bytecode of the hooks and skill scripts.
 __pycache__/
+# PR descriptions drafted by the mr-description skill (the PR on GitHub keeps the text).
+pull-requests/

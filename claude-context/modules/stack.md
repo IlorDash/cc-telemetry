@@ -10,7 +10,7 @@ The Docker services, how data moves between them, what is exposed and where it i
 | `otel-collector.yaml` | OTLP receivers, processors, clickhouse exporter, pipelines |
 | `.env.example` → `.env` | `CLICKHOUSE_PASSWORD`, `GRAFANA_ADMIN_PASSWORD`; optional `OTLP_BIND`, `GRAFANA_BIND`, `GRAFANA_PORT`, `CLICKHOUSE_VERSION`, `RETENTION_DAYS` (365), `CLICKHOUSE_LIMITS` (`small`\|`none`, default `none`), `CLICKHOUSE_CPUS` (0 = no limit) (`.env` git-ignored, created by `setup-server.ps1` / `setup-server.sh`; only the `.sh` writes the optional keys — Windows runs on the compose defaults) |
 | `grafana/provisioning/datasources/clickhouse.yaml` | datasource uid `clickhouse`, native `clickhouse:9000`, user `otel`, db `cc`, password from env |
-| `grafana/provisioning/dashboards/dashboards.yaml` | file provider, `updateIntervalSeconds: 30`, `allowUiUpdates: true` |
+| `grafana/provisioning/dashboards/dashboards.yaml` | file provider, `updateIntervalSeconds: 30`, `allowUiUpdates: true`, `foldersFromFilesStructure: true` (root files → General, `ru/` → folder `ru`) |
 | `clickhouse/init-views.sh`, `clickhouse/refresh-loop.sh`, `clickhouse/{schema,backfill,views,refresh}.sql` | see `modules/telemetry-data.md` |
 | `clickhouse/config.d/common.xml` | always on, mounted as `config.d/cc-common.xml`: text log, system logs removed (below) |
 | `clickhouse/users.d/common.xml` | always on, mounted as `users.d/cc-common.xml`: `default` profile `log_queries` / `log_query_views` 0 |

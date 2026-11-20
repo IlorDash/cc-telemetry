@@ -42,6 +42,51 @@ for t in $tables; do
   fi
 done
 
+# Columns added to cc.events_t after it was first created (account_uuid, status_code, error). The materialized
+# view fills them only for new events, so an older table is rebuilt once from otel.otel_logs: a copy with the
+# same layout (partitions, TTL: setup-server.sh migrates the layout itself) plus the missing columns at the end
+# (the column order of schema.sql and backfill.sql), filled month by month with backfill.sql, checked against
+# the old table and swapped in. The old view is dropped first: schema.sql creates the new one, and the backfill
+# below copies the events that arrived meanwhile. cc.events_t holds only a copy of otel.otel_logs.
+# An interrupted run starts the copy again (cc.events_t still lacks the columns) or drops the checked old table.
+col_n() { "${CH[@]}" -q "SELECT count() FROM system.columns WHERE database = 'cc' AND table = '$1' AND name = 'account_uuid'"; }
+if [ "$("${CH[@]}" -q "EXISTS TABLE cc.events_t")" = 1 ] && [ "$(col_n events_t)" = 0 ]; then
+  echo "cc.events_t has no account_uuid, status_code, error: rebuilding it from otel.otel_logs (once)"
+  cutoff="$("${CH[@]}" -q "SELECT toString(now() - INTERVAL 1 MINUTE)")"
+  "${CH[@]}" -q "DROP VIEW IF EXISTS cc.events_mv"
+  "${CH[@]}" -q "DROP TABLE IF EXISTS cc.events_t_cols SYNC"
+  "${CH[@]}" -q "CREATE TABLE cc.events_t_cols AS cc.events_t"
+  "${CH[@]}" -q "ALTER TABLE cc.events_t_cols ADD COLUMN account_uuid LowCardinality(String), ADD COLUMN status_code UInt32, ADD COLUMN error String CODEC(ZSTD(1))"
+  months="$("${CH[@]}" -q "SELECT DISTINCT toStartOfMonth(toDate(TimestampTime)) AS m, addMonths(m, 1) FROM otel.otel_logs WHERE ServiceName = 'claude-code' ORDER BY m")"
+  while IFS=$'\t' read -r lo hi; do
+    [ -n "$lo" ] || continue
+    echo "  copy ${lo%-*}"
+    sed 's/cc\.events_t\b/cc.events_t_cols/g' /init/backfill.sql \
+      | "${CH[@]}" --multiquery --param_lo="$lo 00:00:00" --param_hi="$hi 00:00:00" --param_guard=30
+  done <<<"$months"
+  # Every row of the old table older than the start must be in the copy, with the same tokens and cost.
+  # Month by month: the set of keys of one month stays within the per-query memory limit.
+  cmp="SELECT count(), sum(input_tokens + output_tokens + cache_read_tokens + cache_creation_tokens), round(sum(cost_usd), 4) FROM"
+  old_months="$("${CH[@]}" -q "SELECT DISTINCT toStartOfMonth(toDate(ts)) AS m, addMonths(m, 1) FROM cc.events_t ORDER BY m")"
+  while IFS=$'\t' read -r lo hi; do
+    [ -n "$lo" ] || continue
+    w="ts >= toDateTime64('$lo 00:00:00', 9) AND ts < toDateTime64('$hi 00:00:00', 9) AND ts < toDateTime64('$cutoff', 9)"
+    old="$("${CH[@]}" -q "$cmp cc.events_t WHERE $w")"
+    new="$("${CH[@]}" -q "$cmp cc.events_t_cols WHERE $w AND (session_id, seq, ts) IN (SELECT session_id, seq, ts FROM cc.events_t WHERE $w)")"
+    if [ "$old" != "$new" ]; then
+      echo "The rebuilt cc.events_t_cols does not match cc.events_t in ${lo%-*} (rows/tokens/cost: old $old, copy $new): nothing was swapped." >&2
+      echo "cc.events_mv is dropped meanwhile: new events stay in otel.otel_logs and are copied on the next successful run." >&2
+      exit 1
+    fi
+  done <<<"$old_months"
+  "${CH[@]}" -q "EXCHANGE TABLES cc.events_t AND cc.events_t_cols"
+  echo "cc.events_t rebuilt with the new columns (rows, tokens and cost checked month by month)"
+fi
+# The old table after a checked swap (also when a previous run stopped right after it).
+if [ "$("${CH[@]}" -q "EXISTS TABLE cc.events_t_cols")" = 1 ] && [ "$(col_n events_t_cols)" = 0 ] && [ "$(col_n events_t)" = 1 ]; then
+  "${CH[@]}" -q "DROP TABLE cc.events_t_cols SYNC"
+fi
+
 sed "s/__RETENTION_DAYS__/$RETENTION_DAYS/g" /init/schema.sql | "${CH[@]}" --multiquery
 
 # Backfill: one pass per month of data keeps the set of known keys small (per-query memory limit).

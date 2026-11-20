@@ -1,0 +1,2221 @@
+{
+  "uid": "cc-sessions-ru",
+  "title": "Сессии",
+  "tags": [
+    "cc",
+    "claude-code",
+    "otel"
+  ],
+  "timezone": "browser",
+  "editable": true,
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5m",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timepicker": {
+    "quick_ranges": [
+      {
+        "display": "Последние 5 минут",
+        "from": "now-5m",
+        "to": "now"
+      },
+      {
+        "display": "Последний час",
+        "from": "now-1h",
+        "to": "now"
+      },
+      {
+        "display": "Последние 24 часа",
+        "from": "now-24h",
+        "to": "now"
+      },
+      {
+        "display": "Последние 7 дней",
+        "from": "now-7d",
+        "to": "now"
+      },
+      {
+        "display": "Последние 30 дней",
+        "from": "now-30d",
+        "to": "now"
+      },
+      {
+        "display": "Всё время",
+        "from": "now-10y",
+        "to": "now"
+      }
+    ],
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "1h"
+    ]
+  },
+  "links": [
+    {
+      "type": "link",
+      "title": "EN",
+      "tooltip": "Английская версия",
+      "url": "/d/cc-sessions",
+      "keepTime": true,
+      "includeVars": true
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "account",
+        "label": "Аккаунт",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "clickhouse"
+        },
+        "query": "SELECT account_uuid, argMax(account, ts) AS name FROM cc.events WHERE account_uuid != '' GROUP BY account_uuid ORDER BY name",
+        "definition": "SELECT account_uuid, argMax(account, ts) AS name FROM cc.events WHERE account_uuid != '' GROUP BY account_uuid ORDER BY name",
+        "includeAll": true,
+        "allValue": "'__all'",
+        "multi": true,
+        "refresh": 2,
+        "sort": 0,
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": []
+      },
+      {
+        "name": "project",
+        "label": "Проект",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "clickhouse"
+        },
+        "query": "SELECT DISTINCT project FROM cc.events WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) ORDER BY project",
+        "definition": "SELECT DISTINCT project FROM cc.events WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) ORDER BY project",
+        "includeAll": true,
+        "allValue": "__all",
+        "multi": false,
+        "refresh": 2,
+        "sort": 0,
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": []
+      },
+      {
+        "name": "session",
+        "label": "Сессия",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "clickhouse"
+        },
+        "query": "SELECT session_id, if(title != '', concat(leftUTF8(title, 60), ' (', left(session_id, 8), ')'), session_id) AS name FROM cc.sessions WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
+        "definition": "SELECT session_id, if(title != '', concat(leftUTF8(title, 60), ' (', left(session_id, 8), ')'), session_id) AS name FROM cc.sessions WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
+        "includeAll": true,
+        "allValue": "__all",
+        "multi": false,
+        "refresh": 2,
+        "sort": 0,
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": []
+      },
+      {
+        "name": "actor",
+        "label": "Исполнитель",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "clickhouse"
+        },
+        "query": "SELECT DISTINCT actor FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') ORDER BY actor",
+        "definition": "SELECT DISTINCT actor FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') ORDER BY actor",
+        "includeAll": true,
+        "allValue": "__all",
+        "multi": false,
+        "refresh": 2,
+        "sort": 0,
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": []
+      },
+      {
+        "name": "skill",
+        "label": "Навык",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "clickhouse"
+        },
+        "query": "SELECT DISTINCT skill FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND skill != '' ORDER BY skill",
+        "definition": "SELECT DISTINCT skill FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND skill != '' ORDER BY skill",
+        "includeAll": true,
+        "allValue": "__all",
+        "multi": false,
+        "refresh": 2,
+        "sort": 0,
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": []
+      },
+      {
+        "name": "extra_cols",
+        "label": "Колонки",
+        "type": "custom",
+        "query": "нет : none,ID сессии : id,Начало : started,Аккаунт : account",
+        "multi": true,
+        "includeAll": false,
+        "current": {
+          "selected": true,
+          "text": [
+            "нет"
+          ],
+          "value": [
+            "none"
+          ]
+        },
+        "options": [
+          {
+            "selected": true,
+            "text": "нет",
+            "value": "none"
+          },
+          {
+            "selected": false,
+            "text": "ID сессии",
+            "value": "id"
+          },
+          {
+            "selected": false,
+            "text": "Начало",
+            "value": "started"
+          },
+          {
+            "selected": false,
+            "text": "Аккаунт",
+            "value": "account"
+          }
+        ]
+      },
+      {
+        "name": "shown_cols",
+        "label": "shown_cols",
+        "type": "query",
+        "hide": 2,
+        "skipUrlSync": true,
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "clickhouse"
+        },
+        "query": "SELECT arrayJoin(arrayFilter(x -> x NOT IN ('session_id', 'started', 'account') OR has(arrayMap(y -> if(y = 'id', 'session_id', y), splitByChar(',', '${extra_cols:csv}')), x), ['sid', 'from_ms', 'to_ms', 'name', 'last_prompt', 'project', 'branch', 'session_id', 'started', 'account', 'model', 'turns', 'tokens', 'cost_usd', 'hit', 'errors'])) AS shown_cols",
+        "definition": "SELECT arrayJoin(arrayFilter(x -> x NOT IN ('session_id', 'started', 'account') OR has(arrayMap(y -> if(y = 'id', 'session_id', y), splitByChar(',', '${extra_cols:csv}')), x), ['sid', 'from_ms', 'to_ms', 'name', 'last_prompt', 'project', 'branch', 'session_id', 'started', 'account', 'model', 'turns', 'tokens', 'cost_usd', 'hit', 'errors'])) AS shown_cols",
+        "includeAll": true,
+        "multi": true,
+        "refresh": 2,
+        "sort": 0,
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": []
+      },
+      {
+        "name": "session_header",
+        "label": "session_header",
+        "type": "query",
+        "hide": 2,
+        "skipUrlSync": true,
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "clickhouse"
+        },
+        "query": "SELECT if(count() = 0, 'Сессия не выбрана', any(h)) AS session_header\nFROM\n(\n  SELECT arrayStringConcat(arrayFilter(x -> x != '',\n           [concat(if(s.title != '', s.title, if(s.first_prompt != '', leftUTF8(replaceAll(s.first_prompt, '\\n', ' '), 80), '(без названия)')), if(s.git_branch != '', concat('  ', s.git_branch), '')),\n            s.project,\n            multiIf(positionCaseInsensitive(s.model, 'opus') > 0, 'Opus', positionCaseInsensitive(s.model, 'sonnet') > 0, 'Sonnet', positionCaseInsensitive(s.model, 'haiku') > 0, 'Haiku', s.model),\n            s.account,\n            left(s.session_id, 8),\n            if(intDiv(a.ms, 60000) >= 60,\n               concat(toString(intDiv(a.ms, 3600000)), ' ч ', toString(intDiv(a.ms, 60000) % 60), ' мин'),\n               if(a.ms < 60000, concat(toString(intDiv(a.ms, 1000)), ' с'), concat(toString(intDiv(a.ms, 60000)), ' мин'))),\n            if(s.last_event >= now() - INTERVAL 10 MINUTE, 'LIVE', '')]), ' · ') AS h\n  FROM cc.sessions AS s\n  LEFT JOIN\n  (\n    SELECT session_id,\n           arraySum(arrayMap((c, x, y) -> if(c > 0, y - x, 0), arrayCumSum(arrayMap(q -> q.2, p)), arrayMap(q -> q.1, p), arrayPushBack(arrayPopFront(arrayMap(q -> q.1, p)), toInt64(0)))) AS ms\n    FROM\n    (\n      SELECT session_id, arraySort(arrayConcat(groupArray((a_s, toInt8(1))), groupArray((a_e, toInt8(-1))))) AS p\n      FROM\n      (\n        SELECT session_id, toUnixTimestamp64Milli(ts) - toInt64(duration_ms) AS a_s, toUnixTimestamp64Milli(ts) AS a_e\n        FROM cc.events_raw\n        WHERE event IN ('api_request', 'tool_result') AND session_id = '${session}'\n      )\n      GROUP BY session_id\n    )\n  ) AS a ON a.session_id = s.session_id\n  WHERE s.session_id = '${session}'\n)",
+        "definition": "SELECT if(count() = 0, 'Сессия не выбрана', any(h)) AS session_header\nFROM\n(\n  SELECT arrayStringConcat(arrayFilter(x -> x != '',\n           [concat(if(s.title != '', s.title, if(s.first_prompt != '', leftUTF8(replaceAll(s.first_prompt, '\\n', ' '), 80), '(без названия)')), if(s.git_branch != '', concat('  ', s.git_branch), '')),\n            s.project,\n            multiIf(positionCaseInsensitive(s.model, 'opus') > 0, 'Opus', positionCaseInsensitive(s.model, 'sonnet') > 0, 'Sonnet', positionCaseInsensitive(s.model, 'haiku') > 0, 'Haiku', s.model),\n            s.account,\n            left(s.session_id, 8),\n            if(intDiv(a.ms, 60000) >= 60,\n               concat(toString(intDiv(a.ms, 3600000)), ' ч ', toString(intDiv(a.ms, 60000) % 60), ' мин'),\n               if(a.ms < 60000, concat(toString(intDiv(a.ms, 1000)), ' с'), concat(toString(intDiv(a.ms, 60000)), ' мин'))),\n            if(s.last_event >= now() - INTERVAL 10 MINUTE, 'LIVE', '')]), ' · ') AS h\n  FROM cc.sessions AS s\n  LEFT JOIN\n  (\n    SELECT session_id,\n           arraySum(arrayMap((c, x, y) -> if(c > 0, y - x, 0), arrayCumSum(arrayMap(q -> q.2, p)), arrayMap(q -> q.1, p), arrayPushBack(arrayPopFront(arrayMap(q -> q.1, p)), toInt64(0)))) AS ms\n    FROM\n    (\n      SELECT session_id, arraySort(arrayConcat(groupArray((a_s, toInt8(1))), groupArray((a_e, toInt8(-1))))) AS p\n      FROM\n      (\n        SELECT session_id, toUnixTimestamp64Milli(ts) - toInt64(duration_ms) AS a_s, toUnixTimestamp64Milli(ts) AS a_e\n        FROM cc.events_raw\n        WHERE event IN ('api_request', 'tool_result') AND session_id = '${session}'\n      )\n      GROUP BY session_id\n    )\n  ) AS a ON a.session_id = s.session_id\n  WHERE s.session_id = '${session}'\n)",
+        "includeAll": false,
+        "multi": false,
+        "refresh": 2,
+        "sort": 0,
+        "current": {},
+        "options": []
+      }
+    ]
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 310,
+      "type": "text",
+      "title": "Дашборды",
+      "description": "Навигация. Ссылки сохраняют период и переменные.",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 3,
+        "h": 12
+      },
+      "transparent": false,
+      "options": {
+        "mode": "html",
+        "content": "<a href=\"/d/cc-usage-ru?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Обзор</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">итоги и статус</span></a><a href=\"/d/cc-sessions-ru?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid #F46800;background:#22252b\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Сессии</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">список · таймлайн</span></a><a href=\"/d/cc-prompts-ru?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Промпты</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">дорогие ходы</span></a><a href=\"/d/cc-efficiency-ru?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Эффективность</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">советы и разбор затрат</span></a><a href=\"/d/cc-agents-ru?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Агенты и навыки</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">субагенты, навыки</span></a><a href=\"/d/cc-tools-ru?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Инструменты и файлы</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">вызовы, файлы, чтения</span></a><a href=\"/d/cc-health-ru?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Состояние</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">задержки, хуки</span></a>"
+      }
+    },
+    {
+      "id": 311,
+      "type": "bargauge",
+      "title": "Расход · 5 ч",
+      "description": "Стоимость (cost_usd) по аккаунтам Claude за последние 5 часов. Полоса = эта стоимость в % от пика аккаунта: его максимума за скользящие 5 часов за последние 30 дней (шаг 10 минут). Зелёный до 60 %, жёлтый от 60 %, красный от 80 %. Окна фиксированы: период дашборда и переменные не действуют. Аккаунты без затрат за 7 дней не показаны.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 3,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT\n    concat(if(t.label = '', '(нет аккаунта)', t.label), '  ·  $', toString(round(t.h5, 2))) AS name,\n    round(100 * t.h5 / greatest(p.peak, t.h5, 0.000001)) AS pct\nFROM\n(\n    SELECT account_uuid,\n           argMax(account, ts) AS label,\n           sumIf(cost_usd, ts >= now() - INTERVAL 5 HOUR) AS h5,\n           sumIf(cost_usd, ts >= now() - INTERVAL 7 DAY) AS d7\n    FROM cc.api_requests\n    WHERE ts >= now() - INTERVAL 30 DAY\n    GROUP BY account_uuid\n) AS t\nLEFT JOIN\n(\n    SELECT account_uuid, max(w) AS peak\n    FROM\n    (\n        SELECT account_uuid,\n               sum(c) OVER (PARTITION BY account_uuid ORDER BY b RANGE BETWEEN 17999 PRECEDING AND CURRENT ROW) AS w\n        FROM\n        (\n            SELECT account_uuid, toUInt32(toStartOfInterval(ts, INTERVAL 10 MINUTE)) AS b, sum(cost_usd) AS c\n            FROM cc.api_requests\n            WHERE ts >= now() - INTERVAL 30 DAY\n            GROUP BY account_uuid, b\n        )\n    )\n    GROUP BY account_uuid\n) AS p ON p.account_uuid = t.account_uuid\nWHERE t.d7 > 0\nORDER BY t.h5 DESC, t.d7 DESC"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": true,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "valueMode": "color",
+        "namePlacement": "top",
+        "showUnfilled": true,
+        "sizing": "manual",
+        "minVizHeight": 36,
+        "maxVizHeight": 36,
+        "text": {
+          "titleSize": 15,
+          "valueSize": 15
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#73BF69",
+                "value": null
+              },
+              {
+                "color": "#FADE2A",
+                "value": 60
+              },
+              {
+                "color": "#F2495C",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 313,
+      "type": "stat",
+      "title": "Советы · 7 д",
+      "description": "Число советов (view cc.tips, последние 7 дней). Клик по значению открывает раздел «Советы» на дашборде «Эффективность». Период дашборда и переменные не действуют.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 3,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT count() AS tips\nFROM cc.tips"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/.*/",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value_and_name",
+        "text": {
+          "titleSize": 30,
+          "valueSize": 30
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "0"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "tips"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Советы"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 1
+                    },
+                    {
+                      "color": "orange",
+                      "value": 5
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Открыть все советы",
+                    "url": "/d/cc-efficiency-ru?${__url_time_range}",
+                    "oneClick": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 312,
+      "type": "stat",
+      "title": "",
+      "description": "Самая частая категория советов (view cc.tips, последние 7 дней), в скобках число (при равенстве по алфавиту). Клик по значению открывает раздел «Советы» на дашборде «Эффективность». Период дашборда и переменные не действуют.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 19,
+        "w": 3,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT if(tips = 0, 'нет', concat(multiIf(top = 'cache', 'Пересборка кэша', top = 'repeated-read', 'Повтор чтений', top = 'big-results', 'Крупные выводы', top = 'short-opus', 'Opus на мелочи', top = 'agent-outlier', 'Дорогой агент', top = 'denials', 'Отклонения', top = 'slow-hook', 'Медленные хуки', top = 'slow-ttft', 'Долгий TTFT', top), ' (', toString(n), ')')) AS most_frequent\nFROM\n(\n    SELECT sum(c) AS tips,\n           argMin(category, (-toInt64(c), category)) AS top,\n           max(c) AS n\n    FROM (SELECT category, count() AS c FROM cc.tips GROUP BY category)\n)"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/.*/",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value_and_name",
+        "text": {
+          "titleSize": 20,
+          "valueSize": 20
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "нет"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "most_frequent"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Чаще всего"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Открыть все советы",
+                    "url": "/d/cc-efficiency-ru?${__url_time_range}",
+                    "oneClick": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 421,
+      "type": "text",
+      "title": "Выберите сессию в таблице или в переменной «Сессия»: панели ниже покажут её.",
+      "description": "Таблица сессий и четыре плитки над ней следуют периоду (по последнему промпту) и переменным Аккаунт, Проект, Исполнитель и Навык; переменную «Сессия» они не учитывают, чтобы выбранная строка оставалась среди остальных. Всё ниже заголовка сессии следует выбранной сессии, периоду и всем переменным. Панель слева их не учитывает.",
+      "transparent": true,
+      "gridPos": {
+        "x": 3,
+        "y": 0,
+        "w": 21,
+        "h": 1
+      },
+      "options": {
+        "mode": "html",
+        "content": ""
+      }
+    },
+    {
+      "id": 430,
+      "type": "stat",
+      "title": "Сессии",
+      "description": "Сессии с запросом к модели и промптом в периоде (действуют переменные аккаунта, проекта, исполнителя и навыка; переменная «Сессия» не действует). Строка над числом: сессии с последним событием за последний час.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 3,
+        "y": 1,
+        "w": 5,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT count() AS sessions, concat('активных за час: ', toString(countIf(s.last_event >= now() - INTERVAL 1 HOUR))) AS name\nFROM cc.sessions AS s WHERE ('__all' IN (${account:singlequote}) OR s.account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR s.project = '${project}') AND s.requests > 0 AND s.last_prompt >= $__fromTime AND s.last_prompt <= $__toTime AND (('${actor}' = '__all' AND '${skill}' = '__all') OR s.session_id IN (SELECT session_id FROM cc.api_requests WHERE ('${actor}' != '__all' OR '${skill}' != '__all') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}')))"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "orientation": "vertical",
+        "justifyMode": "auto",
+        "wideLayout": false,
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "text": {
+          "titleSize": 13,
+          "valueSize": 42
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "locale",
+          "decimals": 0,
+          "noValue": "0",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#ccccdc"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 431,
+      "type": "stat",
+      "title": "Медиана длины",
+      "description": "Медианная длина сессии как время активности: пока шёл запрос к модели или вызов инструмента (простой между ними не считается; пересекающиеся запросы и вызовы считаются один раз). Строка над числом: медианное число ходов (запросы к модели, включая субагентов и вспомогательные) на сессию.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 1,
+        "w": 5,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT quantileExact(0.5)(a.ms) / 1000 AS seconds, concat('ходов: ', toString(toUInt64(round(quantileExact(0.5)(s.requests))))) AS name\nFROM cc.sessions AS s\nLEFT JOIN\n(\n  SELECT session_id,\n         arraySum(arrayMap((c, x, y) -> if(c > 0, y - x, 0), arrayCumSum(arrayMap(q -> q.2, p)), arrayMap(q -> q.1, p), arrayPushBack(arrayPopFront(arrayMap(q -> q.1, p)), toInt64(0)))) AS ms\n  FROM\n  (\n    SELECT session_id, arraySort(arrayConcat(groupArray((a_s, toInt8(1))), groupArray((a_e, toInt8(-1))))) AS p\n    FROM\n    (\n      SELECT session_id, toUnixTimestamp64Milli(ts) - toInt64(duration_ms) AS a_s, toUnixTimestamp64Milli(ts) AS a_e\n      FROM cc.events_raw\n      WHERE event IN ('api_request', 'tool_result')\n        AND session_id IN (SELECT session_id FROM cc.sessions WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND requests > 0 AND last_prompt >= $__fromTime AND last_prompt <= $__toTime)\n    )\n    GROUP BY session_id\n  )\n) AS a ON a.session_id = s.session_id\nWHERE ('__all' IN (${account:singlequote}) OR s.account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR s.project = '${project}') AND s.requests > 0 AND s.last_prompt >= $__fromTime AND s.last_prompt <= $__toTime AND (('${actor}' = '__all' AND '${skill}' = '__all') OR s.session_id IN (SELECT session_id FROM cc.api_requests WHERE ('${actor}' != '__all' OR '${skill}' != '__all') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}')))"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "orientation": "vertical",
+        "justifyMode": "auto",
+        "wideLayout": false,
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "text": {
+          "titleSize": 13,
+          "valueSize": 42
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 1,
+          "noValue": "0",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#ccccdc"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 432,
+      "type": "stat",
+      "title": "Медиана cost_usd",
+      "description": "Медиана cost_usd целой сессии (сумма cost_usd у api_request). Строка над числом: 95-й перцентиль. При подписке cost_usd не является счётом.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 13,
+        "y": 1,
+        "w": 5,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT quantileExact(0.5)(s.cost_usd) AS cost_usd, concat('p95 $', toString(round(quantileExact(0.95)(s.cost_usd), 2))) AS name\nFROM cc.sessions AS s WHERE ('__all' IN (${account:singlequote}) OR s.account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR s.project = '${project}') AND s.requests > 0 AND s.last_prompt >= $__fromTime AND s.last_prompt <= $__toTime AND (('${actor}' = '__all' AND '${skill}' = '__all') OR s.session_id IN (SELECT session_id FROM cc.api_requests WHERE ('${actor}' != '__all' OR '${skill}' != '__all') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}')))"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "orientation": "vertical",
+        "justifyMode": "auto",
+        "wideLayout": false,
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "text": {
+          "titleSize": 13,
+          "valueSize": 42
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2,
+          "noValue": "$0.00",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#ccccdc"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 433,
+      "type": "stat",
+      "title": "Сессии с ошибками",
+      "description": "Доля сессий выше, где неудачны не менее 5 % вызовов инструментов (tool_result success = false). Сессии целиком, а не только период.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 1,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT 100 * countIf(t.calls > 0 AND t.failed >= 0.05 * t.calls) / greatest(count(), 1) AS share, 'ошибок инструментов ≥ 5% вызовов' AS name\nFROM (SELECT s.session_id AS session_id FROM cc.sessions AS s WHERE ('__all' IN (${account:singlequote}) OR s.account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR s.project = '${project}') AND s.requests > 0 AND s.last_prompt >= $__fromTime AND s.last_prompt <= $__toTime AND (('${actor}' = '__all' AND '${skill}' = '__all') OR s.session_id IN (SELECT session_id FROM cc.api_requests WHERE ('${actor}' != '__all' OR '${skill}' != '__all') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}')))) AS x\nLEFT JOIN (SELECT session_id, count() AS calls, countIf(NOT success) AS failed FROM cc.tool_calls GROUP BY session_id) AS t ON t.session_id = x.session_id"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "orientation": "vertical",
+        "justifyMode": "auto",
+        "wideLayout": false,
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "text": {
+          "titleSize": 13,
+          "valueSize": 42
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 0,
+          "noValue": "0",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#FADE2A"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 7,
+      "type": "table",
+      "title": "Сессии · клик по строке открывает таймлайн",
+      "description": "Одна строка на сессию с запросом к модели и промптом в периоде, сверху самый свежий последний промпт (не более 500). Название = заголовок, иначе первый промпт. Модель = модель с наибольшей стоимостью в сессии. Ходы = запросы к модели. Токены = input + output + cache create; Хит кэша = cache read / (cache read + input + cache create); Ошибки = неудачные вызовы инструментов / все вызовы; cost_usd = за всю сессию. Клик по названию открывает сессию ниже: период сужается до сессии (запас 3 %, не менее 5 секунд), поэтому сессии в таблице и четыре итога над ней относятся к этому окну; вернуться можно кнопкой «Назад» браузера или выбором периода. Выбранная сессия отмечена ▶ перед названием. ID сессии, Начало и Аккаунт скрыты: включите их в переменной «Колонки» сверху.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 3,
+        "y": 5,
+        "w": 21,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT s.session_id AS sid,\n       if(w.t1 = 0, toUnixTimestamp64Milli(s.started), w.t0) - greatest(intDiv(3 * (if(w.t1 = 0, toUnixTimestamp64Milli(s.last_event), w.t1) - if(w.t1 = 0, toUnixTimestamp64Milli(s.started), w.t0)), 100), 5000) AS from_ms, if(w.t1 = 0, toUnixTimestamp64Milli(s.last_event), w.t1) + greatest(intDiv(3 * (if(w.t1 = 0, toUnixTimestamp64Milli(s.last_event), w.t1) - if(w.t1 = 0, toUnixTimestamp64Milli(s.started), w.t0)), 100), 5000) AS to_ms,\n       concat(if(s.session_id = '${session}', '▶ ', ''), if(s.title != '', s.title, leftUTF8(replaceAll(s.first_prompt, '\\n', ' '), 100))) AS name,\n       s.last_prompt AS last_prompt, s.project AS project, s.git_branch AS branch,\n       left(s.session_id, 8) AS session_id, s.started AS started, s.account AS account,\n       multiIf(positionCaseInsensitive(s.model, 'opus') > 0, 'Opus', positionCaseInsensitive(s.model, 'sonnet') > 0, 'Sonnet', positionCaseInsensitive(s.model, 'haiku') > 0, 'Haiku', s.model) AS model, s.requests AS turns,\n       r.tokens AS tokens, round(s.cost_usd, 3) AS cost_usd, r.hit AS hit,\n       if(t.calls = 0, 0, 100 * t.failed / t.calls) AS errors\nFROM\n(\n  SELECT * FROM cc.sessions AS s\n  WHERE ('__all' IN (${account:singlequote}) OR s.account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR s.project = '${project}') AND s.requests > 0 AND s.last_prompt >= $__fromTime AND s.last_prompt <= $__toTime AND (('${actor}' = '__all' AND '${skill}' = '__all') OR s.session_id IN (SELECT session_id FROM cc.api_requests WHERE ('${actor}' != '__all' OR '${skill}' != '__all') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}')))\n  ORDER BY s.last_prompt DESC LIMIT 500\n) AS s\nLEFT JOIN\n(\n  SELECT session_id, sum(input_tokens + output_tokens + cache_creation_tokens) AS tokens,\n         100 * sum(cache_read_tokens) / greatest(sum(cache_read_tokens + input_tokens + cache_creation_tokens), 1) AS hit\n  FROM cc.api_requests\n  GROUP BY session_id\n) AS r ON r.session_id = s.session_id\nLEFT JOIN\n(\n  SELECT session_id, count() AS calls, countIf(NOT success) AS failed\n  FROM cc.tool_calls\n  GROUP BY session_id\n) AS t ON t.session_id = s.session_id\nLEFT JOIN (\n  SELECT session_id, min(a_s) AS t0, max(a_e) AS t1\n  FROM\n  (\n    SELECT session_id, toUnixTimestamp64Milli(ts) - if(event = 'user_prompt', toInt64(0), toInt64(duration_ms)) AS a_s, toUnixTimestamp64Milli(ts) AS a_e\n    FROM cc.events_raw\n    WHERE event IN ('user_prompt', 'api_request', 'tool_result')\n      AND session_id IN (SELECT session_id FROM cc.events_raw WHERE event = 'user_prompt' AND ts >= $__fromTime AND ts <= $__toTime)\n  )\n  GROUP BY session_id\n) AS w ON w.session_id = s.session_id\nORDER BY s.last_prompt DESC"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "byVariable": true,
+            "include": {
+              "variable": "$shown_cols"
+            }
+          }
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": [
+          {
+            "displayName": "Посл. промпт",
+            "desc": true
+          }
+        ]
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": false,
+            "minWidth": 50
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "sid"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "from_ms"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "to_ms"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "name"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Название"
+              },
+              {
+                "id": "custom.minWidth",
+                "value": 220
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Открыть сессию",
+                    "url": "/d/cc-sessions-ru?from=${__data.fields.from_ms:raw}&to=${__data.fields.to_ms:raw}&${account:queryparam}&${project:queryparam}&var-session=${__data.fields.sid:percentencode}&${actor:queryparam}&${skill:queryparam}&${extra_cols:queryparam}"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "last_prompt"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Посл. промпт"
+              },
+              {
+                "id": "unit",
+                "value": "time:MM-DD HH:mm"
+              },
+              {
+                "id": "custom.width",
+                "value": 140
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#8e8e9e"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "project"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Проект"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "branch"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Ветка"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#FF9830"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "session_id"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "ID сессии"
+              },
+              {
+                "id": "custom.width",
+                "value": 115
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#8e8e9e"
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "started"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Начало"
+              },
+              {
+                "id": "unit",
+                "value": "time:MM-DD HH:mm"
+              },
+              {
+                "id": "custom.width",
+                "value": 130
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#8e8e9e"
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "account"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Аккаунт"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#8e8e9e"
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "model"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Модель"
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "Opus": {
+                        "color": "#B877D9",
+                        "index": 0
+                      },
+                      "Sonnet": {
+                        "color": "#5794F2",
+                        "index": 1
+                      },
+                      "Haiku": {
+                        "color": "#73BF69",
+                        "index": 2
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "turns"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Ходы"
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.width",
+                "value": 75
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "tokens"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Токены"
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cost_usd"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "cost_usd"
+              },
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "hit"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Хит кэша"
+              },
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.width",
+                "value": 105
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "#F2495C",
+                      "value": null
+                    },
+                    {
+                      "color": "#FADE2A",
+                      "value": 75
+                    },
+                    {
+                      "color": "#73BF69",
+                      "value": 90
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "errors"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Ошибки"
+              },
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "#73BF69",
+                      "value": null
+                    },
+                    {
+                      "color": "#FADE2A",
+                      "value": 2
+                    },
+                    {
+                      "color": "#F2495C",
+                      "value": 5
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 422,
+      "type": "text",
+      "title": "$session_header",
+      "description": "Название и ветка, проект, модель (с наибольшей стоимостью), аккаунт, короткий id, время активности (идущие запросы и вызовы, простой не считается) и LIVE (последнее событие не старше 10 минут) выбранной сессии. Без выбора: «Сессия не выбрана».",
+      "transparent": true,
+      "gridPos": {
+        "x": 3,
+        "y": 14,
+        "w": 21,
+        "h": 1
+      },
+      "options": {
+        "mode": "html",
+        "content": ""
+      }
+    },
+    {
+      "id": 440,
+      "type": "stat",
+      "title": "cost_usd",
+      "description": "Сумма cost_usd у api_request выбранной сессии (действуют период и все переменные). Строка над числом: семейство моделей с наибольшей стоимостью и его доля.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 3,
+        "y": 15,
+        "w": 4,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT sum(c) AS cost_usd, if(sum(c) > 0, concat(argMax(fam, c), ' ', toString(round(100 * max(c) / sum(c))), '%'), '') AS name\nFROM (SELECT multiIf(positionCaseInsensitive(model, 'opus') > 0, 'Opus', positionCaseInsensitive(model, 'sonnet') > 0, 'Sonnet', positionCaseInsensitive(model, 'haiku') > 0, 'Haiku', model) AS fam, sum(cost_usd) AS c FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND '${session}' != '__all' AND $__timeFilter(ts) GROUP BY fam)"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "orientation": "vertical",
+        "justifyMode": "auto",
+        "wideLayout": false,
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "text": {
+          "titleSize": 13,
+          "valueSize": 30
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2,
+          "noValue": "—",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#ccccdc"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 441,
+      "type": "stat",
+      "title": "Токены",
+      "description": "Billable токены выбранной сессии: input + output + cache create (cache read не входит).",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 7,
+        "y": 15,
+        "w": 4,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT sum(input_tokens + output_tokens + cache_creation_tokens) AS tokens, 'billable' AS name\nFROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND '${session}' != '__all' AND $__timeFilter(ts)"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "orientation": "vertical",
+        "justifyMode": "auto",
+        "wideLayout": false,
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "text": {
+          "titleSize": 13,
+          "valueSize": 30
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 2,
+          "noValue": "—",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#ccccdc"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 442,
+      "type": "stat",
+      "title": "Ходы",
+      "description": "Запросы к модели выбранной сессии (включая субагентов и вспомогательные). Строка над числом: сколько разных промптов их вызвало.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 11,
+        "y": 15,
+        "w": 4,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT count() AS turns, concat('промптов: ', toString(uniqExact(prompt_id))) AS name\nFROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND '${session}' != '__all' AND $__timeFilter(ts)"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "orientation": "vertical",
+        "justifyMode": "auto",
+        "wideLayout": false,
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "text": {
+          "titleSize": 13,
+          "valueSize": 30
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "locale",
+          "decimals": 0,
+          "noValue": "—",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#ccccdc"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 443,
+      "type": "stat",
+      "title": "Хит кэша",
+      "description": "cache read / (cache read + input + cache create) токенов выбранной сессии. От 90 % зелёный, от 75 % жёлтый, ниже красный.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 15,
+        "y": 15,
+        "w": 4,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT 100 * sum(cache_read_tokens) / greatest(sum(cache_read_tokens + input_tokens + cache_creation_tokens), 1) AS hit_rate, '≥ 90% хорошо' AS name\nFROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND '${session}' != '__all' AND $__timeFilter(ts)"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "orientation": "vertical",
+        "justifyMode": "auto",
+        "wideLayout": false,
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "text": {
+          "titleSize": 13,
+          "valueSize": 30
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 0,
+          "min": 0,
+          "max": 100,
+          "noValue": "—",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#F2495C",
+                "value": null
+              },
+              {
+                "color": "#FADE2A",
+                "value": 75
+              },
+              {
+                "color": "#73BF69",
+                "value": 90
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 444,
+      "type": "stat",
+      "title": "Ошибки инструментов",
+      "description": "Неудачные вызовы инструментов / все вызовы выбранной сессии (tool_result success = false). До 2 % зелёный, 2 % жёлтый, 5 % красный.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 19,
+        "y": 15,
+        "w": 5,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT 100 * countIf(NOT success) / greatest(count(), 1) AS error_rate, concat('ошибок: ', toString(countIf(NOT success)), ' из ', toString(count())) AS name\nFROM cc.tool_calls WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND '${session}' != '__all' AND $__timeFilter(ts)"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "orientation": "vertical",
+        "justifyMode": "auto",
+        "wideLayout": false,
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "text": {
+          "titleSize": 13,
+          "valueSize": 30
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "noValue": "—",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#73BF69",
+                "value": null
+              },
+              {
+                "color": "#FADE2A",
+                "value": 2
+              },
+              {
+                "color": "#F2495C",
+                "value": 5
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 100,
+      "type": "state-timeline",
+      "title": "Таймлайн",
+      "description": "Выбранная сессия за период дашборда, одна ячейка на шаг времени; полоса покрывает время работы элемента (запрос или вызов пишется при завершении, поэтому он идёт от конца минус duration_ms назад). Промпты: отправлен промпт пользователя. Основной · API: шёл запрос основного агента. Субагенты: работал субагент (от первого до последнего его запроса). Инструменты: шёл вызов инструмента (зелёный = все ок, красный = хотя бы один неудачный на шаге). Клик по сессии на дашбордах «Сессии», «Обзор» или «Промпты» задаёт период сессии; при более широком периоде полосы тонкие. Промпты видны только при Исполнитель и Навык = All.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 3,
+        "y": 18,
+        "w": 21,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "queryType": "timeseries",
+          "rawSql": "SELECT toDateTime(b * $__interval_s) AS time, prompts, main_api, subagents, tools\nFROM\n(\nSELECT b, max(p) AS prompts, max(m) AS main_api, max(a) AS subagents, max(t) AS tools\nFROM\n(\n  SELECT arrayJoin(range(toUInt64(intDiv(s, $__interval_s * 1000)), toUInt64(intDiv(e, $__interval_s * 1000)) + 1)) AS b, p, m, a, t\n  FROM\n  (\n    SELECT toUnixTimestamp64Milli(ts) AS s, toUnixTimestamp64Milli(ts) AS e, toUInt8(1) AS p, toUInt8(0) AS m, toUInt8(0) AS a, toUInt8(0) AS t\n    FROM cc.events\n    WHERE event = 'user_prompt' AND '${actor}' = '__all' AND '${skill}' = '__all' AND ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND '${session}' != '__all' AND $__timeFilter(ts)\n    UNION ALL\n    SELECT toUnixTimestamp64Milli(ts) - toInt64(duration_ms) AS s, toUnixTimestamp64Milli(ts) AS e, toUInt8(0), toUInt8(1), toUInt8(0), toUInt8(0)\n    FROM cc.api_requests\n    WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND '${session}' != '__all' AND actor = 'main' AND $__timeFilter(ts)\n    UNION ALL\n    SELECT min(toUnixTimestamp64Milli(ts) - toInt64(duration_ms)) AS s, max(toUnixTimestamp64Milli(ts)) AS e, toUInt8(0), toUInt8(0), toUInt8(1), toUInt8(0)\n    FROM cc.api_requests\n    WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND '${session}' != '__all' AND agent_id != '' AND $__timeFilter(ts)\n    GROUP BY agent_id\n    UNION ALL\n    SELECT toUnixTimestamp64Milli(ts) - toInt64(duration_ms) AS s, toUnixTimestamp64Milli(ts) AS e, toUInt8(0), toUInt8(0), toUInt8(0), if(success, toUInt8(1), toUInt8(2))\n    FROM cc.tool_calls\n    WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND '${session}' != '__all' AND $__timeFilter(ts)\n  )\n)\nGROUP BY b\nORDER BY b WITH FILL FROM toUInt64(intDiv(toUnixTimestamp($__fromTime), $__interval_s)) TO toUInt64(intDiv(toUnixTimestamp($__toTime), $__interval_s)) + 1\n)\nORDER BY time"
+        }
+      ],
+      "options": {
+        "mergeValues": true,
+        "showValue": "never",
+        "alignValue": "left",
+        "rowHeight": 0.8,
+        "legend": {
+          "showLegend": false,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 100,
+            "lineWidth": 0,
+            "insertNulls": false,
+            "spanNulls": false
+          },
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "transparent"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "prompts"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Промпты"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "transparent"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": " ",
+                        "color": "transparent",
+                        "index": 0
+                      },
+                      "1": {
+                        "text": "промпт",
+                        "color": "#ccccdc",
+                        "index": 1
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "main_api"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Основной · API"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "transparent"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": " ",
+                        "color": "transparent",
+                        "index": 0
+                      },
+                      "1": {
+                        "text": "запрос",
+                        "color": "#B877D9",
+                        "index": 1
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "subagents"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Субагенты"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "transparent"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": " ",
+                        "color": "transparent",
+                        "index": 0
+                      },
+                      "1": {
+                        "text": "субагент",
+                        "color": "#FF9830",
+                        "index": 1
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "tools"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Инструменты"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "transparent"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": " ",
+                        "color": "transparent",
+                        "index": 0
+                      },
+                      "1": {
+                        "text": "ок",
+                        "color": "#73BF69",
+                        "index": 1
+                      },
+                      "2": {
+                        "text": "ошибка",
+                        "color": "#F2495C",
+                        "index": 2
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 101,
+      "type": "timeseries",
+      "title": "Нарастающие cost_usd и токены",
+      "description": "Нарастающий итог по выбранной сессии: cost_usd (левая ось, зелёный) и billable токены (input + output + cache create; правая ось, синий), один шаг на запрос к модели.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 3,
+        "y": 23,
+        "w": 8,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "queryType": "timeseries",
+          "rawSql": "SELECT t.1 AS time, t.2 AS cost_usd, t.3 AS tokens\nFROM\n(\n  SELECT arrayJoin(arrayZip(arrayMap(x -> x.1, s), arrayCumSum(arrayMap(x -> x.2, s)), arrayCumSum(arrayMap(x -> x.3, s)))) AS t\n  FROM\n  (\n    SELECT arraySort(groupArray((ts, cost_usd, input_tokens + output_tokens + cache_creation_tokens))) AS s\n    FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND '${session}' != '__all' AND $__timeFilter(ts)\n  )\n)\nORDER BY time"
+        }
+      ],
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cost_usd"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "cost_usd"
+              },
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#73BF69"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "tokens"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "токены"
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5794F2"
+                }
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 1
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 8,
+      "type": "table",
+      "title": "Промпты сессии · клик по промпту открывает его в Промптах",
+      "description": "Промпты выбранной сессии в периоде, старые сверху. Промпт = сообщение пользователя и все запросы к API до следующего. Токены = input + output + cache create всех его запросов; Инструменты = его вызовы инструментов. Клик по промпту открывает его среди промптов этой сессии. Текст промпта пишется только если клиент задал OTEL_LOG_USER_PROMPTS=1.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 11,
+        "y": 23,
+        "w": 13,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT p.started AS started,\n       if(p.prompt IN ('', '<REDACTED>'), '(текст не записан)', leftUTF8(replaceAll(p.prompt, '\\n', ' '), 200)) AS prompt,\n       p.session_id AS session_id,\n       p.input + p.output + p.cache_creation AS tokens, round(p.cost_usd, 3) AS cost_usd, p.tool_calls AS tools\nFROM cc.prompts AS p\nWHERE ('__all' IN (${account:singlequote}) OR p.account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR p.project = '${project}') AND ('${session}' = '__all' OR p.session_id = '${session}') AND p.requests > 0 AND p.started >= $__fromTime AND p.started <= $__toTime AND (('${actor}' = '__all' AND '${skill}' = '__all') OR (p.session_id, p.prompt_id) IN (SELECT session_id, prompt_id FROM cc.api_requests WHERE ('${actor}' != '__all' OR '${skill}' != '__all') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}'))) AND '${session}' != '__all'\nORDER BY p.started\nLIMIT 500"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": [
+          {
+            "displayName": "Время",
+            "desc": false
+          }
+        ]
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": false,
+            "minWidth": 50
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "session_id"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "started"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Время"
+              },
+              {
+                "id": "unit",
+                "value": "time:MM-DD HH:mm"
+              },
+              {
+                "id": "custom.width",
+                "value": 130
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#8e8e9e"
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "prompt"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Промпт"
+              },
+              {
+                "id": "custom.minWidth",
+                "value": 200
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Открыть в Промптах",
+                    "url": "/d/cc-prompts-ru?${__url_time_range}&${account:queryparam}&${project:queryparam}&var-session=${__data.fields.session_id:percentencode}&var-actor=$__all&var-skill=$__all"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "tokens"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Токены"
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cost_usd"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "cost_usd"
+              },
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "tools"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Инструменты"
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.width",
+                "value": 130
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

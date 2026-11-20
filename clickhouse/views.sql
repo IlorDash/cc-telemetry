@@ -10,11 +10,11 @@
 --    Low-cardinality text columns are LowCardinality(String).
 CREATE OR REPLACE VIEW cc.events_raw AS
 SELECT
-    ts, project_label, host, cc_version, event, session_id, prompt_id, account, agent_id, request_id,
+    ts, project_label, host, cc_version, event, session_id, prompt_id, account_uuid, account, agent_id, request_id,
     query_source, agent_name, agent_type, skill_name, skill_trigger, tool_name, tool_use_id, tool_input,
     tool_parameters, success, decision, decision_source, duration_ms, model, input_tokens, output_tokens,
     cache_read_tokens, cache_creation_tokens, cost_usd, agent_total_tokens, agent_tool_uses, prompt,
-    hook_name, hook_duration_ms, result_bytes, ttft_ms
+    hook_name, hook_duration_ms, result_bytes, ttft_ms, status_code, error
 FROM cc.events_t;
 
 -- 2. Session titles and working directory sent by the client hook as separate events:
@@ -120,7 +120,7 @@ GROUP BY request_id;
 -- 8. Model requests with actor (main / agent name / aux:<source>) and skill.
 CREATE OR REPLACE VIEW cc.api_requests AS
 SELECT
-    e.ts AS ts, e.project AS project, e.host AS host, e.account AS account,
+    e.ts AS ts, e.project AS project, e.host AS host, e.account AS account, e.account_uuid AS account_uuid,
     e.session_id AS session_id, e.prompt_id AS prompt_id, e.agent_id AS agent_id,
     multiIf(
         e.agent_id != '', if(a.agent = '', 'agent?', a.agent),
@@ -134,7 +134,9 @@ SELECT
     e.cache_creation_tokens AS cache_creation_tokens,
     e.input_tokens + e.output_tokens + e.cache_read_tokens + e.cache_creation_tokens AS total_tokens,
     e.cost_usd AS cost_usd,
-    e.duration_ms AS duration_ms
+    e.duration_ms AS duration_ms,
+    e.ttft_ms AS ttft_ms,        -- time to first token, 0 when not streamed
+    e.request_id AS request_id   -- one response; tool_result events carry the same id (work phase, Efficiency dashboard)
 FROM cc.events AS e
 LEFT JOIN cc.agents AS a ON a.agent_id = e.agent_id
 WHERE e.event = 'api_request';
@@ -145,10 +147,10 @@ WHERE e.event = 'api_request';
 --    Worktrees <project>-<name>/ fold into the same relative path as the main folder.
 CREATE OR REPLACE VIEW cc.tool_calls AS
 SELECT
-    ts, project, host, account, session_id, prompt_id, agent_id,
+    ts, project, host, account, account_uuid, session_id, prompt_id, agent_id,
     if(agent_id = '', 'main', if(agent_label = '', 'agent?', agent_label)) AS actor,
     skill_label AS skill,
-    tool_name, tool_use_id, success, duration_ms,
+    tool_name, tool_use_id, success, duration_ms, result_bytes,
     multiIf(tool_name = 'Read', 'read',
             tool_name IN ('Edit', 'MultiEdit', 'Write', 'NotebookEdit'), 'write',
             tool_name IN ('Grep', 'Glob'), 'search',
@@ -177,11 +179,11 @@ FROM
         e.ts AS ts,
         if(e.project_label != 'unknown', e.project_label,
            if(sp.project != '', sp.project, 'unknown')) AS project,
-        e.host AS host, e.account AS account,
+        e.host AS host, e.account AS account, e.account_uuid AS account_uuid,
         e.session_id AS session_id, e.prompt_id AS prompt_id, e.agent_id AS agent_id,
         a.agent AS agent_label, r.skill AS skill_label,
         e.tool_name AS tool_name, e.tool_use_id AS tool_use_id,
-        e.success AS success, e.duration_ms AS duration_ms,
+        e.success AS success, e.duration_ms AS duration_ms, e.result_bytes AS result_bytes,
         e.abs_path AS p, e.bash_cmd AS bash_cmd
     FROM cc.events_t AS e
     LEFT JOIN cc.session_project AS sp ON sp.session_id = e.session_id
@@ -192,6 +194,9 @@ FROM
 
 -- 10. One row per session.
 --     title, title_source, git_branch, cwd come from cc.session_meta ('' when the client sent none).
+--     account / account_uuid: of the latest event that has an account (a session may span accounts).
+--     last_prompt: time of the latest user_prompt; a session without a prompt gets `started`.
+--     model: the model with the highest api_request cost in the session ('' when there is no request).
 CREATE OR REPLACE VIEW cc.sessions AS
 SELECT
     s.*,
@@ -201,13 +206,19 @@ SELECT
     m.cwd                                          AS cwd
 FROM
 (
+  -- one join per query level: ClickHouse 22.3 cannot expand `s.*` over two joins
+  SELECT t.*, mm.model AS model
+  FROM
+  (
     SELECT
         session_id,
         any(project)                                   AS project,
         any(host)                                      AS host,
-        any(account)                                   AS account,
+        argMaxIf(account, ts, ev.account != '')        AS account,
+        argMaxIf(account_uuid, ts, ev.account != '')   AS account_uuid,
         min(ts)                                        AS started,
         max(ts)                                        AS last_event,
+        if(countIf(event = 'user_prompt') > 0, maxIf(ts, event = 'user_prompt'), min(ts)) AS last_prompt,
         argMinIf(prompt, ts, event = 'user_prompt')    AS first_prompt,
         countIf(event = 'user_prompt')                 AS prompts,
         sumIf(cost_usd, event = 'api_request')         AS cost_usd,
@@ -217,18 +228,34 @@ FROM
         countIf(event = 'subagent_completed')          AS agents_run,
         countIf(event = 'skill_activated')             AS skills_run,
         countIf(event = 'api_request')                 AS requests
-    FROM cc.events
+    FROM cc.events AS ev
     WHERE session_id != ''
     GROUP BY session_id
+  ) AS t
+  LEFT JOIN
+  (
+    SELECT session_id, argMax(mdl, mcost) AS model
+    FROM
+    (
+        SELECT session_id, model AS mdl, sum(cost_usd) AS mcost
+        FROM cc.events
+        WHERE event = 'api_request' AND session_id != '' AND model != ''
+        GROUP BY session_id, model
+    )
+    GROUP BY session_id
+  ) AS mm ON mm.session_id = t.session_id
 ) AS s
 LEFT JOIN cc.session_meta AS m ON m.session_id = s.session_id;
 
 -- 11. Tips: one row per finding of the last 7 days. The table cc.tips_t is rebuilt by clickhouse/refresh.sql
 --     (rules and thresholds are there). Columns: category, title, body, scope (project / agent / hook),
---     metric (the number behind the tip), link (relative Grafana URL).
+--     metric (the number behind the tip), link (relative Grafana URL), affected (tokens the tip is about,
+--     NULL for time tips), cost_usd (cost of the requests it is about, NULL when not known); see refresh.sql.
+--     Rows are ordered by affected, biggest first, NULLs last.
 CREATE OR REPLACE VIEW cc.tips AS
-SELECT category, title, body, scope, metric, link
-FROM cc.tips_t;
+SELECT category, title, body, scope, metric, link, affected, cost_usd
+FROM cc.tips_t
+ORDER BY affected DESC NULLS LAST, category, title;
 
 -- 12. One row per prompt (session_id + prompt_id): the user prompt and everything it triggered
 --     (main, subagent and auxiliary requests, tool calls). Sums add up to cc.sessions.
@@ -239,7 +266,8 @@ SELECT
     prompt_id,
     any(project)                                   AS project,
     any(host)                                      AS host,
-    any(account)                                   AS account,
+    argMaxIf(account, ts, ev.account != '')        AS account,
+    argMaxIf(account_uuid, ts, ev.account != '')   AS account_uuid,
     min(ts)                                        AS started,
     max(ts)                                        AS last_event,
     argMinIf(prompt, ts, event = 'user_prompt')    AS prompt,
@@ -255,7 +283,7 @@ SELECT
     countIf(event = 'tool_result')                 AS tool_calls,
     maxIf(result_bytes, event = 'tool_result')     AS max_result_bytes,
     countIf(event = 'subagent_completed')          AS agents_run
-FROM cc.events
+FROM cc.events AS ev
 WHERE session_id != '' AND prompt_id != ''
 GROUP BY session_id, prompt_id
 HAVING countIf(event IN ('user_prompt', 'api_request', 'tool_result')) > 0;

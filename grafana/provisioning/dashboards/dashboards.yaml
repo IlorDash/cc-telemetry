@@ -7,3 +7,5 @@ providers:
     updateIntervalSeconds: 30
     options:
       path: /var/lib/grafana/dashboards
+      # root files stay in General, the ru/ subfolder becomes the folder "ru"
+      foldersFromFilesStructure: true
