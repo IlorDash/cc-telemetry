@@ -88,7 +88,8 @@ The script:
    and derivatives whose release Docker publishes packages for) or tells you what to install. The installer also enables the
    `docker` service at boot and adds your user to the `docker` group;
 2. creates `.env` with random passwords (an existing `.env` is kept) and sets `OTLP_BIND`, `GRAFANA_BIND` and `GRAFANA_PORT` in it
-   (see below), plus `CLICKHOUSE_VERSION` on an old ARM CPU (see "Raspberry Pi 4");
+   (see below), plus `CLICKHOUSE_VERSION` on an old ARM CPU (see "Raspberry Pi 4") and the retention and limit keys
+   `RETENTION_DAYS`, `CLICKHOUSE_LIMITS` and `CLICKHOUSE_CPUS` (see "Retention and limits" in section 4);
 3. stops with a message if the Grafana port is taken by another program (a busy 4317/4318 is reported as a warning), then starts
    the stack and waits until the `cc.*` views are created;
 4. checks Grafana and the OTLP ports (`localhost:4317`, `localhost:4318`), and that the `docker` service starts at boot
@@ -135,7 +136,8 @@ machine; remove the line from `.env` to return to the default. Caveats: 22.3 dat
 (no security fixes: use it on a trusted LAN only), a data volume written by a newer ClickHouse does not start with it (so a Pi 4
 needs a fresh volume), and a Native dump from a newer server (`linux-server-tools/backup.sh`) should be restored into a fresh
 stack and checked with a row count per table. The collector's tables, the `cc.*` views and every dashboard query were checked on
-22.3 (see the verification notes in section 5).
+22.3 (see the verification notes in section 5). With 22.3 the script also writes the small-server defaults: a retention of 180
+days instead of 365, and the resource limits (see "Retention and limits" in section 4).
 
 **Security.** Grafana is plain HTTP behind the `admin` login (no anonymous access); OTLP (4317 and 4318) has no authentication. Use the LAN
 mode on a trusted home or office network only, or `--local-only` and an SSH tunnel for Grafana.
@@ -160,9 +162,9 @@ The first time, run `git pull` yourself: older versions of the script have no `-
    set up before the retention" in section 4) and repeats the checks. Containers whose image and configuration did not change keep running, except that a
    changed collector config (`otel-collector.yaml`) or Grafana provisioning (`grafana/provisioning/`) is reloaded by restarting
    that service (dashboard files are re-read by Grafana by itself). The data volumes are never removed;
-5. compares the row counts. Before the dump it fixes a cutoff (179 days ago) and counts the rows younger than it; after the
-   update it counts them again with the same cutoff, and no table may have fewer. Rows older than the cutoff may be removed by
-   the retention TTL; the script only reports how many. It prints `OK`, or a `FAIL` banner with the dump folder, and exits with
+5. compares the row counts. Before the dump it fixes a cutoff (the retention minus one day ago, 179 days for 180) and counts the rows
+   younger than it; after the update it counts them again with the same cutoff, and no table may have fewer. Rows older than the
+   cutoff may be removed by the retention TTL; the script only reports how many. It prints `OK`, or a `FAIL` banner with the dump folder, and exits with
    status 1.
 
 If `git pull` fails (for example because the branch diverged), nothing on the stack has changed. Fix the repository and run
@@ -407,8 +409,8 @@ folder is relative to the `cc-telemetry` folder, not to the current directory. W
 
 With Docker in WSL the data lives inside the distro: `wsl --unregister` deletes it. Dump first.
 
-Data is kept for 180 days in the `clickhouse-data` volume: a TTL removes older rows from `otel.*` and `cc.events_t`
-(whole days at a time). The collector writes raw events to `otel.otel_logs`. A
+Data is kept for `RETENTION_DAYS` days in the `clickhouse-data` volume (180 with ClickHouse 22.3, else 365; see "Retention and
+limits" below): a TTL removes older rows from `otel.*` and `cc.events_t` (whole days at a time). The collector writes raw events to `otel.otel_logs`. A
 materialized view (`cc.events_mv`) flattens every new Claude Code event into the table `cc.events_t` as it arrives, and the
 `cc.*` views that the dashboards read are plain views over that table, so dashboards read a few columns instead of
 parsing the raw events. Two small tables, the inferred project of each session (`cc.session_project_t`) and the usage tips
@@ -425,15 +427,31 @@ expressions of `cc.events_mv` or the columns of `cc.events_t`, `CREATE ... IF NO
 rows keep the old values, so the change needs a migration (dump first, then rebuild `cc.events_t` from `otel.otel_logs`).
 `cc.events_t` holds nothing that is not in `otel.otel_logs`, so `backup.sh` dumps only the `otel.*` tables.
 
-**Retention.** `cc.events_t` is partitioned by day and has `TTL toDateTime(ts) + INTERVAL 180 DAY` in `clickhouse/schema.sql`;
-the `otel.*` tables get the same 180 days from `ttl: 4320h` in `otel-collector.yaml`. Both settings apply only to tables
-that do not exist yet. To change the period on a running server, alter the live tables (replace `180`):
+**Retention and limits.** One key in `.env` sets how long data is kept: `RETENTION_DAYS`. `setup-server.sh` writes it when it is
+missing: 180 when `CLICKHOUSE_VERSION` is 22.3 (`22.3.*`, the tag for an old ARM CPU such as a Raspberry Pi 4, see "Raspberry Pi 4"),
+365 otherwise. Without the key (the Windows script does not write it) Docker Compose uses 365. The value is written once and
+kept: a later change of `CLICKHOUSE_VERSION` does not change it. `cc.events_t` gets the TTL from `clickhouse/schema.sql` (the
+placeholder `__RETENTION_DAYS__`, replaced by the `views-init` service), the `otel.*` tables get it from `views-init` as soon
+as the collector has created them (`otel-collector.yaml` has no TTL of its own).
+
+To change the period, edit `RETENTION_DAYS` in `.env` and run `bash setup-server.sh` again. On Linux the script applies it to the
+existing tables: a longer period needs no question; a shorter one deletes the rows older than the new period, so a plain run
+asks at the terminal (default no; `--yes` does not answer for you; without a terminal it skips the step with a warning) and
+`--update` goes ahead after its dump. On Windows, and when you run the stack by hand, `views-init` sets the TTL only on `otel.*`
+tables that have none and holds no rows older than the period; to change an existing TTL alter the live tables yourself (replace
+`180`; dump first when the period gets shorter):
 
 ```sql
 ALTER TABLE cc.events_t MODIFY TTL toDateTime(ts) + INTERVAL 180 DAY;
 ALTER TABLE otel.otel_logs MODIFY TTL TimestampTime + toIntervalDay(180);
 ALTER TABLE otel.otel_metrics_sum MODIFY TTL toDateTime(TimeUnix) + toIntervalDay(180);  -- also _gauge, _histogram, _exponential_histogram, _summary
 ```
+
+The resource limits of a small server follow the same rule. `CLICKHOUSE_LIMITS=small` mounts `clickhouse/limits/small/` (see
+"Resource limits" below), `none` uses ClickHouse's own defaults; `CLICKHOUSE_CPUS` is the CPU quota of the container (`0` = no
+limit). `setup-server.sh` writes `small` and `2` with ClickHouse 22.3 and `none` and `0` otherwise; without the keys Docker
+Compose uses `none` and `0`. Change the values in `.env` and run `bash setup-server.sh` (or `docker compose up -d`): the
+`clickhouse` container is recreated, which takes a few seconds; the collector retries meanwhile.
 
 The collector sends events to ClickHouse in batches every 30 seconds, so a new event shows up in Grafana up to 30 seconds
 late.
@@ -443,18 +461,17 @@ month, which makes every merge rewrite the whole month (a lot of writes to an SD
 `bash setup-server.sh --update` (or a plain `bash setup-server.sh`) migrates it by itself and does nothing when it is
 already done: it copies `cc.events_t` into a day-partitioned table month by month, swaps the tables, copies the events that
 arrived meanwhile, compares row counts, tokens and cost of both tables and drops the old one only when they match; then it sets
-the TTL on the `otel.*` tables. If rows older than 180 days exist, the TTL would delete them: `--update` goes ahead (it has
+the TTL on the `otel.*` tables. If rows older than `RETENTION_DAYS` exist, the TTL would delete them: `--update` goes ahead (it has
 just made its dump); a plain run asks at the terminal (default no) and `--yes` does not answer for you. Without a terminal
 it skips the step with a warning: run `--update`, or dump first and re-run at a terminal. A run that was interrupted continues where it stopped. The script also lists the old
 `system.query_log*` and `system.query_views_log*` tables, which are no longer written once ClickHouse runs with the new
-config, with a `DROP TABLE` command for each; it does not delete them itself. The collector reads `otel-collector.yaml` at
-start: after the update `--update` restarts it, otherwise run `docker compose restart otel-collector`.
+config, with a `DROP TABLE` command for each; it does not delete them itself.
 
 A Windows server (`setup-server.ps1` does not migrate) or any other setup does the same by hand. Run the SQL through
 `linux-server-tools/ch.sh` (see above) and dump first (`backup.sh dump`):
 
-1. Create the new table: copy the `CREATE TABLE IF NOT EXISTS cc.events_t (...) ... ;` statement from `clickhouse/schema.sql`
-   and change the name to `cc.events_t_new`.
+1. Create the new table: copy the `CREATE TABLE IF NOT EXISTS cc.events_t (...) ... ;` statement from `clickhouse/schema.sql`,
+   change the name to `cc.events_t_new` and replace `__RETENTION_DAYS__` with your number of days (`RETENTION_DAYS`).
 2. Copy month by month (a single `INSERT` over more than 100 days is refused). Months: `SELECT DISTINCT toYYYYMM(ts) FROM cc.events_t ORDER BY 1`.
    For each month, for example `202611`:
    `INSERT INTO cc.events_t_new SELECT * FROM cc.events_t WHERE toYYYYMM(ts) = 202611;`
@@ -464,27 +481,33 @@ A Windows server (`setup-server.ps1` does not migrate) or any other setup does t
    `INSERT INTO cc.events_t SELECT * FROM cc.events_t_new WHERE toYYYYMM(ts) = 202611 AND (session_id, seq, ts) NOT IN (SELECT session_id, seq, ts FROM cc.events_t WHERE toYYYYMM(ts) = 202611);`
 5. Check: the first query counts the old table, the second the same rows in the new one; counts and tokens must be equal, cost too
    (rounded to 6 digits: a float sum can differ in the last digits when it is added up in another order).
-   Only rows younger than 179 days are compared: the TTL of the new table may already remove older ones. Run them per month
+   Only rows younger than the retention minus one day are compared (the queries use 179, for a retention of 180 days): the TTL
+   of the new table may already remove older ones. Run them per month
    (add `AND toYYYYMM(ts) = 202611` on both sides) if the table is large:
    `SELECT count(), sum(input_tokens + output_tokens), round(sum(cost_usd), 6) FROM cc.events_t_new WHERE ts >= now() - INTERVAL 179 DAY;`
    `SELECT count(), sum(input_tokens + output_tokens), round(sum(cost_usd), 6) FROM cc.events_t WHERE ts >= now() - INTERVAL 179 DAY AND (session_id, seq, ts) IN (SELECT session_id, seq, ts FROM cc.events_t_new WHERE ts >= now() - INTERVAL 179 DAY);`
 6. Only when they are equal: `DROP TABLE cc.events_t_new SYNC;`. The table is a copy of `otel.otel_logs`, which stays. Otherwise keep it
    and swap back with the same `EXCHANGE TABLES`.
-7. Set the TTL of the live `otel.*` tables with the `ALTER TABLE ... MODIFY TTL` statements above, then run
-   `docker compose restart otel-collector`.
+7. Set the TTL of the live `otel.*` tables with the `ALTER TABLE ... MODIFY TTL` statements above.
 
-ClickHouse runs with limits sized for a small server such as a Raspberry Pi 4, on every machine: 2 CPU cores, 3 GB of
-memory for the server and 1.5 GB per query, 3 threads per query, and no system logs at all (`query_log` is off too: it wrote
-most of what ClickHouse put on the disk). The limits are in `clickhouse/config.d/low-resource.xml`,
-`clickhouse/users.d/low-resource.xml` and `cpus` in `docker-compose.yml`. After editing the XML files run
-`docker compose restart clickhouse`; the server script does not restart ClickHouse for them.
+**Resource limits.** `CLICKHOUSE_LIMITS=small` (see "Retention and limits" above) runs ClickHouse with limits sized for a small
+server such as a Raspberry Pi 4: 2 CPU cores (`CLICKHOUSE_CPUS`), 3 GB of memory for the server and 1.5 GB per query, 3 threads
+per query, two background merge slots, small caches and at most 8 concurrent queries. They are in
+`clickhouse/limits/small/config.xml` and `clickhouse/limits/small/users.xml`; `clickhouse/limits/none/` holds empty files. A dashboard
+query that needs more than 1.5 GB fails instead of slowing the server down. Without these limits (`none`) ClickHouse uses its own
+defaults, which assume a server that has the machine to itself.
 
-The ClickHouse text log (`/var/log/clickhouse-server/clickhouse-server.log` in the container) is limited to level `warning`,
-10 MB per file, and two rotated (compressed) files are kept; errors also go to `clickhouse-server.err.log`. For a detailed log, set `<level>` to `trace` in the
-same file and restart ClickHouse.
+Whatever the limits, ClickHouse writes no system logs (`query_log` is off too: it wrote most of what ClickHouse put on the disk) and
+the text log (`/var/log/clickhouse-server/clickhouse-server.log` in the container) is limited to level `warning`, 10 MB per file,
+and two rotated (compressed) files are kept; errors also go to `clickhouse-server.err.log`. That is in
+`clickhouse/config.d/common.xml` and `clickhouse/users.d/common.xml`. For a detailed log, set `<level>` to `trace` in
+`config.d/common.xml` and restart ClickHouse.
+
+After editing an XML file run `docker compose restart clickhouse`; the server script does not restart ClickHouse for it (it
+recreates it only when `CLICKHOUSE_LIMITS` or `CLICKHOUSE_CPUS` change).
 
 To find out why a dashboard panel is slow, switch `query_log` on for a while: delete the `<query_log remove="1"/>` line in
-`clickhouse/config.d/low-resource.xml`, set `<log_queries>1</log_queries>` in `clickhouse/users.d/low-resource.xml` and run
+`clickhouse/config.d/common.xml`, set `<log_queries>1</log_queries>` in `clickhouse/users.d/common.xml` and run
 `docker compose restart clickhouse`. Then look for the slow query in `system.query_log` (`query_duration_ms`, `query`). Afterwards
 restore both files, run `docker compose restart clickhouse` and `DROP TABLE system.query_log SYNC`.
 
@@ -562,5 +585,5 @@ Observed with Claude Code 2.1.323 and the client settings above:
   directory (it contains your OS user name) and the Claude Code version, read from the local session files. Nothing of your
   prompts or Claude's replies. To opt out, run the client script with `-NoSessionMeta` / `--no-session-meta`.
 
-Everything is stored only on the server PC, for 180 days. If you don't want prompts stored, remove `OTEL_LOG_USER_PROMPTS`:
+Everything is stored only on the server PC, for `RETENTION_DAYS` days (180 with ClickHouse 22.3, else 365; see section 4). If you don't want prompts stored, remove `OTEL_LOG_USER_PROMPTS`:
 the `first_prompt` column will then be empty.

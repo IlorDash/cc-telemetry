@@ -18,9 +18,12 @@
 --
 -- The layout of cc.events_t (PARTITION BY, TTL, SETTINGS) is different: setup-server.sh migrates it
 -- (migrate_storage, on every run; Windows servers: README, manual migration). It takes the CREATE TABLE of
--- cc.events_t below as the target and reads the retention from its TTL line, which otel.* get too. So keep
--- the lines "CREATE TABLE IF NOT EXISTS cc.events_t", "PARTITION BY ..." and "TTL ... INTERVAL <n> DAY" as
--- they are written, and the exporter ttl in otel-collector.yaml at the same number of days.
+-- cc.events_t below as the target. So keep the lines "CREATE TABLE IF NOT EXISTS cc.events_t",
+-- "PARTITION BY ..." and "TTL ..." as they are written.
+-- The retention is not written here: __RETENTION_DAYS__ is replaced by init-views.sh (and by migrate_storage)
+-- with RETENTION_DAYS from .env (setup-server.sh writes 180 for ClickHouse 22.3, else 365; docker-compose.yml
+-- defaults to 365). The same number is the TTL of the otel.* tables (init-views.sh, migrate_storage). So this
+-- file cannot be piped to clickhouse-client as it is: replace the placeholder first.
 
 CREATE DATABASE IF NOT EXISTS cc;
 
@@ -79,7 +82,7 @@ CREATE TABLE IF NOT EXISTS cc.events_t
 ENGINE = MergeTree
 PARTITION BY toDate(ts)
 ORDER BY (event, ts)
-TTL toDateTime(ts) + INTERVAL 180 DAY
+TTL toDateTime(ts) + INTERVAL __RETENTION_DAYS__ DAY
 SETTINGS ttl_only_drop_parts = 1;
 
 -- Inferred project per session and usage tips: small tables rebuilt by clickhouse/refresh.sql, run only by the

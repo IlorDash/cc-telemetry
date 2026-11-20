@@ -26,8 +26,10 @@ exporters:
     database: otel
     username: otel
     password: ${env:CLICKHOUSE_PASSWORD}
+    # No `ttl` here: the retention (RETENTION_DAYS in .env) is applied to the tables this exporter creates by the
+    # views-init service (clickhouse/init-views.sh) and by setup-server.sh. A duration in hours cannot follow a
+    # number of days from .env.
     create_schema: true
-    ttl: 4320h
     logs_table_name: otel_logs
     timeout: 10s
     retry_on_failure:

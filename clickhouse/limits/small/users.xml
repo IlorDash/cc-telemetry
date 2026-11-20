@@ -1,3 +1,6 @@
+<!-- default profile of a small server (CLICKHOUSE_LIMITS=small): threads, memory per query, background merges.
+     The profilers and log_query_threads cost CPU only: with the log tables removed (config.d/common.xml)
+     they write nothing, so they belong here and not to the always-on files. -->
 <clickhouse>
   <profiles>
     <default>
@@ -6,8 +9,6 @@
       <query_profiler_real_time_period_ns>0</query_profiler_real_time_period_ns>
       <query_profiler_cpu_time_period_ns>0</query_profiler_cpu_time_period_ns>
       <log_query_threads>0</log_query_threads>
-      <log_queries>0</log_queries>
-      <log_query_views>0</log_query_views>
       <background_pool_size>2</background_pool_size>
     </default>
   </profiles>

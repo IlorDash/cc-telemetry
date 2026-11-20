@@ -8,7 +8,9 @@ services:
     # CLICKHOUSE_VERSION in .env overrides the tag (setup-server.sh sets 22.3.20.29 on ARM CPUs without LRCPC, e.g. Raspberry Pi 4).
     image: clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-25.8}
     restart: unless-stopped
-    cpus: 2
+    # CLICKHOUSE_CPUS in .env: CPU cores of the container, 0 = no limit (default). setup-server.sh writes 2 together with
+    # CLICKHOUSE_LIMITS=small for ClickHouse 22.3 (Raspberry Pi 4).
+    cpus: ${CLICKHOUSE_CPUS:-0}
     environment:
       CLICKHOUSE_DB: otel
       CLICKHOUSE_USER: otel
@@ -16,8 +18,22 @@ services:
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
     volumes:
       - clickhouse-data:/var/lib/clickhouse
-      - ./clickhouse/config.d/low-resource.xml:/etc/clickhouse-server/config.d/low-resource.xml:ro
-      - ./clickhouse/users.d/low-resource.xml:/etc/clickhouse-server/users.d/low-resource.xml:ro
+      # Always on: small text log, no system logs, no query logging.
+      - ./clickhouse/config.d/common.xml:/etc/clickhouse-server/config.d/cc-common.xml:ro
+      - ./clickhouse/users.d/common.xml:/etc/clickhouse-server/users.d/cc-common.xml:ro
+      # CLICKHOUSE_LIMITS in .env: small = memory, thread and merge limits of a small server, none = ClickHouse
+      # defaults (default). Long syntax with create_host_path: false, so a mistyped value fails instead of
+      # making Docker create a directory in place of the file.
+      - type: bind
+        source: ./clickhouse/limits/${CLICKHOUSE_LIMITS:-none}/config.xml
+        target: /etc/clickhouse-server/config.d/cc-limits.xml
+        read_only: true
+        bind: { create_host_path: false }
+      - type: bind
+        source: ./clickhouse/limits/${CLICKHOUSE_LIMITS:-none}/users.xml
+        target: /etc/clickhouse-server/users.d/cc-limits.xml
+        read_only: true
+        bind: { create_host_path: false }
     ulimits:
       nofile: { soft: 262144, hard: 262144 }
     healthcheck:
@@ -44,8 +60,9 @@ services:
       clickhouse:
         condition: service_healthy
 
-  # One-shot: waits until the collector has created otel.otel_logs, then creates the cc.* tables, the
-  # materialized view and the views and backfills cc.events_t (schema.sql, backfill.sql, views.sql).
+  # One-shot: waits until the collector has created otel.otel_logs, sets the retention TTL of otel.* tables that
+  # have none, then creates the cc.* tables, the materialized view and the views and backfills cc.events_t
+  # (schema.sql, backfill.sql, views.sql).
   # Re-run after editing clickhouse/views.sql:  docker compose run --rm views-init
   views-init:
     image: clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-25.8}
@@ -53,6 +70,8 @@ services:
     entrypoint: ["bash", "/init/init-views.sh"]
     environment:
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
+      # Days of the retention TTL (RETENTION_DAYS in .env; setup-server.sh writes 180 for ClickHouse 22.3, else 365).
+      RETENTION_DAYS: ${RETENTION_DAYS:-365}
     volumes:
       - ./clickhouse:/init:ro
     depends_on:
