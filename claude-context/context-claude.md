@@ -21,7 +21,8 @@ ClickHouse and shows them in Grafana. Everything stays on the LAN. Single branch
 | update | `setup-server.sh --update`: safety dump + row counts, `git pull --ff-only`, re-run, restart of collector/Grafana when their config changed, row-count check |
 | backfill | `clickhouse/backfill.sql`: copies `otel.otel_logs` rows missing from `cc.events_t` (not a backfill from transcripts) |
 | refresh | `cc-refresh` service rebuilding `cc.session_project_t` and `cc.tips_t` every 300 s; the inferred project of a new session and the tips lag ≤ 5 min |
-| retention | 180-day TTL on `otel.*` and `cc.events_t` (day partitions); older installs get it from `setup-server.sh` `migrate_storage` (every run), Windows by hand |
+| retention | `RETENTION_DAYS`-day TTL (`.env`; 180 for ClickHouse 22.3 via `setup-server.sh`, else 365) on `otel.*` and `cc.events_t` (day partitions); views-init sets it where none exists, `setup-server.sh` `migrate_storage` (every run) adds or changes it, Windows by hand |
+| small server | ClickHouse 22.3 (old ARM): `setup-server.sh` defaults `CLICKHOUSE_LIMITS=small` (`clickhouse/limits/small/`), `CLICKHOUSE_CPUS=2`, 180 days; every other tag `none` / 0 / 365 |
 | old ARM | `aarch64` without `lrcpc` (Raspberry Pi 4): only ClickHouse ≤ 22.3 runs → `CLICKHOUSE_VERSION=22.3.20.29` |
 
 ## Data flow
@@ -76,7 +77,7 @@ Grafana :3000 (host port GRAFANA_PORT)  7 dashboards, shared variables + links b
 
 | Module file | Covers |
 | --- | --- |
-| `modules/stack.md` | `docker-compose.yml`, `otel-collector.yaml`, `.env`, ClickHouse tables, versions and resource limits (`clickhouse/{config,users}.d/`), Grafana provisioning, ports |
+| `modules/stack.md` | `docker-compose.yml`, `otel-collector.yaml`, `.env`, ClickHouse tables, versions, always-on config (`clickhouse/{config,users}.d/common.xml`) and resource limits (`clickhouse/limits/`), Grafana provisioning, ports |
 | `modules/telemetry-data.md` | events and attributes Claude Code sends, session-meta records of the client hook, the `cc.*` views (`clickhouse/views.sql`) and `cc.tips` rules (`clickhouse/refresh.sql`) |
 | `modules/materialization.md` | `cc.events_t` + `cc.events_mv` (`clickhouse/schema.sql`), backfill (`backfill.sql`, `init-views.sh`), `cc-refresh` (`refresh.sql`, `refresh-loop.sh`), migration rule, health checks |
 | `modules/dashboard.md` | `grafana/dashboards/*.json` (7 dashboards): uids, shared variables and links bar, panels, fixed panel ids, drill-down links, `check-dashboard.js` |

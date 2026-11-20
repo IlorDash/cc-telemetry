@@ -32,7 +32,8 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
   Ubuntu/Debian and derivatives) and the ufw / firewalld rule paths.
 
 - **M?** `reload_changed_config` restarts only `otel-collector` and `grafana`: a pulled change to
-  `clickhouse/config.d/low-resource.xml` or `clickhouse/users.d/low-resource.xml` leaves
+  `clickhouse/config.d/common.xml`, `clickhouse/users.d/common.xml` or
+  `clickhouse/limits/<CLICKHOUSE_LIMITS>/{config,users}.xml` leaves
   `clickhouse` running on the old values (its service definition is unchanged, so `compose up -d`
   does not recreate it). Both are single-file bind mounts: git replaces the file, the running
   container likely keeps the old inode until a restart (unverified).
@@ -58,15 +59,21 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
   A plain `setup-server.sh --update` (`compose up -d`) recreates only changed containers, so the
   collector restarts only when its service definition (image tag, environment, ports) changes,
   or when the pulled commits changed `otel-collector.yaml` (`reload_changed_config`).
-- **?** The exporter's `ttl: 4320h` in the `CREATE TABLE` of `otel.*` on a fresh install is not
-  verified (the live tables got their TTL by `ALTER ... MODIFY TTL`).
+- **?** On a fresh install (no exporter `ttl` any more) the `otel.*` TTL comes only from
+  views-init (`init-views.sh`: ≤ 60 s wait for 5 `otel_metrics_*` tables, then `ALTER ... MODIFY TTL`
+  where none exists). Not run on a fresh volume, and not on 25.8 at all.
+- **?** `migrate_storage` changing an existing TTL (`ttl_state` from `engine_full`, lengthen /
+  shorten, `other` left with a warning) and `check_window_days` were not run against a changed
+  `RETENTION_DAYS`; the `ttl_state` regex is fitted to the 22.3 `engine_full` form
+  (`+ toIntervalDay(<n>)`), 25.8 unverified (a different rendering would read as `other`).
 
-## ClickHouse config (`clickhouse/config.d/`, `clickhouse/users.d/`)
+## ClickHouse config (`clickhouse/config.d/`, `clickhouse/users.d/`, `clickhouse/limits/`)
 
-- **M?** `background_pool_size` sits in the `default` profile (`users.d`). 22.3 still reads it there
-  (shows as changed in `system.settings`, observed 2026-11-17; the actual pool size was not
-  measured); in 25.8 it is a server-level setting, so in a profile it is likely ignored and the
-  2-thread merge limit does not apply on 25.8 servers. Unverified on 25.8.
+- **M?** `background_pool_size` sits in the `default` profile (`limits/small/users.xml`). 22.3 still
+  reads it there (shows as changed in `system.settings`, observed 2026-11-17; the actual pool size
+  was not measured); in 25.8 it is a server-level setting, so in a profile it is likely ignored and
+  the 2-thread merge limit does not apply on a 25.8 server with `CLICKHOUSE_LIMITS=small` (set by
+  hand: `setup-server.sh` picks `small` only for 22.3). Unverified on 25.8.
 - **L** Stale `system.query_log*` / `system.query_views_log*` tables (e.g. `query_log_0`, left on 22.3 by
   the old `query_log` TTL, ~78k rows observed 2026-11-17) stay on servers that had them, as the log is
   now off. `setup-server.sh` only warns with the `DROP TABLE ... SYNC` command; dropping needs the

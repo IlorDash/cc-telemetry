@@ -59,6 +59,10 @@ args       --local-only | --lan (= --enable-lan), --lan-ip <IPv4>, --grafana-por
            CLICKHOUSE_VERSION flag > old ARM: missing → 22.3.20.29, 23.3.22.3 → 22.3.20.29 (warn) > kept
            4317/4318 busy by another program → warn only
            warn: tag ≥ 22.10 on old ARM; tag < 24 = out of support
+           resolve_key (missing → default written once, present → kept; then validated, bad → fail):
+           RETENTION_DAYS     22.3.* tag → 180, else 365        ^[1-9][0-9]*$
+           CLICKHOUSE_LIMITS  22.3.* → small, else none        small | none
+           CLICKHOUSE_CPUS    22.3.* → 2, else 0 (no limit)    ^[0-9]+(\.[0-9]+)?$
 3 stack    LAN note when a bind is not local; compose up -d (fails → logs --tail 50 views-init, fail);
            poll views-init until exited (90 × 2 s), must be 0; then migrate_storage (`modules/server-update.md`);
            [update re-run: reload_changed_config]
@@ -73,6 +77,9 @@ args       --local-only | --lan (= --enable-lan), --lan-ip <IPv4>, --grafana-por
 ```
 - `get_env`: last `KEY=` line, `\r` stripped. `set_env`: `sed` replace or append; a CRLF `.env`
   stays CRLF. No other line of `.env` is read or written.
+- The three resolve_key keys are written once and kept: a later `CLICKHOUSE_VERSION` change does
+  not change them (a shorter retention deletes data). `setup-server.ps1` writes none of them:
+  Windows runs on the compose defaults (365 / `none` / 0).
 - A re-run without `--lan`/`--local-only` keeps the binds; `--local-only` never removes firewall
   rules added earlier.
 - Old ARM = `uname -m` is `aarch64` and the `/proc/cpuinfo` `Features` line lacks `lrcpc`

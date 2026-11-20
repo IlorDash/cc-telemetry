@@ -10,7 +10,7 @@
   - steps:
       - [ ] Замерить Overview и Tips после группы 3 на ARMv8.0 / ClickHouse 22.3
       - [x] Поднять refresh по умолчанию: дашборды обновляются раз в 5 мин и открываются на 24 ч, минимум в Grafana — 1 мин
-      - [x] Лимиты ClickHouse для слабого сервера (low-resource.xml в config.d/users.d, cpus: 2) — на всех серверах
+      - [x] Лимиты ClickHouse для слабого сервера (clickhouse/limits/small, cpus: 2) — только при ClickHouse 22.3 (CLICKHOUSE_LIMITS / CLICKHOUSE_CPUS в .env); логи выключены на всех серверах
       - [ ] Замерить Overview на диапазоне All (now-10y) на ARM при refresh 5 мин
       - [ ] Проверить, что лимиты применяются на ClickHouse 25.8 (background_pool_size в профиле, см. pending-bugs)
       - [ ] Замерить cc.tips на ARM (8 правил поверх cc.events)

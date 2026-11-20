@@ -24,7 +24,7 @@ cc.api_requests, cc.tool_calls, cc.events, cc.events_raw ──refresh.sql──
 
 | Object | Engine / key | Content |
 | --- | --- | --- |
-| `cc.events_t` | MergeTree, `PARTITION BY toDate(ts)`, `ORDER BY (event, ts)`, `TTL toDateTime(ts) + INTERVAL 180 DAY`, `ttl_only_drop_parts = 1` (whole days dropped) | the 36 columns of `cc.events_raw` (low-cardinality text as `LowCardinality(String)`, `tool_input`/`tool_parameters`/`prompt` `ZSTD(1)`) + `seq`, `abs_path`, `path_cand`, `bash_cmd`; no `project` column |
+| `cc.events_t` | MergeTree, `PARTITION BY toDate(ts)`, `ORDER BY (event, ts)`, `TTL toDateTime(ts) + INTERVAL __RETENTION_DAYS__ DAY` (placeholder replaced with `RETENTION_DAYS`, below), `ttl_only_drop_parts = 1` (whole days dropped) | the 36 columns of `cc.events_raw` (low-cardinality text as `LowCardinality(String)`, `tool_input`/`tool_parameters`/`prompt` `ZSTD(1)`) + `seq`, `abs_path`, `path_cand`, `bash_cmd`; no `project` column |
 | `cc.session_project_t` | MergeTree `ORDER BY session_id` | `session_id`, `project` (inferred) |
 | `cc.tips_t` | MergeTree `ORDER BY tuple()` | the `cc.tips` columns |
 
@@ -58,8 +58,13 @@ MV rebuild) → anti-join top-up → per-month check → `DROP` old. Windows / o
 ## views-init (`init-views.sh`, `set -euo pipefail`)
 
 ```
+RETENTION_DAYS from env (compose: ${RETENTION_DAYS:-365}), not ^[1-9][0-9]*$ → exit 1
 wait ≤ 10 min for otel.otel_logs
-schema.sql
+wait ≤ 60 s for ≥ 5 otel.otel_metrics_* tables, then go on with what exists
+otel.otel_logs, otel.otel_metrics_* without ' TTL ' in engine_full:
+  no row older than RETENTION_DAYS → ALTER MODIFY TTL <col> + toIntervalDay(RETENTION_DAYS)
+  else → message, left as it is (deleting is the user's decision: setup-server.sh asks)
+sed s/__RETENTION_DAYS__/RETENTION_DAYS/ schema.sql | clickhouse-client --multiquery
 months = DISTINCT toStartOfMonth(TimestampTime) of claude-code rows (from the data: wrong client clocks covered)
   per month: backfill.sql  lo = month, hi = next month, guard 30      (a failed month fails views-init)
 missing = last-hour claude-code rows not in cc.events_t
@@ -69,6 +74,9 @@ views.sql                                                             → "cc.* 
 - `backfill.sql`: anti-join on `(session_id, seq, ts)` restricted to `[lo, hi)`, so the key set
   stays per month (1.5 GB per-query limit). Rows within `guard` s of `now()` are left to the MV;
   rows further ahead (fast client clock) are copied. Idempotent: a re-run inserts nothing.
+- An existing TTL is never changed here (also not the one of `cc.events_t`: `IF NOT EXISTS`); a
+  changed `RETENTION_DAYS` reaches existing tables only through `migrate_storage`
+  (`modules/server-update.md`). A metrics table created after the 60 s wait gets its TTL on the next run.
 - Views are applied last, so a view never reads a half-filled table. views-init never runs
   `refresh.sql`.
 - Live check (2026-11-18, ClickHouse 22.3.20.29): `cc.events_t` count = `claude-code` rows of
