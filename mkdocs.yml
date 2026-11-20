@@ -1,0 +1,122 @@
+site_name: cc-telemetry
+site_description: Local usage statistics for Claude Code - OTLP events into ClickHouse, shown in Grafana, on your own LAN.
+repo_url: https://github.com/IlorDash/cc-telemetry
+# The GitHub workflow sets SITE_URL from actions/configure-pages (its base_url
+# output), which is what makes the canonical links, the sitemap and the language
+# switcher's hreflang entries point at the real published address. Empty locally,
+# where a relative build is what you want.
+site_url: !ENV [SITE_URL, ""]
+use_directory_urls: true
+
+docs_dir: docs
+site_dir: site
+
+# Kept next to the docs for convenience, but it is not part of the site.
+exclude_docs: |
+  requirements.txt
+
+theme:
+  name: material
+  language: en
+  features:
+    - navigation.sections
+    - navigation.top
+    # navigation.instant is deliberately NOT enabled: mkdocs-static-i18n cannot
+    # keep the language switcher pointing at the current page with it on, so
+    # switching RU/EN would always drop you back on the home page.
+    - content.code.copy
+    - toc.follow
+  palette:
+    # primary: custom makes Material read the brand colour from
+    # docs/stylesheets/extra.css instead of one of its built-in palettes.
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+extra_css:
+  - stylesheets/extra.css
+
+hooks:
+  - hooks/app_version.py
+
+# Under --strict these become build failures, so a renamed heading or a typo in
+# a cross-page anchor is caught in CI instead of shipping as a dead link.
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      # Keeps Cyrillic headings in the anchors instead of dropping them, so
+      # cross-page links into the Russian pages resolve.
+      slugify: !!python/object/apply:pymdownx.slugs.slugify {kwds: {case: lower}}
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight
+  - pymdownx.keys
+
+plugins:
+  - search
+  # Suffix mode: `page.md` is English, `page.ru.md` is its Russian twin.
+  # The plugin builds / and /ru/ and injects the language switcher into the header.
+  - i18n:
+      docs_structure: suffix
+      reconfigure_material: true
+      reconfigure_search: true
+      languages:
+        - locale: en
+          default: true
+          name: English
+          build: true
+        - locale: ru
+          name: Русский
+          build: true
+          site_name: cc-telemetry
+          # Matches nav *titles*, not paths: a leaf whose title is identical in
+          # both languages needs no entry; a section title above it does.
+          nav_translations:
+            Overview: Обзор
+            Installation: Установка
+            Server: Сервер
+            Clients: Клиенты
+            Using the dashboards: Работа с дашбордами
+            Dashboards: Дашборды
+            Tips: Подсказки
+            Operations: Эксплуатация
+            Maintenance: Обслуживание
+            Troubleshooting: Решение проблем
+            Data and privacy: Данные и приватность
+            Release notes: Примечания к выпуску
+
+nav:
+  - Overview: index.md
+  - Installation:
+      - Server: server.md
+      - Clients: clients.md
+  - Using the dashboards:
+      - Dashboards: dashboards.md
+      - Tips: tips.md
+  - Operations:
+      - Maintenance: maintenance.md
+      - Troubleshooting: troubleshooting.md
+      - Data and privacy: data.md
+  - Release notes:
+      - 1.0.0: release-1-0-0.md

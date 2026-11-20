@@ -7,3 +7,8 @@ backup/
 # parallel-task worktree: ledger/plan buffer and the AI-setup unlock marker (claude-context/guides/ledgers.md)
 /.wt-ledger/
 /.wt-context-unlocked
+# Documentation site
+/site/
+/.venv/
+# Python bytecode (the docs hooks, the AI-setup hooks)
+__pycache__/

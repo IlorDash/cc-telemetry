@@ -52,7 +52,7 @@ Dispatch **mr-reviewer** (model from `claude-context/agents/mr-reviewer.md` fron
 - `git diff --stat <base>...<source>` (three dots: changes on the source since the merge base).
 - Diffs of what a user meets: script options and steps, ports and bind addresses, `.env` keys,
   image tags, collector processors (what is sent / dropped), `cc.*` view columns the dashboards
-  read, dashboards (new panels, variables, links), README sections.
+  read, dashboards (new panels, variables, links), site pages (`docs/`) and the README.
 - The code behind every claim you are going to make.
 - Past PR titles: `git log --merges --format='%s%n%b' -20 <base>` (GitHub puts the PR title in the
   merge commit body).
@@ -70,7 +70,7 @@ Dispatch **mr-reviewer** (model from `claude-context/agents/mr-reviewer.md` fron
 | Something a user sees or can do: a dashboard, panel, variable, tip, script option, setup step, platform | **New features** — one item per capability |
 | Internal work a feature needed (a new view column, a shared helper in a script) | One sentence **inside that feature** |
 | Wrong behaviour that exists on the base branch | **Bug fixes** — group related defects |
-| README changes beyond what a feature item already says | **Documentation** |
+| Site pages / README changes beyond what a feature item already says (new pages, release notes, screenshots) | **Documentation** |
 | AI setup (`claude-context/`: agents, skills, hooks, guides, module docs) | **Tooling** — one short item, or leave out when it is only doc upkeep |
 | Anything that needs action on an installed stack or client: re-run a setup script, `views-init`, new `.env` key, new port to open, changed image tag, data newly collected or dropped, removed dashboard or panel | **Upgrade notes** |
 | Refactoring without visible effect, renames, formatting, comments | **Leave out** |
