@@ -58,35 +58,24 @@
       "1h"
     ]
   },
-  "links": [],
+  "links": [
+    {
+      "type": "dashboards",
+      "title": "Dashboards",
+      "tags": [
+        "cc"
+      ],
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "targetBlank": false,
+      "tooltip": "",
+      "url": ""
+    }
+  ],
   "templating": {
     "list": [
-      {
-        "name": "account",
-        "label": "Account",
-        "type": "query",
-        "datasource": {
-          "type": "grafana-clickhouse-datasource",
-          "uid": "clickhouse"
-        },
-        "query": "SELECT account_uuid, argMax(account, ts) AS name FROM cc.events WHERE account_uuid != '' GROUP BY account_uuid ORDER BY name",
-        "definition": "SELECT account_uuid, argMax(account, ts) AS name FROM cc.events WHERE account_uuid != '' GROUP BY account_uuid ORDER BY name",
-        "includeAll": true,
-        "allValue": "'__all'",
-        "multi": true,
-        "refresh": 2,
-        "sort": 0,
-        "current": {
-          "selected": true,
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
-        },
-        "options": []
-      },
       {
         "name": "project",
         "label": "Project",
@@ -95,8 +84,8 @@
           "type": "grafana-clickhouse-datasource",
           "uid": "clickhouse"
         },
-        "query": "SELECT DISTINCT project FROM cc.events WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) ORDER BY project",
-        "definition": "SELECT DISTINCT project FROM cc.events WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) ORDER BY project",
+        "query": "SELECT DISTINCT project FROM cc.events ORDER BY project",
+        "definition": "SELECT DISTINCT project FROM cc.events ORDER BY project",
         "includeAll": true,
         "allValue": "__all",
         "multi": false,
@@ -117,8 +106,8 @@
           "type": "grafana-clickhouse-datasource",
           "uid": "clickhouse"
         },
-        "query": "SELECT session_id, if(title != '', concat(leftUTF8(title, 60), ' (', left(session_id, 8), ')'), session_id) AS name FROM cc.sessions WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
-        "definition": "SELECT session_id, if(title != '', concat(leftUTF8(title, 60), ' (', left(session_id, 8), ')'), session_id) AS name FROM cc.sessions WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
+        "query": "SELECT session_id, if(title != '', concat(leftUTF8(title, 60), ' (', left(session_id, 8), ')'), session_id) AS name FROM cc.sessions WHERE ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
+        "definition": "SELECT session_id, if(title != '', concat(leftUTF8(title, 60), ' (', left(session_id, 8), ')'), session_id) AS name FROM cc.sessions WHERE ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
         "includeAll": true,
         "allValue": "__all",
         "multi": false,
@@ -139,8 +128,8 @@
           "type": "grafana-clickhouse-datasource",
           "uid": "clickhouse"
         },
-        "query": "SELECT DISTINCT actor FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') ORDER BY actor",
-        "definition": "SELECT DISTINCT actor FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') ORDER BY actor",
+        "query": "SELECT DISTINCT actor FROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') ORDER BY actor",
+        "definition": "SELECT DISTINCT actor FROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') ORDER BY actor",
         "includeAll": true,
         "allValue": "__all",
         "multi": false,
@@ -161,8 +150,8 @@
           "type": "grafana-clickhouse-datasource",
           "uid": "clickhouse"
         },
-        "query": "SELECT DISTINCT skill FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND skill != '' ORDER BY skill",
-        "definition": "SELECT DISTINCT skill FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND skill != '' ORDER BY skill",
+        "query": "SELECT DISTINCT skill FROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND skill != '' ORDER BY skill",
+        "definition": "SELECT DISTINCT skill FROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND skill != '' ORDER BY skill",
         "includeAll": true,
         "allValue": "__all",
         "multi": false,
@@ -182,317 +171,32 @@
   },
   "panels": [
     {
-      "id": 350,
-      "type": "text",
-      "title": "Dashboards",
-      "description": "Navigation. Links keep the time range and the variables.",
+      "id": 15,
+      "type": "row",
+      "title": "Tools",
+      "collapsed": false,
       "gridPos": {
         "x": 0,
         "y": 0,
-        "w": 3,
-        "h": 12
-      },
-      "transparent": false,
-      "options": {
-        "mode": "html",
-        "content": "<a href=\"/d/cc-usage?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Overview</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">totals and status</span></a><a href=\"/d/cc-sessions?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Sessions</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">list · timeline</span></a><a href=\"/d/cc-prompts?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Prompts</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">costliest turns</span></a><a href=\"/d/cc-efficiency?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Efficiency</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">tips and cost breakdown</span></a><a href=\"/d/cc-agents?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Agents &amp; skills</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">subagents, skills</span></a><a href=\"/d/cc-tools?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid #F46800;background:#22252b\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Tools &amp; files</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">calls, files, reads</span></a><a href=\"/d/cc-health?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Health</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">latency, hooks</span></a>"
-      }
-    },
-    {
-      "id": 351,
-      "type": "bargauge",
-      "title": "Usage · last 5 h",
-      "description": "Cost (cost_usd) per Claude account over the last 5 hours. Bar = that cost as % of the account's peak: its highest rolling 5-hour cost over the last 30 days (10-minute steps). Green below 60 %, yellow from 60 %, red from 80 %. Fixed windows: ignores the dashboard time range and the variables. Accounts with no cost in 7 days are not listed.",
-      "datasource": {
-        "type": "grafana-clickhouse-datasource",
-        "uid": "clickhouse"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 12,
-        "w": 3,
-        "h": 4
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "grafana-clickhouse-datasource",
-            "uid": "clickhouse"
-          },
-          "editorType": "sql",
-          "format": 1,
-          "queryType": "table",
-          "rawSql": "SELECT\n    concat(if(t.label = '', '(no account)', t.label), '  ·  $', toString(round(t.h5, 2))) AS name,\n    round(100 * t.h5 / greatest(p.peak, t.h5, 0.000001)) AS pct\nFROM\n(\n    SELECT account_uuid,\n           argMax(account, ts) AS label,\n           sumIf(cost_usd, ts >= now() - INTERVAL 5 HOUR) AS h5,\n           sumIf(cost_usd, ts >= now() - INTERVAL 7 DAY) AS d7\n    FROM cc.api_requests\n    WHERE ts >= now() - INTERVAL 30 DAY\n    GROUP BY account_uuid\n) AS t\nLEFT JOIN\n(\n    SELECT account_uuid, max(w) AS peak\n    FROM\n    (\n        SELECT account_uuid,\n               sum(c) OVER (PARTITION BY account_uuid ORDER BY b RANGE BETWEEN 17999 PRECEDING AND CURRENT ROW) AS w\n        FROM\n        (\n            SELECT account_uuid, toUInt32(toStartOfInterval(ts, INTERVAL 10 MINUTE)) AS b, sum(cost_usd) AS c\n            FROM cc.api_requests\n            WHERE ts >= now() - INTERVAL 30 DAY\n            GROUP BY account_uuid, b\n        )\n    )\n    GROUP BY account_uuid\n) AS p ON p.account_uuid = t.account_uuid\nWHERE t.d7 > 0\nORDER BY t.h5 DESC, t.d7 DESC"
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "values": true,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "orientation": "horizontal",
-        "displayMode": "basic",
-        "valueMode": "color",
-        "namePlacement": "top",
-        "showUnfilled": true,
-        "sizing": "manual",
-        "minVizHeight": 36,
-        "maxVizHeight": 36,
-        "text": {
-          "titleSize": 15,
-          "valueSize": 15
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "min": 0,
-          "max": 100,
-          "decimals": 0,
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "#73BF69",
-                "value": null
-              },
-              {
-                "color": "#FADE2A",
-                "value": 60
-              },
-              {
-                "color": "#F2495C",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 353,
-      "type": "stat",
-      "title": "Tips · 7 d",
-      "description": "Number of tips (view cc.tips, last 7 days). Click the value to open the Tips section of the Efficiency dashboard. Ignores the dashboard time range and the variables.",
-      "datasource": {
-        "type": "grafana-clickhouse-datasource",
-        "uid": "clickhouse"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 16,
-        "w": 3,
-        "h": 3
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "grafana-clickhouse-datasource",
-            "uid": "clickhouse"
-          },
-          "editorType": "sql",
-          "format": 1,
-          "queryType": "table",
-          "rawSql": "SELECT count() AS tips\nFROM cc.tips"
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "/.*/",
-          "values": false
-        },
-        "orientation": "horizontal",
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "textMode": "value_and_name",
-        "text": {
-          "titleSize": 30,
-          "valueSize": 30
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "noValue": "0"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "tips"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Tips"
-              },
-              {
-                "id": "color",
-                "value": {
-                  "mode": "thresholds"
-                }
-              },
-              {
-                "id": "thresholds",
-                "value": {
-                  "mode": "absolute",
-                  "steps": [
-                    {
-                      "color": "green",
-                      "value": null
-                    },
-                    {
-                      "color": "yellow",
-                      "value": 1
-                    },
-                    {
-                      "color": "orange",
-                      "value": 5
-                    }
-                  ]
-                }
-              },
-              {
-                "id": "links",
-                "value": [
-                  {
-                    "title": "Open all tips",
-                    "url": "/d/cc-efficiency?${__url_time_range}",
-                    "oneClick": true
-                  }
-                ]
-              }
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "id": 352,
-      "type": "stat",
-      "title": "",
-      "description": "The most frequent tip category (view cc.tips, last 7 days) with its count in brackets (ties: alphabetical order). Click the value to open the Tips section of the Efficiency dashboard. Ignores the dashboard time range and the variables.",
-      "datasource": {
-        "type": "grafana-clickhouse-datasource",
-        "uid": "clickhouse"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 19,
-        "w": 3,
-        "h": 3
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "grafana-clickhouse-datasource",
-            "uid": "clickhouse"
-          },
-          "editorType": "sql",
-          "format": 1,
-          "queryType": "table",
-          "rawSql": "SELECT if(tips = 0, 'none', concat(multiIf(top = 'cache', 'Cache rebuilds', top = 'repeated-read', 'Repeated reads', top = 'big-results', 'Big tool results', top = 'short-opus', 'Short Opus answers', top = 'agent-outlier', 'Costly agent run', top = 'denials', 'Denied tool calls', top = 'slow-hook', 'Slow hooks', top = 'slow-ttft', 'Slow first token', top), ' (', toString(n), ')')) AS most_frequent\nFROM\n(\n    SELECT sum(c) AS tips,\n           argMin(category, (-toInt64(c), category)) AS top,\n           max(c) AS n\n    FROM (SELECT category, count() AS c FROM cc.tips GROUP BY category)\n)"
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "/.*/",
-          "values": false
-        },
-        "orientation": "horizontal",
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "textMode": "value_and_name",
-        "text": {
-          "titleSize": 20,
-          "valueSize": 20
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "noValue": "none"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "most_frequent"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Most frequent"
-              },
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "blue"
-                }
-              },
-              {
-                "id": "links",
-                "value": [
-                  {
-                    "title": "Open all tips",
-                    "url": "/d/cc-efficiency?${__url_time_range}",
-                    "oneClick": true
-                  }
-                ]
-              }
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "id": 480,
-      "type": "text",
-      "title": "Tool events from tool_result and tool_decision. File paths come from the tool parameters.",
-      "description": "Every panel follows the time range and the Account, Project, Session, Actor and Skill variables. The rail on the left ignores them.",
-      "transparent": true,
-      "gridPos": {
-        "x": 3,
-        "y": 0,
-        "w": 21,
+        "w": 24,
         "h": 1
       },
-      "options": {
-        "mode": "html",
-        "content": ""
-      }
+      "panels": []
     },
     {
-      "id": 481,
-      "type": "stat",
-      "title": "Tool calls",
-      "description": "Number of tool calls (tool_result events) in the time range.",
+      "id": 16,
+      "type": "barchart",
+      "title": "Tool calls by tool",
+      "description": "",
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "clickhouse"
       },
       "gridPos": {
-        "x": 3,
+        "x": 0,
         "y": 1,
-        "w": 5,
-        "h": 4
+        "w": 8,
+        "h": 10
       },
       "targets": [
         {
@@ -504,46 +208,31 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT count() AS calls, 'tool_result events' AS name\nFROM cc.tool_calls WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)"
+          "rawSql": "SELECT tool_name, count() AS calls\nFROM cc.tool_calls WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nGROUP BY tool_name ORDER BY calls DESC LIMIT 25"
         }
       ],
       "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": true
+        "orientation": "horizontal",
+        "xField": "tool_name",
+        "showValue": "auto",
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom"
         },
-        "orientation": "vertical",
-        "justifyMode": "auto",
-        "wideLayout": false,
-        "colorMode": "value",
-        "graphMode": "none",
-        "textMode": "value_and_name",
-        "text": {
-          "titleSize": 13,
-          "valueSize": 42
-        }
+        "stacking": "none",
+        "barWidth": 0.8
       },
       "fieldConfig": {
-        "defaults": {
-          "unit": "locale",
-          "decimals": 0,
-          "noValue": "0",
-          "color": {
-            "mode": "fixed",
-            "fixedColor": "#ccccdc"
-          }
-        },
+        "defaults": {},
         "overrides": []
       }
     },
     {
-      "id": 482,
-      "type": "stat",
-      "title": "Error rate",
-      "description": "Share of tool calls that failed (tool_result with success = false; a rejected call counts as failed). Below 2 % green, 2 % and above yellow, 5 % and above red, as on Overview.",
+      "id": 17,
+      "type": "table",
+      "title": "Tools × actor × skill",
+      "description": "",
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "clickhouse"
@@ -551,215 +240,7 @@
       "gridPos": {
         "x": 8,
         "y": 1,
-        "w": 5,
-        "h": 4
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "grafana-clickhouse-datasource",
-            "uid": "clickhouse"
-          },
-          "editorType": "sql",
-          "format": 1,
-          "queryType": "table",
-          "rawSql": "SELECT 100 * countIf(NOT success) / greatest(count(), 1) AS error_rate, 'tool_result success = false' AS name\nFROM cc.tool_calls WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)"
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": true
-        },
-        "orientation": "vertical",
-        "justifyMode": "auto",
-        "wideLayout": false,
-        "colorMode": "value",
-        "graphMode": "none",
-        "textMode": "value_and_name",
-        "text": {
-          "titleSize": 13,
-          "valueSize": 42
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "decimals": 1,
-          "noValue": "0",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "#73BF69",
-                "value": null
-              },
-              {
-                "color": "#FADE2A",
-                "value": 2
-              },
-              {
-                "color": "#F2495C",
-                "value": 5
-              }
-            ]
-          }
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 483,
-      "type": "stat",
-      "title": "Rejected",
-      "description": "Tool calls that were rejected (tool_decision events with decision = reject), split by who rejected them: config (permission rules), hook, user (rejected or not allowed in the prompt). The Actor and Skill variables are matched through the agent and the model request of the decision. Green with none, red from one.",
-      "datasource": {
-        "type": "grafana-clickhouse-datasource",
-        "uid": "clickhouse"
-      },
-      "gridPos": {
-        "x": 13,
-        "y": 1,
-        "w": 5,
-        "h": 4
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "grafana-clickhouse-datasource",
-            "uid": "clickhouse"
-          },
-          "editorType": "sql",
-          "format": 1,
-          "queryType": "table",
-          "rawSql": "SELECT count() AS rejected, concat('config ', toString(countIf(source = 'config')), ' · hook ', toString(countIf(source = 'hook')), ' · user ', toString(countIf(source = 'user'))) AS name\nFROM\n(\n    SELECT e.ts AS ts, e.account_uuid AS account_uuid, e.project AS project, e.session_id AS session_id, e.tool_name AS tool_name,\n           if(startsWith(e.decision_source, 'user'), 'user', e.decision_source) AS source,\n           if(e.agent_id = '', 'main', if(a.agent = '', 'agent?', a.agent)) AS actor, r.skill AS skill\n    FROM cc.events AS e\n    LEFT JOIN cc.agents AS a ON a.agent_id = e.agent_id\n    LEFT JOIN cc.requests AS r ON r.request_id = e.request_id\n    WHERE e.event = 'tool_decision' AND e.decision = 'reject' AND e.tool_name != '' AND $__timeFilter(e.ts)\n)\nWHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}')"
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": true
-        },
-        "orientation": "vertical",
-        "justifyMode": "auto",
-        "wideLayout": false,
-        "colorMode": "value",
-        "graphMode": "none",
-        "textMode": "value_and_name",
-        "text": {
-          "titleSize": 13,
-          "valueSize": 42
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "locale",
-          "decimals": 0,
-          "noValue": "0",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "#73BF69",
-                "value": null
-              },
-              {
-                "color": "#F2495C",
-                "value": 1
-              }
-            ]
-          }
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 484,
-      "type": "stat",
-      "title": "Median result size",
-      "description": "Median size of the result a tool returned to the model (tool_result_size_bytes, calls with a result only); the second line is the 95th percentile. The telemetry carries bytes, not tokens (about 4 bytes per token).",
-      "datasource": {
-        "type": "grafana-clickhouse-datasource",
-        "uid": "clickhouse"
-      },
-      "gridPos": {
-        "x": 18,
-        "y": 1,
-        "w": 6,
-        "h": 4
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "grafana-clickhouse-datasource",
-            "uid": "clickhouse"
-          },
-          "editorType": "sql",
-          "format": 1,
-          "queryType": "table",
-          "rawSql": "SELECT ifNotFinite(quantileIf(0.5)(result_bytes, result_bytes > 0), 0) AS median_bytes, concat('p95 ', formatReadableSize(ifNotFinite(quantileIf(0.95)(result_bytes, result_bytes > 0), 0))) AS name\nFROM cc.tool_calls WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)"
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": true
-        },
-        "orientation": "vertical",
-        "justifyMode": "auto",
-        "wideLayout": false,
-        "colorMode": "value",
-        "graphMode": "none",
-        "textMode": "value_and_name",
-        "text": {
-          "titleSize": 13,
-          "valueSize": 42
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "bytes",
-          "decimals": 1,
-          "noValue": "0",
-          "color": {
-            "mode": "fixed",
-            "fixedColor": "#ccccdc"
-          }
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 485,
-      "type": "table",
-      "title": "Calls by tool",
-      "description": "The 7 tools with the most calls. Errors = failed calls / calls of the tool: below 2 % green, 2 % and above yellow, 5 % and above red, as in Error rate above.",
-      "datasource": {
-        "type": "grafana-clickhouse-datasource",
-        "uid": "clickhouse"
-      },
-      "gridPos": {
-        "x": 3,
-        "y": 5,
-        "w": 10,
+        "w": 16,
         "h": 10
       },
       "targets": [
@@ -772,86 +253,391 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT tool_name AS tool, count() AS calls, 100 * countIf(NOT success) / count() AS error_pct\nFROM cc.tool_calls WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nGROUP BY tool_name ORDER BY calls DESC LIMIT 7"
+          "rawSql": "SELECT actor, if(skill = '', '-', skill) AS skill, tool_name,\n       count() AS calls, countIf(NOT success) AS errors, round(avg(duration_ms)) AS avg_ms\nFROM cc.tool_calls WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nGROUP BY actor, skill, tool_name\nORDER BY calls DESC"
         }
       ],
       "options": {
         "showHeader": true,
-        "cellHeight": "sm",
-        "sortBy": [
-          {
-            "displayName": "Calls",
-            "desc": true
-          }
-        ]
+        "cellHeight": "sm"
       },
       "fieldConfig": {
         "defaults": {
           "custom": {
-            "align": "auto",
-            "filterable": false,
-            "minWidth": 50
+            "filterable": true
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 18,
+      "type": "table",
+      "title": "Bash commands",
+      "description": "",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 11,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT bash_cmd AS command, actor, count() AS calls, countIf(NOT success) AS errors\nFROM cc.tool_calls WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts) AND tool_name = 'Bash'\nGROUP BY command, actor ORDER BY calls DESC LIMIT 50"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 19,
+      "type": "table",
+      "title": "Rejected tool calls (permissions / hooks)",
+      "description": "",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 11,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT tool_name, decision_source AS source, count() AS rejected\nFROM cc.events\nWHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND $__timeFilter(ts) AND event = 'tool_decision' AND decision = 'reject'\nGROUP BY tool_name, source ORDER BY rejected DESC"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 20,
+      "type": "row",
+      "title": "Files (paths relative to project; worktrees folded in)",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 19,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 21,
+      "type": "table",
+      "title": "Top files",
+      "description": "",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 20,
+        "w": 16,
+        "h": 12
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT path, area,\n       countIf(op = 'read') AS reads, countIf(op = 'write') AS writes, countIf(op = 'search') AS searches,\n       count() AS total, uniqExact(session_id) AS sessions,\n       arrayStringConcat(groupUniqArray(actor), ', ') AS actors,\n       arrayStringConcat(groupUniqArrayIf(skill, skill != ''), ', ') AS skills\nFROM cc.tool_calls WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts) AND path != ''\nGROUP BY path, area ORDER BY total DESC LIMIT 200"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 22,
+      "type": "barchart",
+      "title": "Accesses by area",
+      "description": "claude-context = claude-context/ and .claude/; external = outside the project folder",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 20,
+        "w": 8,
+        "h": 12
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT area, count() AS accesses\nFROM cc.tool_calls WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts) AND area != ''\nGROUP BY area ORDER BY accesses DESC LIMIT 20"
+        }
+      ],
+      "options": {
+        "orientation": "horizontal",
+        "xField": "area",
+        "showValue": "auto",
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "stacking": "none",
+        "barWidth": 0.8
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "id": 23,
+      "type": "table",
+      "title": "Top directories",
+      "description": "",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT dir, countIf(op = 'read') AS reads, countIf(op = 'write') AS writes,\n       countIf(op = 'search') AS searches, count() AS total\nFROM cc.tool_calls WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts) AND dir != ''\nGROUP BY dir ORDER BY total DESC LIMIT 100"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 24,
+      "type": "table",
+      "title": "Files re-read within one session (context churn)",
+      "description": "",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 32,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT session_id, path, count() AS reads\nFROM cc.tool_calls WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts) AND op = 'read' AND path != ''\nGROUP BY session_id, path HAVING reads > 2\nORDER BY reads DESC LIMIT 100"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 143,
+      "type": "row",
+      "title": "Results and errors",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 41,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 140,
+      "type": "table",
+      "title": "Largest tool results",
+      "description": "Size of the result returned to the model (tool_result_size_bytes); big results fill the context window",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 42,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT r.ts AS ts, r.session_id AS session_id, r.tool_name AS tool_name, c.actor AS actor, if(c.skill = '', '-', c.skill) AS skill,\n       if(c.bash_cmd != '', c.bash_cmd, c.path) AS target, r.result_bytes AS result_bytes\nFROM cc.events AS r\nINNER JOIN (SELECT tool_use_id, actor, skill, path, bash_cmd FROM cc.tool_calls WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)) AS c ON c.tool_use_id = r.tool_use_id\nWHERE ('${project}' = '__all' OR r.project = '${project}') AND ('${session}' = '__all' OR r.session_id = '${session}') AND $__timeFilter(r.ts) AND r.event = 'tool_result' AND r.result_bytes > 0\nORDER BY result_bytes DESC LIMIT 50"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true
           }
         },
         "overrides": [
           {
             "matcher": {
               "id": "byName",
-              "options": "tool"
+              "options": "result_bytes"
             },
             "properties": [
-              {
-                "id": "displayName",
-                "value": "Tool"
-              },
-              {
-                "id": "custom.width",
-                "value": 150
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "calls"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Calls"
-              },
               {
                 "id": "unit",
-                "value": "locale"
-              },
-              {
-                "id": "decimals",
-                "value": 0
-              },
-              {
-                "id": "fieldMinMax",
-                "value": true
-              },
-              {
-                "id": "min",
-                "value": 0
-              },
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "#5794F2"
-                }
-              },
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "gauge",
-                  "mode": "gradient"
-                }
+                "value": "bytes"
               }
             ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 141,
+      "type": "table",
+      "title": "Error rate by tool",
+      "description": "Share of tool calls with success = false (includes rejected calls)",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 52,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
           },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT tool_name, count() AS calls, countIf(NOT success) AS errors, round(100 * errors / calls, 1) AS error_pct\nFROM cc.tool_calls WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nGROUP BY tool_name HAVING errors > 0 ORDER BY error_pct DESC, errors DESC LIMIT 50"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
+        "overrides": [
           {
             "matcher": {
               "id": "byName",
@@ -859,56 +645,8 @@
             },
             "properties": [
               {
-                "id": "displayName",
-                "value": "Errors"
-              },
-              {
                 "id": "unit",
                 "value": "percent"
-              },
-              {
-                "id": "decimals",
-                "value": 1
-              },
-              {
-                "id": "custom.align",
-                "value": "right"
-              },
-              {
-                "id": "custom.width",
-                "value": 80
-              },
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-text"
-                }
-              },
-              {
-                "id": "color",
-                "value": {
-                  "mode": "thresholds"
-                }
-              },
-              {
-                "id": "thresholds",
-                "value": {
-                  "mode": "absolute",
-                  "steps": [
-                    {
-                      "color": "#73BF69",
-                      "value": null
-                    },
-                    {
-                      "color": "#FADE2A",
-                      "value": 2
-                    },
-                    {
-                      "color": "#F2495C",
-                      "value": 5
-                    }
-                  ]
-                }
               }
             ]
           }
@@ -916,19 +654,19 @@
       }
     },
     {
-      "id": 19,
+      "id": 142,
       "type": "table",
-      "title": "Rejected tool calls",
-      "description": "Tool calls rejected (tool_decision events with decision = reject) per tool, project and who rejected them: config (permission rules), hook, user (rejected or not allowed in the prompt). Counts from 5 are red (the denials tip fires at 5 in 7 days). Target of the denials tip. The Actor and Skill variables are matched through the agent and the model request of the decision.",
+      "title": "Result size by tool",
+      "description": "Average, maximum and total size of tool results",
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "clickhouse"
       },
       "gridPos": {
-        "x": 13,
-        "y": 5,
-        "w": 11,
-        "h": 10
+        "x": 12,
+        "y": 52,
+        "w": 12,
+        "h": 9
       },
       "targets": [
         {
@@ -940,673 +678,53 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT tool_name AS tool, project, source, count() AS n\nFROM\n(\n    SELECT e.ts AS ts, e.account_uuid AS account_uuid, e.project AS project, e.session_id AS session_id, e.tool_name AS tool_name,\n           if(startsWith(e.decision_source, 'user'), 'user', e.decision_source) AS source,\n           if(e.agent_id = '', 'main', if(a.agent = '', 'agent?', a.agent)) AS actor, r.skill AS skill\n    FROM cc.events AS e\n    LEFT JOIN cc.agents AS a ON a.agent_id = e.agent_id\n    LEFT JOIN cc.requests AS r ON r.request_id = e.request_id\n    WHERE e.event = 'tool_decision' AND e.decision = 'reject' AND e.tool_name != '' AND $__timeFilter(e.ts)\n)\nWHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}')\nGROUP BY tool_name, project, source ORDER BY n DESC, tool_name LIMIT 50"
+          "rawSql": "SELECT r.tool_name AS tool_name, count() AS results, round(avg(r.result_bytes)) AS avg_bytes, max(r.result_bytes) AS max_bytes, sum(r.result_bytes) AS total_bytes\nFROM cc.events AS r\nINNER JOIN (SELECT tool_use_id FROM cc.tool_calls WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)) AS c ON c.tool_use_id = r.tool_use_id\nWHERE ('${project}' = '__all' OR r.project = '${project}') AND ('${session}' = '__all' OR r.session_id = '${session}') AND $__timeFilter(r.ts) AND r.event = 'tool_result' AND r.result_bytes > 0\nGROUP BY tool_name ORDER BY total_bytes DESC LIMIT 50"
         }
       ],
       "options": {
         "showHeader": true,
-        "cellHeight": "sm",
-        "sortBy": [
-          {
-            "displayName": "Count",
-            "desc": true
-          }
-        ]
+        "cellHeight": "sm"
       },
       "fieldConfig": {
         "defaults": {
           "custom": {
-            "align": "auto",
-            "filterable": false,
-            "minWidth": 50
+            "filterable": true
           }
         },
         "overrides": [
           {
             "matcher": {
               "id": "byName",
-              "options": "tool"
+              "options": "avg_bytes"
             },
             "properties": [
-              {
-                "id": "displayName",
-                "value": "Tool"
-              },
-              {
-                "id": "custom.minWidth",
-                "value": 100
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "project"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Project"
-              },
-              {
-                "id": "custom.minWidth",
-                "value": 110
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "source"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Source"
-              },
-              {
-                "id": "custom.width",
-                "value": 90
-              },
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "#8e8e9e"
-                }
-              },
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-text"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "n"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Count"
-              },
-              {
-                "id": "unit",
-                "value": "locale"
-              },
-              {
-                "id": "decimals",
-                "value": 0
-              },
-              {
-                "id": "custom.align",
-                "value": "right"
-              },
-              {
-                "id": "custom.width",
-                "value": 80
-              },
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-text"
-                }
-              },
-              {
-                "id": "color",
-                "value": {
-                  "mode": "thresholds"
-                }
-              },
-              {
-                "id": "thresholds",
-                "value": {
-                  "mode": "absolute",
-                  "steps": [
-                    {
-                      "color": "#ccccdc",
-                      "value": null
-                    },
-                    {
-                      "color": "#F2495C",
-                      "value": 5
-                    }
-                  ]
-                }
-              }
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "id": 24,
-      "type": "table",
-      "title": "Files re-read within one session",
-      "description": "Files read more than twice in one session (Read tool calls), paths relative to the project. Size = mean size of the result; Repeat tokens = about size / 4 x (reads - 1): the tokens the repeated reads added (the telemetry carries bytes, 4 bytes per token is a rule of thumb). Sorted by Repeat tokens, 50 rows at most. Target of the repeated-read tip.",
-      "datasource": {
-        "type": "grafana-clickhouse-datasource",
-        "uid": "clickhouse"
-      },
-      "gridPos": {
-        "x": 3,
-        "y": 15,
-        "w": 13,
-        "h": 8
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "grafana-clickhouse-datasource",
-            "uid": "clickhouse"
-          },
-          "editorType": "sql",
-          "format": 1,
-          "queryType": "table",
-          "rawSql": "SELECT path AS file, project, count() AS reads, round(avg(result_bytes)) AS size, round(avg(result_bytes) / 4 * (count() - 1)) AS repeat_tokens\nFROM cc.tool_calls WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts) AND op = 'read' AND path != ''\nGROUP BY session_id, project, path HAVING reads > 2\nORDER BY repeat_tokens DESC LIMIT 50"
-        }
-      ],
-      "options": {
-        "showHeader": true,
-        "cellHeight": "sm",
-        "sortBy": [
-          {
-            "displayName": "Repeat tokens",
-            "desc": true
-          }
-        ]
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "align": "auto",
-            "filterable": false,
-            "minWidth": 50
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "file"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "File"
-              },
-              {
-                "id": "custom.minWidth",
-                "value": 200
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "project"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Project"
-              },
-              {
-                "id": "custom.width",
-                "value": 130
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "reads"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Reads"
-              },
-              {
-                "id": "unit",
-                "value": "locale"
-              },
-              {
-                "id": "decimals",
-                "value": 0
-              },
-              {
-                "id": "custom.align",
-                "value": "right"
-              },
-              {
-                "id": "custom.width",
-                "value": 70
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "size"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Size"
-              },
               {
                 "id": "unit",
                 "value": "bytes"
-              },
-              {
-                "id": "decimals",
-                "value": 1
-              },
-              {
-                "id": "custom.align",
-                "value": "right"
-              },
-              {
-                "id": "custom.width",
-                "value": 90
-              },
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "#8e8e9e"
-                }
-              },
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-text"
-                }
               }
             ]
           },
           {
             "matcher": {
               "id": "byName",
-              "options": "repeat_tokens"
+              "options": "max_bytes"
             },
             "properties": [
-              {
-                "id": "displayName",
-                "value": "Repeat tokens"
-              },
-              {
-                "id": "unit",
-                "value": "short"
-              },
-              {
-                "id": "decimals",
-                "value": 1
-              },
-              {
-                "id": "fieldMinMax",
-                "value": true
-              },
-              {
-                "id": "min",
-                "value": 0
-              },
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "#5794F2"
-                }
-              },
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "gauge",
-                  "mode": "gradient"
-                }
-              }
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "id": 140,
-      "type": "table",
-      "title": "Largest tool results",
-      "description": "The 50 biggest results returned to the model (tool_result_size_bytes); big results fill the context window. Target = the file path (relative to the project) or the first word of the Bash command; the telemetry has no other target and none is shown for other tools. From 1 MiB the size is red. Target of the big-results tip.",
-      "datasource": {
-        "type": "grafana-clickhouse-datasource",
-        "uid": "clickhouse"
-      },
-      "gridPos": {
-        "x": 16,
-        "y": 15,
-        "w": 8,
-        "h": 8
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "grafana-clickhouse-datasource",
-            "uid": "clickhouse"
-          },
-          "editorType": "sql",
-          "format": 1,
-          "queryType": "table",
-          "rawSql": "SELECT tool_name AS tool, multiIf(bash_cmd != '', bash_cmd, path != '', path, '—') AS target, result_bytes AS size\nFROM cc.tool_calls WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts) AND result_bytes > 0\nORDER BY result_bytes DESC LIMIT 50"
-        }
-      ],
-      "options": {
-        "showHeader": true,
-        "cellHeight": "sm",
-        "sortBy": [
-          {
-            "displayName": "Size",
-            "desc": true
-          }
-        ]
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "align": "auto",
-            "filterable": false,
-            "minWidth": 50
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "tool"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Tool"
-              },
-              {
-                "id": "custom.width",
-                "value": 90
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "target"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Target"
-              },
-              {
-                "id": "custom.minWidth",
-                "value": 120
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "size"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Size"
-              },
               {
                 "id": "unit",
                 "value": "bytes"
-              },
-              {
-                "id": "decimals",
-                "value": 1
-              },
-              {
-                "id": "custom.align",
-                "value": "right"
-              },
-              {
-                "id": "custom.width",
-                "value": 90
-              },
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-text"
-                }
-              },
-              {
-                "id": "color",
-                "value": {
-                  "mode": "thresholds"
-                }
-              },
-              {
-                "id": "thresholds",
-                "value": {
-                  "mode": "absolute",
-                  "steps": [
-                    {
-                      "color": "#FF9830",
-                      "value": null
-                    },
-                    {
-                      "color": "#F2495C",
-                      "value": 1048576
-                    }
-                  ]
-                }
-              }
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "id": 486,
-      "type": "bargauge",
-      "title": "Bash by first word",
-      "description": "The 5 most frequent first words of Bash commands (git, docker, ...). Claude Code sends only the first word of a command, so this is not a count of repeated commands.",
-      "datasource": {
-        "type": "grafana-clickhouse-datasource",
-        "uid": "clickhouse"
-      },
-      "gridPos": {
-        "x": 3,
-        "y": 23,
-        "w": 8,
-        "h": 8
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "grafana-clickhouse-datasource",
-            "uid": "clickhouse"
-          },
-          "editorType": "sql",
-          "format": 1,
-          "queryType": "table",
-          "rawSql": "SELECT bash_cmd AS command, count() AS calls\nFROM cc.tool_calls WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts) AND tool_name = 'Bash' AND bash_cmd != ''\nGROUP BY command ORDER BY calls DESC LIMIT 5"
-        }
-      ],
-      "options": {
-        "orientation": "horizontal",
-        "displayMode": "gradient",
-        "valueMode": "text",
-        "showUnfilled": true,
-        "namePlacement": "top",
-        "sizing": "manual",
-        "minVizHeight": 16,
-        "maxVizHeight": 34,
-        "text": {
-          "titleSize": 15,
-          "valueSize": 14
-        },
-        "reduceOptions": {
-          "values": true,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "/^calls$/"
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "min": 0,
-          "unit": "locale",
-          "decimals": 0,
-          "color": {
-            "mode": "fixed",
-            "fixedColor": "#5794F2"
-          }
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 487,
-      "type": "table",
-      "title": "Most edited files",
-      "description": "Files changed most often (Edit, MultiEdit, Write and NotebookEdit calls), paths relative to the project, with the number of sessions that changed them. Sorted by Edits, the top 5.",
-      "datasource": {
-        "type": "grafana-clickhouse-datasource",
-        "uid": "clickhouse"
-      },
-      "gridPos": {
-        "x": 11,
-        "y": 23,
-        "w": 13,
-        "h": 8
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "grafana-clickhouse-datasource",
-            "uid": "clickhouse"
-          },
-          "editorType": "sql",
-          "format": 1,
-          "queryType": "table",
-          "rawSql": "SELECT path AS file, project, count() AS edits, uniqExact(session_id) AS sessions\nFROM cc.tool_calls WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts) AND op = 'write' AND path != ''\nGROUP BY project, path ORDER BY edits DESC LIMIT 5"
-        }
-      ],
-      "options": {
-        "showHeader": true,
-        "cellHeight": "sm",
-        "sortBy": [
-          {
-            "displayName": "Edits",
-            "desc": true
-          }
-        ]
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "align": "auto",
-            "filterable": false,
-            "minWidth": 50
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "file"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "File"
-              },
-              {
-                "id": "custom.minWidth",
-                "value": 200
               }
             ]
           },
           {
             "matcher": {
               "id": "byName",
-              "options": "project"
+              "options": "total_bytes"
             },
             "properties": [
-              {
-                "id": "displayName",
-                "value": "Project"
-              },
-              {
-                "id": "custom.width",
-                "value": 130
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "edits"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Edits"
-              },
               {
                 "id": "unit",
-                "value": "locale"
-              },
-              {
-                "id": "decimals",
-                "value": 0
-              },
-              {
-                "id": "custom.align",
-                "value": "right"
-              },
-              {
-                "id": "custom.width",
-                "value": 80
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "sessions"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Sessions"
-              },
-              {
-                "id": "unit",
-                "value": "locale"
-              },
-              {
-                "id": "decimals",
-                "value": 0
-              },
-              {
-                "id": "custom.align",
-                "value": "right"
-              },
-              {
-                "id": "custom.width",
-                "value": 90
+                "value": "bytes"
               }
             ]
           }
