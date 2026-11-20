@@ -53,9 +53,9 @@ as it arrives, with no other filter.
 
 ## Where the data lives
 
-- **The telemetry stays on the server PC.** The collector writes every event to ClickHouse (`otel.otel_logs`
-  and the metrics tables), which keeps it in the Docker volume `clickhouse-data`. The
-  collector has no other exporter: nothing is forwarded to another server.
+- **The telemetry stays on the server PC.** The collector writes every event to ClickHouse
+  (`otel.otel_logs` and the metrics tables), which keeps it in the Docker volume
+  `clickhouse-data`. The collector has no other exporter: nothing is forwarded to another server.
 - **What Grafana contacts by itself.** The stack does not change Grafana's defaults, so Grafana
   sends anonymous usage statistics and checks grafana.com for updates, and the ClickHouse plugin
   is downloaded from grafana.com on the first start. This traffic has no prompts or events in
