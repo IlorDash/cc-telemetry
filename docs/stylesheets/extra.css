@@ -1,0 +1,84 @@
+/* ---------------------------------------------------------------------------
+   Colours: a muted, pastel take on Grafana orange (the active-item colour of
+   the dashboard rail), so the guide reads calmly next to the dashboards.
+
+   Material calls the header colour the "primary" colour and the hover/focus
+   colour the "accent" colour. mkdocs.yml sets both to "custom", which makes
+   the theme read the variables below instead of its built-in palettes - so
+   this file is the single place the colours are defined.
+
+   The selector lists both schemes explicitly: the slate (dark) scheme redefines
+   these variables itself, so plain :root alone would be overridden the moment a
+   reader switches to dark mode.
+   --------------------------------------------------------------------------- */
+
+:root,
+[data-md-color-scheme="default"],
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color:        #C27C57;
+  --md-primary-fg-color--light: #D9A586;
+  --md-primary-fg-color--dark:  #A4643F;
+
+  --md-primary-bg-color:        #ffffff;
+  --md-primary-bg-color--light: rgba(255, 255, 255, 0.75);
+
+  --md-accent-fg-color:              #D9946D;
+  --md-accent-fg-color--transparent: rgba(217, 148, 109, 0.12);
+  --md-accent-bg-color:              #ffffff;
+  --md-accent-bg-color--light:       rgba(255, 255, 255, 0.75);
+}
+
+/* Links: the primary colour is too dark on the slate background. */
+[data-md-color-scheme="slate"] {
+  --md-typeset-a-color: #E2AE8F;
+}
+
+/* ---------------------------------------------------------------------------
+   Admonitions in pastel tones. Material colours each kind in its own rules,
+   so the border, the title band and the icon are overridden per kind.
+   --------------------------------------------------------------------------- */
+
+.md-typeset .admonition.note,    .md-typeset details.note    { --cc-adm: 132, 166, 204; }
+.md-typeset .admonition.info,    .md-typeset details.info    { --cc-adm: 128, 178, 196; }
+.md-typeset .admonition.tip,     .md-typeset details.tip     { --cc-adm: 134, 184, 150; }
+.md-typeset .admonition.warning, .md-typeset details.warning { --cc-adm: 214, 172, 110; }
+.md-typeset .admonition.danger,  .md-typeset details.danger  { --cc-adm: 205, 130, 130; }
+
+.md-typeset .admonition[class*="note"],
+.md-typeset .admonition[class*="info"],
+.md-typeset .admonition[class*="tip"],
+.md-typeset .admonition[class*="warning"],
+.md-typeset .admonition[class*="danger"],
+.md-typeset details[class*="note"],
+.md-typeset details[class*="info"],
+.md-typeset details[class*="tip"],
+.md-typeset details[class*="warning"],
+.md-typeset details[class*="danger"] {
+  border-color: rgb(var(--cc-adm));
+}
+
+.md-typeset .admonition[class*="note"] > .admonition-title,
+.md-typeset .admonition[class*="info"] > .admonition-title,
+.md-typeset .admonition[class*="tip"] > .admonition-title,
+.md-typeset .admonition[class*="warning"] > .admonition-title,
+.md-typeset .admonition[class*="danger"] > .admonition-title,
+.md-typeset details[class*="note"] > summary,
+.md-typeset details[class*="info"] > summary,
+.md-typeset details[class*="tip"] > summary,
+.md-typeset details[class*="warning"] > summary,
+.md-typeset details[class*="danger"] > summary {
+  background-color: rgba(var(--cc-adm), 0.14);
+}
+
+.md-typeset .admonition[class*="note"] > .admonition-title::before,
+.md-typeset .admonition[class*="info"] > .admonition-title::before,
+.md-typeset .admonition[class*="tip"] > .admonition-title::before,
+.md-typeset .admonition[class*="warning"] > .admonition-title::before,
+.md-typeset .admonition[class*="danger"] > .admonition-title::before,
+.md-typeset details[class*="note"] > summary::before,
+.md-typeset details[class*="info"] > summary::before,
+.md-typeset details[class*="tip"] > summary::before,
+.md-typeset details[class*="warning"] > summary::before,
+.md-typeset details[class*="danger"] > summary::before {
+  background-color: rgb(var(--cc-adm));
+}

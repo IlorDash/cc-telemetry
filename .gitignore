@@ -2,3 +2,13 @@
 backup/
 # junction to claude-context (see claude-context/guides/context-repo.md)
 /.claude
+# Playwright MCP screenshots and prototypes
+.playwright-mcp/
+# parallel-task worktree: ledger/plan buffer and the AI-setup unlock marker (claude-context/guides/ledgers.md)
+/.wt-ledger/
+/.wt-context-unlocked
+# Documentation site
+/site/
+/.venv/
+# Python bytecode (the docs hooks, the AI-setup hooks)
+__pycache__/
