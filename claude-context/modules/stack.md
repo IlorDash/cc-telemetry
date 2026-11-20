@@ -20,7 +20,7 @@ The Docker services, how data moves between them, what is exposed and where it i
 
 | Service | Image | Ports | Notes |
 | --- | --- | --- | --- |
-| `clickhouse` | `clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-25.8}` | none published | db `otel`, user `otel`; healthcheck `SELECT 1`; `ulimits nofile 262144`; `cpus: ${CLICKHOUSE_CPUS:-0}` (0 = no limit) |
+| `clickhouse` | `clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-25.8}` | none published | db `otel`, user `otel`; healthcheck `SELECT 1` every 60 s (timeout 5 s, 3 retries; no `start_period`, so the first check — and the start of the services that wait for `service_healthy` — comes ~60 s after start); `ulimits nofile 262144`; `cpus: ${CLICKHOUSE_CPUS:-0}` (0 = no limit) |
 | `otel-collector` | `otel/opentelemetry-collector-contrib:0.135.0` | `${OTLP_BIND:-0.0.0.0}:4317` gRPC (Claude Code), `${OTLP_BIND:-0.0.0.0}:4318` HTTP (session-meta hook) | starts after clickhouse is healthy |
 | `views-init` | `clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-25.8}` | — | one-shot, `restart: "no"`; `bash /init/init-views.sh`; env `RETENTION_DAYS: ${RETENTION_DAYS:-365}`; `docker compose ps -a` shows `Exited (0)` when fine |
 | `cc-refresh` | `clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-25.8}` | — | `bash /init/refresh-loop.sh`: `refresh.sql` every 300 s, client `--max_threads 1`; logs `refresh ok` / `refresh FAILED` and keeps looping; `depends_on` clickhouse healthy + views-init `service_completed_successfully` (a failed views-init fails `compose up -d`); after a reboot views-init does not run again, the loop waits for its tables |
@@ -102,7 +102,7 @@ metrics: otlp → memory_limiter → batch → clickhouse
   retry up to 300 s and a 10000-item queue, then data is dropped.
 - No exporter `ttl` (hours cannot follow `RETENTION_DAYS` from `.env`): the exporter creates the
   tables without a TTL; views-init sets it on those that have none (`modules/materialization.md`),
-  `setup-server.sh` `migrate_storage` changes an existing one (`modules/server-update.md`).
+  `setup-server.sh` `apply_retention` changes an existing one (`modules/server-update.md`).
 - Batch 30 s: an event shows on the dashboard up to ~30 s late (fewer, larger inserts → fewer
   parts and merges on the SD card).
 - Receivers have **no authentication**.
@@ -116,7 +116,7 @@ metrics: otlp → memory_limiter → batch → clickhouse
   (Claude Code events) or `cc-session-meta` (client hook); the views filter it.
 - Retention: one source, `RETENTION_DAYS` in `.env` (compose default 365; `setup-server.sh` writes
   180 for 22.3, else 365, once, then keeps it). `schema.sql` holds the placeholder
-  `__RETENTION_DAYS__`, replaced by `init-views.sh` and `setup-server.sh` `events_ddl` (`sed`):
+  `__RETENTION_DAYS__`, replaced by `init-views.sh` and `setup-server.sh` `events_ttl_expr` (`sed`):
   do not pipe `schema.sql` to `clickhouse-client` as it is.
 - `cc.events_t` (MergeTree, `PARTITION BY toDate(ts)`, `ORDER BY (event, ts)`,
   `TTL toDateTime(ts) + INTERVAL __RETENTION_DAYS__ DAY`, `ttl_only_drop_parts = 1`): the `claude-code`

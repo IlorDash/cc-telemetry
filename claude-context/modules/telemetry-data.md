@@ -71,8 +71,10 @@ parent `session.id`.
 | `assistant_response` | `response` (dropped by the collector), `response_length`, `model`, `request_id` |
 | `tool_result` | `tool_name`, `success`, `duration_ms`, `tool_input` (JSON: `file_path`/`notebook_path`/`path`/`pattern`/`command`), `tool_parameters` (`bash_command`: first word only, e.g. `git`; reported 2026-11-15), `tool_result_size_bytes`, `request_id`, `tool_use_id`, `agent_id` |
 | `tool_decision` | `decision`, `source`, `tool_name`, `permission_mode`, `request_id`, `tool_use_id`, `agent_id` (subagent decisions), `tool_parameters`; `source` values `config`, `hook`, `user_reject`, `user_temporary`, `request_id` always set (observed on Claude Code 2.1.327, 2026-11-19) |
-| `api_error` | `model`, `error`, `status_code`, `duration_ms`, `attempt`, `request_id`, `speed`, `query_source`, `effort` (list supplied for the redesign, 2026-11-19); one event per failed attempt, retries included. Not yet in the live data — see pending-bugs.md |
+| `api_error` | `model`, `error`, `status_code`, `duration_ms`, `attempt`, `request_id`, `client_request_id`, `speed`, `query_source`, `effort`, `agent_id`, `agent.name`, `skill.name`; one event per failed attempt, retries included (observed on Claude Code 2.1.325–2.1.328, 2026-11-16..19: 12 events, all `status_code` 429 rate limit) |
 | `compaction` | `trigger` (`auto` seen), `pre_tokens`, `post_tokens`, `duration_ms`, `success` (observed on Claude Code 2.1.327, 2026-11-19); unused by the views |
+| `permission_mode_changed` | `from_mode`, `to_mode` (observed on Claude Code 2.1.328–2.1.329, 2026-11-20); unused by the views |
+| `feedback_survey` | `survey_type`, `event_type`, `appearance_id`, `event_origin` (observed on Claude Code 2.1.325–2.1.329, 2026-11-15..20); unused by the views |
 | `at_mention` | `mention_type`, `success`; **no path**: an `@` file is inlined without a tool call, so it never feeds project inference |
 | `subagent_completed` | `agent_type`, `agent_id`, `total_tokens`, `total_tool_uses`, `duration_ms`, `model` |
 | `skill_activated` | `skill.name`, `skill.source`, `invocation_trigger` |
@@ -88,7 +90,7 @@ Metrics: `claude_code.{token.usage,cost.usage,lines_of_code.count,active_time.to
 ## Views (`cc.*`, plain views over `cc.events_t`, the refreshed tables and `cc.session_meta`)
 
 ```
-cc.events_t ─┬─ cc.events_raw (36 original columns)
+cc.events_t ─┬─ cc.events_raw (39 original columns)
              └─ cc.path_roots (path_cand) ◄─ cc.session_meta (cwd; plain view over otel_logs)
 cc.path_roots + labels ══[cc-refresh, 300 s]══► cc.session_project_t ─► cc.session_project
 cc.events_raw ─┬─ cc.events  = events_raw LEFT JOIN session_project (effective project)
@@ -109,7 +111,7 @@ cc.api_requests, cc.tool_calls, cc.events, cc.events_raw ══[cc-refresh]═�
   uuid, else `''`); last four `result_bytes` (`tool_result_size_bytes`), `ttft_ms`, `status_code`
   (`api_error`, `toUInt32OrZero`: 0 without an HTTP status) and `error` (`api_error` text), passed
   on to `cc.events` via `e.*`. In `cc.events_t`, `account_uuid`, `status_code`, `error` are the last
-  three columns (added later; `init-views.sh` rebuilds an older table once).
+  three columns (the order of the `backfill.sql` SELECT, which inserts by position).
 - `cc.session_meta` (defined right after `events_raw`, because `path_roots` reads it): per
   `session_id` the latest value (`argMax(…, Timestamp)`) of `title`, `title_source`, `git_branch`,
   `cwd`, `host`, `cc_version`, plus `updated`; only `event.name = 'session_meta'`, non-empty id.

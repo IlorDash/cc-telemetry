@@ -24,9 +24,9 @@ cc.api_requests, cc.tool_calls, cc.events, cc.events_raw ──refresh.sql──
 
 | Object | Engine / key | Content |
 | --- | --- | --- |
-| `cc.events_t` | MergeTree, `PARTITION BY toDate(ts)`, `ORDER BY (event, ts)`, `TTL toDateTime(ts) + INTERVAL __RETENTION_DAYS__ DAY` (placeholder replaced with `RETENTION_DAYS`, below), `ttl_only_drop_parts = 1` (whole days dropped) | the 36 columns of `cc.events_raw` (low-cardinality text as `LowCardinality(String)`, `tool_input`/`tool_parameters`/`prompt` `ZSTD(1)`) + `seq`, `abs_path`, `path_cand`, `bash_cmd`; no `project` column |
+| `cc.events_t` | MergeTree, `PARTITION BY toDate(ts)`, `ORDER BY (event, ts)`, `TTL toDateTime(ts) + INTERVAL __RETENTION_DAYS__ DAY` (placeholder replaced with `RETENTION_DAYS`, below), `ttl_only_drop_parts = 1` (whole days dropped) | the 39 columns of `cc.events_raw` (low-cardinality text as `LowCardinality(String)`, `tool_input`/`tool_parameters`/`prompt`/`error` `ZSTD(1)`) + `seq`, `abs_path`, `path_cand`, `bash_cmd`; no `project` column. Column order: the 36 older columns, the four computed ones, then `account_uuid`, `status_code`, `error` (= order of the `backfill.sql` SELECT: inserted by position) |
 | `cc.session_project_t` | MergeTree `ORDER BY session_id` | `session_id`, `project` (inferred) |
-| `cc.tips_t` | MergeTree `ORDER BY tuple()` | the `cc.tips` columns |
+| `cc.tips_t` | MergeTree `ORDER BY tuple()` | the `cc.tips` columns; `affected`, `cost_usd` added to an older table by `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` in `schema.sql` |
 
 Insert-time columns (`tool_result` only, else `''`):
 
@@ -47,11 +47,8 @@ them: `IF NOT EXISTS` skips the change and stored rows keep the old values. Need
 hand (header of `schema.sql`): dump → `DROP VIEW cc.events_mv` → new table filled from
 `otel.otel_logs` + `EXCHANGE TABLES` → new MV → backfill for rows that arrived in between.
 
-**Exception — layout only** (partition key, TTL; same columns): `setup-server.sh` `migrate_storage`
-migrates an old-layout `cc.events_t` on every run after views-init (`modules/server-update.md`):
-copy from the old table month by month (not from `otel.otel_logs`) into `cc.events_t_new` (DDL cut
-from `schema.sql`) → `EXCHANGE TABLES` (`cc.events_mv` keeps writing to `cc.events_t` by name, no
-MV rebuild) → anti-join top-up → per-month check → `DROP` old. Windows / other setups: by hand (README).
+No script migrates `cc.events_t` (the earlier layout and column migrations were removed); only its
+TTL is changed, by `setup-server.sh` `apply_retention` (`modules/server-update.md`).
 - One `INSERT` over > 100 daily partitions is refused (`max_partitions_per_insert_block`):
   copies into `cc.events_t` go per month.
 
@@ -75,11 +72,11 @@ views.sql                                                             → "cc.* 
   stays per month (1.5 GB per-query limit). Rows within `guard` s of `now()` are left to the MV;
   rows further ahead (fast client clock) are copied. Idempotent: a re-run inserts nothing.
 - An existing TTL is never changed here (also not the one of `cc.events_t`: `IF NOT EXISTS`); a
-  changed `RETENTION_DAYS` reaches existing tables only through `migrate_storage`
+  changed `RETENTION_DAYS` reaches existing tables only through `apply_retention`
   (`modules/server-update.md`). A metrics table created after the 60 s wait gets its TTL on the next run.
 - Views are applied last, so a view never reads a half-filled table. views-init never runs
   `refresh.sql`.
-- Live check (2026-11-18, ClickHouse 22.3.20.29): `cc.events_t` count = `claude-code` rows of
+- Live check (2026-11-21, ClickHouse 22.3.20.29): `cc.events_t` count = `claude-code` rows of
   `otel.otel_logs`, no duplicate `(session_id, seq, ts)`.
 
 ## cc-refresh (`refresh-loop.sh`, `refresh.sql`)

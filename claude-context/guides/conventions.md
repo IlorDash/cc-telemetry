@@ -26,8 +26,8 @@ Layers: `schema.sql` (tables `cc.events_t`, `cc.session_project_t`, `cc.tips_t` 
   project) or, when they feed it or need no project, on `cc.events_raw`.
 - New attribute → a column at the end of `cc.events_t` in `schema.sql`, the MV, `backfill.sql`
   (same position: the backfill inserts by position) and `cc.events_raw` (reaches `cc.events` via
-  `e.*`) — a migration (above); old rows get it only by a rebuild from `otel.otel_logs` (as
-  `init-views.sh` does for `account_uuid`, `status_code`, `error`). Document it in
+  `e.*`) — a migration (above); old rows get it only by a manual rebuild from `otel.otel_logs`
+  (the migration above). Document it in
   `modules/telemetry-data.md` (via context-auditor) and, if it is collected text, on the `data`
   page (`docs/data.md` + `docs/data.ru.md`).
 - `refresh.sql` rebuilds a table as `*_new` → INSERT → check → `EXCHANGE TABLES` → `DROP *_new`;

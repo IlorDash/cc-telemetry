@@ -1,21 +1,21 @@
-# Server update and storage migration — `setup-server.sh`
+# Server update and retention — `setup-server.sh`
 
 `setup-server.sh --update` (safety dump, pull, re-run, config reload, row-count check) and
-`migrate_storage` (retention TTL + day partitions of an older install). `migrate_storage` runs on
-**every** run of `setup-server.sh` after views-init exited 0, not only under `--update`; the
-update re-run calls it like any other run. Linux only: `setup-server.ps1` has neither.
-The rest of the script (steps, `.env`, LAN): `modules/setup-scripts.md`.
+`apply_retention` (sets or changes the retention TTL of `otel.*` and `cc.events_t`).
+`apply_retention` runs on **every** run of `setup-server.sh` after views-init exited 0, not only
+under `--update`; the update re-run calls it like any other run. Linux only: `setup-server.ps1`
+has neither. The rest of the script (steps, `.env`, LAN): `modules/setup-scripts.md`.
 
 ## Files
 
 | Path | Role |
 | --- | --- |
-| `setup-server.sh` | `run_update`, `finish_update`, `reload_changed_config`, EXIT trap `update_exit_note`; `migrate_storage`, `migrate_events_t`, `warn_old_query_logs`; helpers `row_counts`, `recent_row_counts`, `save_retention_baseline`, `ttl_col`, `ttl_state`, `ttl_tables`, `check_window_days`, `load_retention`, `events_ddl` |
+| `setup-server.sh` | `run_update`, `finish_update`, `reload_changed_config`, EXIT trap `update_exit_note`; `apply_retention`, `apply_events_t_ttl`, `warn_old_query_logs`; helpers `row_counts`, `recent_row_counts`, `save_retention_baseline`, `ttl_col`, `ttl_state`, `ttl_tables`, `check_window_days`, `load_retention`, `events_ttl_expr` |
 | `.env` | `RETENTION_DAYS`: the one source of the retention (`load_retention` in `run_update`, `resolve_key` in step 2; missing → 180 for a `22.3.*` tag, else 365) |
-| `clickhouse/schema.sql` | the `cc.events_t` DDL `migrate_events_t` creates as `cc.events_t_new` (`events_ddl`: `__RETENTION_DAYS__` replaced by `sed`) |
+| `clickhouse/schema.sql` | the `TTL` line of `CREATE TABLE IF NOT EXISTS cc.events_t`, read by `events_ttl_expr` (`__RETENTION_DAYS__` replaced by `sed`); keep those two lines as written |
 | `linux-server-tools/backup.sh` | the safety dump (`BACKUP_DIR=<dir> ... dump`) and the restore command printed on a loss |
 
-## migrate_storage (every run, after views-init exited 0)
+## apply_retention (every run, after views-init exited 0)
 
 ```
 RETENTION_DAYS = n from .env (step 2, validated ^[1-9][0-9]*$); WINDOW = n - 1
@@ -29,31 +29,24 @@ old  = rows older than WINDOW days of todo tables with none or d > n (lengthenin
 old > 0  update re-run → go on (the dump keeps them)
          terminal → ask [y/N] (default no); --yes does not count; no terminal → no
          no → warn (run --update, or dump + re-run in a terminal), warn_old_query_logs, return
-migrate_events_t (state from system.tables partition_key of cc.events_t / cc.events_t_new):
-  key = schema.sql, no _new       → TTL d = n: nothing; other: warn, left; none / d ≠ n: ALTER MODIFY TTL
-                                    (+ ttl_only_drop_parts = 1 only when there was none)
-  old key, _new has new key       → copy interrupted: DROP _new, start again
-  new key, _new has old key       → swap done: resume at the top-up
-  anything else with _new         → fail (drop the leftover by hand)
-  migrate: CREATE _new from schema.sql DDL (key reported ≠ schema.sql → DROP _new, fail)
-           → INSERT per month → EXCHANGE TABLES cc.events_t_new AND cc.events_t
-           → top-up per month: old rows NOT IN new by (session_id, seq, ts)
-           → check per month, rows younger than CHECK_WINDOW: count, sum of 4 token columns equal,
-             sum(cost_usd) within 1e-9 relative → mismatch: fail, old table kept as _new
-           → DROP TABLE cc.events_t_new SYNC
+apply_events_t_ttl: no cc.events_t → warn, return;  d = n → nothing;  other → warn, left;
+  none / d ≠ n → ALTER MODIFY TTL <events_ttl_expr> (+ ttl_only_drop_parts = 1 only when there was none)
 otel.* in todo → ALTER TABLE ... MODIFY TTL <col> + toIntervalDay(n)
 warn_old_query_logs
 ```
 - TTL column: `otel_logs` `TimestampTime`, `otel_metrics_*` `toDateTime(TimeUnix)`, `events_t` `toDateTime(ts)`.
-- Re-run after success = no-op; every interrupted state continues or restarts by itself.
+- Re-run after success = no-op: every part reads its state from `system.tables`.
 - A changed `RETENTION_DAYS` is applied here on the next run: longer at once, shorter under the
   old-rows question above. views-init only sets a TTL where there is none, never changes one.
-- `CHECK_WINDOW`: a shorter TTL still in place keeps deleting until changed, so the data checks
-  compare only rows younger than the shortest of the new and the current TTLs.
+- `CHECK_WINDOW`: a shorter TTL still in place keeps deleting until changed, so the `--update`
+  data check compares only rows younger than the shortest of the new and the current TTLs.
 - `warn_old_query_logs`: `log_queries` = 1 → warn to `compose restart clickhouse` and re-run;
   else per `system.query_log*` / `system.query_views_log*` table prints rows, size and
   `echo 'DROP TABLE system.<name> SYNC' | [sudo ]bash linux-server-tools/ch.sh` — never drops.
-- `setup-server.ps1` has no migration: Windows servers migrate by hand (README).
+- No layout or column migration of `cc.events_t` (removed): a change to the MV / `cc.events_t`
+  columns needs a manual migration (`modules/materialization.md`).
+- `setup-server.ps1` has no retention step: on Windows views-init sets the TTL where there is none;
+  a changed `RETENTION_DAYS` does not reach existing tables.
 
 ## --update
 
@@ -66,7 +59,7 @@ run_update   (all post-pull code is in this function, parsed before the pull; en
              ClickHouse), then per otel.* table with a ttl_col: rows with that time >= cutoff
   code       upstream → git pull --ff-only; no upstream / no repo → warn, files as they are
   exec       CCT_UPDATE=1 CCT_UPDATE_DIR=<dir> CCT_UPDATE_PREV=<prev> bash setup-server.sh <args minus --update>
-re-run       steps 2–6; in step 3 after views-init exited 0 → migrate_storage → reload_changed_config (below)
+re-run       steps 1–6 (`modules/setup-scripts.md`); in step 3 after views-init exited 0 → apply_retention → reload_changed_config (below)
              then finish_update: per rowcounts.tsv table, recount with the stored cutoff:
                in ttl-recent.tsv → recent rows now < before → LOST (exact); else OK, older rows that
                  shrank → OK with "<n> ... removed by the retention TTL" (informational)
@@ -92,5 +85,5 @@ EXIT trap    failing exit once the dump folder is set → prints it (+ rollback 
 - Not handled: a pulled edit of `clickhouse/config.d/common.xml`, `clickhouse/users.d/common.xml`
   or `clickhouse/limits/*/*.xml` — `clickhouse` is not restarted (`pending-bugs.md`). A changed
   `CLICKHOUSE_LIMITS` / `CLICKHOUSE_CPUS` in `.env` is: `compose up -d` recreates the container.
-- No volume is removed (no `down -v`); earlier dumps stay. Removed only: the checked old copy
-  `cc.events_t_new` (`migrate_storage`) and, through the TTL, rows older than the retention. With `sudo docker` the dump files belong to root.
+- No volume is removed (no `down -v`); earlier dumps stay. Removed only through the TTL: rows
+  older than the retention. With `sudo docker` the dump files belong to root.

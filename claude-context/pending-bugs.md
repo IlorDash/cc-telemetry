@@ -37,8 +37,8 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
   `clickhouse` running on the old values (its service definition is unchanged, so `compose up -d`
   does not recreate it). Both are single-file bind mounts: git replaces the file, the running
   container likely keeps the old inode until a restart (unverified).
-- **?** `migrate_storage` was never exercised by a real `--update` run (dump → `ttl-recent.tsv` →
-  migration → `finish_update` with the exact recent-row check).
+- **?** `apply_retention` was never exercised by a real `--update` run (dump → `ttl-recent.tsv` →
+  TTL change → `finish_update` with the exact recent-row check).
 
 ## setup-client.ps1
 
@@ -62,7 +62,7 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
 - **?** On a fresh install (no exporter `ttl` any more) the `otel.*` TTL comes only from
   views-init (`init-views.sh`: ≤ 60 s wait for 5 `otel_metrics_*` tables, then `ALTER ... MODIFY TTL`
   where none exists). Not run on a fresh volume, and not on 25.8 at all.
-- **?** `migrate_storage` changing an existing TTL (`ttl_state` from `engine_full`, lengthen /
+- **?** `apply_retention` changing an existing TTL (`ttl_state` from `engine_full`, lengthen /
   shorten, `other` left with a warning) and `check_window_days` were not run against a changed
   `RETENTION_DAYS`; the `ttl_state` regex is fitted to the 22.3 `engine_full` form
   (`+ toIntervalDay(<n>)`), 25.8 unverified (a different rendering would read as `other`).
@@ -100,18 +100,18 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
   project keeps its absolute path there.
 - **?** `cc.tips` rules (now in `refresh.sql`) verified only on ClickHouse 22.3; 25.8 untested.
 - **?** `cc.tips` rules `cache`, `agent-outlier`, `slow-ttft` have not fired on real data yet
-  (2026-11-19): SQL and thresholds unconfirmed.
-- **?** No `api_error` event in the live data yet (2026-11-19, Claude Code 2.1.327): its attribute
-  names, `cc.events_raw.status_code`/`error` and the Health panels 493/495 are checked only on empty
-  data; whether `api_error` carries `agent_id` / `skill.name` (used for the Actor/Skill filter) is unknown.
+  (2026-11-19, still none 2026-11-21): SQL and thresholds unconfirmed.
+- **?** `api_error` is in the live data now (12 events, all `status_code` 429, Claude Code
+  2.1.325–2.1.328, observed 2026-11-21): attribute names, `agent_id` / `skill.name` and
+  `cc.events_t.status_code` / `error` confirmed; the Health panels 493/495 were not reviewed
+  against those rows.
 
 ## materialization (`clickhouse/schema.sql`, `backfill.sql`, `refresh.sql`, `cc-refresh`)
 
 - **?** Run only on ClickHouse 22.3.20.29 (2026-11-18): `schema.sql`, the backfill, `refresh.sql`
   (`EXCHANGE TABLES`) and the new views never ran on 23.3 or 25.8.
 - **?** The day-partitioned `cc.events_t` (`PARTITION BY toDate(ts)`, TTL, `ttl_only_drop_parts`)
-  and `cc.events_mv` writing to the new table by name after `EXCHANGE TABLES` (`migrate_storage`)
-  are proven only on 22.3.20.29; ClickHouse 25.8 untested.
+  is proven only on 22.3.20.29; ClickHouse 25.8 untested.
 - **?** The `throwIf` abort path of `refresh.sql` (duplicate `session_id` → no swap, old table
   kept, next run drops the leftover `_new`) was never triggered.
 - **?** A very large first backfill (upgrade over a big history) was not timed against the setup
@@ -133,3 +133,10 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
 - **?** A real `setup-server.sh --update` across the `cc-usage.json` → `overview.json` rename is
   untested: the home path changes in the `grafana` env (recreated by `compose up -d`) while the
   provider picks up the new file only within 30 s — possibly a short window without the dashboard.
+
+## docs demo (`tools/docs-demo/`)
+
+- **M?** `demo.sh up` loads only `otel_logs.sql`, the generated rows and `clickhouse/views.sql`; since
+  the merge the views read `cc.events_t`, `cc.session_project_t` and `cc.tips_t`, which only
+  `schema.sql` (+ `backfill.sql`, `refresh.sql`) create — so `views.sql` likely fails on the demo and
+  no screenshots or `check.js` run is possible. Not run on this branch (found by reading, 2026-11-21).

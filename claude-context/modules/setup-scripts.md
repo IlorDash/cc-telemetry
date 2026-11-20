@@ -1,7 +1,7 @@
 # Setup scripts — server, clients, Linux helpers
 
 How `setup-server.ps1` / `setup-server.sh` and the client scripts work, the Linux helpers and the
-LAN path. `--update` and `migrate_storage`: `modules/server-update.md`.
+LAN path. `--update` and `apply_retention`: `modules/server-update.md`.
 
 ## Files
 
@@ -64,7 +64,7 @@ args       --local-only | --lan (= --enable-lan), --lan-ip <IPv4>, --grafana-por
            CLICKHOUSE_LIMITS  22.3.* → small, else none        small | none
            CLICKHOUSE_CPUS    22.3.* → 2, else 0 (no limit)    ^[0-9]+(\.[0-9]+)?$
 3 stack    LAN note when a bind is not local; compose up -d (fails → logs --tail 50 views-init, fail);
-           poll views-init until exited (90 × 2 s), must be 0; then migrate_storage (`modules/server-update.md`);
+           poll views-init until exited (90 × 2 s), must be 0; then apply_retention (`modules/server-update.md`);
            [update re-run: reload_changed_config]
 4 checks   http <bind|127.0.0.1>:<GRAFANA_PORT>/api/health; TCP 4317, 4318; docker enabled at boot (ask → enable)
 5 LAN      only if OTLP_BIND or GRAFANA_BIND is not 127.0.0.1/localhost
@@ -85,11 +85,11 @@ args       --local-only | --lan (= --enable-lan), --lan-ip <IPv4>, --grafana-por
 - Old ARM = `uname -m` is `aarch64` and the `/proc/cpuinfo` `Features` line lacks `lrcpc`
   (no `Features` line → not old). Any other `CLICKHOUSE_VERSION` value is the user's and stays.
 - `confirm`: `--yes` answers yes; no terminal answers no. `as_root`: direct as root, else `sudo`.
-  Exception: the retention question of `migrate_storage` is not `confirm` — `--yes` does not answer it.
+  Exception: the retention question of `apply_retention` is not `confirm` — `--yes` does not answer it.
 
-### migrate_storage and --update
+### apply_retention and --update
 
-In `modules/server-update.md`: `migrate_storage` (every run, after views-init exited 0) and
+In `modules/server-update.md`: `apply_retention` (every run, after views-init exited 0) and
 `--update` (`run_update`, `reload_changed_config`, `finish_update`, EXIT trap). Linux only.
 
 ## Clients

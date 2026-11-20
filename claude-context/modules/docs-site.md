@@ -71,8 +71,8 @@ feature branch ──PR──► develop ──PR──► main ──push──
 | `server` | Windows / Linux install, options, what the script does, failures | `setup-server.ps1`, `setup-server.sh` |
 | `clients` | install, what the script changes (env keys), session titles, project | `client/setup-client.{ps1,sh}`, `client/*.json` |
 | `dashboards` | Grafana login, "Russian dashboards" (RU «Русские дашборды»: RU/EN switch, what is translated), rail, variables, time range, clicks, one section per dashboard | `grafana/dashboards/*.json`, `grafana/rail/rail.json`; RU twin: titles from `grafana/dashboards/ru/*.json` (built from `grafana/i18n/ru.json`) |
-| `tips` | what a tip is, rules table, affected tokens/cost, links | `cc.tips` in `clickhouse/views.sql` |
-| `maintenance` | check, `--update`, backup/restore, views-init, retention, settings, removal; the `ru` folder appears on an older server after a Grafana restart | `setup-server.*`, `linux-server-tools/*.sh`, `docker-compose.yml`, `.env.example`, `grafana/provisioning/` |
+| `tips` | what a tip is, where tips show, rules table, affected tokens/cost, links | rules and thresholds in `clickhouse/refresh.sql` (`cc.tips_t`), view `cc.tips` in `clickhouse/views.sql`; Efficiency + rail |
+| `maintenance` | check the stack, update (Linux `--update`, Windows, roll back), backup/restore, recreate the views, disk use and retention (change the retention), resource limits and logs (incl. the 30 s collector delay), change a setting, stop and remove; `cc-refresh`; the `ru` folder appears on an older server after a Grafana restart | `setup-server.*`, `linux-server-tools/*.sh`, `docker-compose.yml`, `.env.example`, `otel-collector.yaml`, `clickhouse/` (retention, `limits/`), `grafana/provisioning/` |
 | `troubleshooting` | one table per step: `Message` (or `Symptom`) / `Cause` / `What to do` | the scripts' messages |
 | `data` | what is sent / dropped, where it lives, prompt logging, deleting data | `otel-collector.yaml`, `client/*.json`, `clickhouse/views.sql` |
 | `release-X-Y-Z` | features of that version | — |

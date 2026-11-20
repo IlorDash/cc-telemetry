@@ -34,6 +34,7 @@ Home page: `GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH` in `docker-compose.yml` �
 | `schemaVersion` | 39 |
 | `refresh` / `time` | 5 m / `now-24h` → `now` in every file, `ru/` copies too (Grafana refuses intervals below 1 m: `GF_DASHBOARDS_MIN_REFRESH_INTERVAL`) |
 | `templating` | the five shared variables below, identical in every file; Sessions adds `extra_cols`, `shown_cols`, `session_header` |
+| `timepicker.refresh_intervals` | `1m`, `5m`, `15m`, `1h` (nothing below the 1 m minimum) |
 | `timepicker.quick_ranges` | Last 5 minutes, 1 hour, 24 hours, 7 days, 30 days, All (`now-10y`) |
 | `links` | only the language switch (`RU` → `/d/<uid>-ru`; the RU copy has `EN` → `/d/<uid>`), `keepTime`, `includeVars` — navigation is the rail; hand-added links are kept |
 | layout | rail x0 w3 (ids 300–399); content x3 w21; no `row` panels (section headers are h1 text panels); only Full HD (1920 px) and wider is supported |
