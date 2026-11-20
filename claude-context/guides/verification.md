@@ -7,7 +7,9 @@ did not; never claim a check that did not run.
 | Changed | Check |
 | --- | --- |
 | `clickhouse/views.sql` | `wsl -d Ubuntu -- docker compose run --rm views-init` (must print `cc.* views are ready`); then a `SELECT count()` per touched view and a sample of the changed columns through `linux-server-tools/ch.sh`; then the dashboard check |
-| `grafana/dashboards/*.json` | `JSON.parse` every changed file with `node -e`; wait ≤ 30 s for Grafana to reload; dashboard check (`check-dashboard.js` runs every file's queries and checks that each uid is provisioned and home = `cc-usage`) |
+| `grafana/dashboards/*.json` | `JSON.parse` every changed file with `node -e`; `node grafana/rail/sync-rail.js --check` and `node grafana/i18n/build-ru.js --check` both exit 0 (a `DIFFERS` → run the script without `--check`, in that order); wait ≤ 30 s for Grafana to reload; dashboard check on the English files and on the RU copies (below) |
+| `grafana/i18n/ru.json`, `build-ru.js`, `grafana/rail/*` | run `sync-rail.js`, then `build-ru.js` (a missing translation stops it: add the `ru.json` entry); both `--check` exit 0; dashboard check with `--dashboards grafana/dashboards/ru` |
+| layout or text of a dashboard (headers, widths, new labels) | look at the English page **and its `-ru` copy** at 1920 px on the demo stack (`demo.sh up`, `http://localhost:13000`, a Playwright screenshot): Russian text is longer, headers and cells get cut first there. Never from the live Grafana |
 | `otel-collector.yaml` | `wsl -d Ubuntu -- docker compose restart otel-collector`; log shows `Everything is ready`; a fresh event arrives (`SELECT max(Timestamp) FROM otel.otel_logs`) |
 | `docker-compose.yml` | `wsl -d Ubuntu -- docker compose up -d`; `docker compose ps -a` all Up, `views-init` Exited (0) |
 | `*.ps1` | parse: `[System.Management.Automation.Language.Parser]::ParseFile(...)` with 0 errors; no bytes > 127; run it (below) |
@@ -28,8 +30,15 @@ every supported tag.
 
 **Dashboard check:** `node claude-context/scripts/check-dashboard.js` — runs every variable and
 panel query through Grafana's `/api/ds/query` with all variables = All (or
-`--project <p> --session <id>`), prints `ok`/`FAIL` per query; all must be `ok`. It checks SQL and
-macros, not the visual layout — say so when layout changed.
+`--project <p> --session <id>`), prints `ok`/`FAIL` per query; all must be `ok`. It reads only the
+top-level `grafana/dashboards/*.json`; run it a second time with
+`--dashboards grafana/dashboards/ru` for the RU copies (their SQL labels are translated, so a
+broken `sql.literals` / `sql.fragments` entry fails only there). It checks SQL and macros, not the
+visual layout — say so when layout changed.
+
+**`--check` reports every file `DIFFERS`** with no real change → the `.json` files are checked out
+with CRLF; `.gitattributes` has `*.json text eol=lf`, so a fresh checkout fixes it. Never
+`git checkout --` a file with uncommitted edits to get there.
 
 The stack is not running → say "not verified on the live stack" and why.
 
@@ -40,7 +49,7 @@ helpers on the worktree's files:
 
 | Changed in `<wt>` | Check |
 | --- | --- |
-| `grafana/dashboards/*.json` | JSON parse; `node <main>/claude-context/scripts/check-dashboard.js --dashboards <wt>/grafana/dashboards` — queries run against the live views; a uid new in the worktree reports `not provisioned` (expected, say so). The live Grafana shows the main folder's files: layout is not visible until merge |
+| `grafana/dashboards/*.json` | JSON parse; `node <wt>/grafana/rail/sync-rail.js --check` and `node <wt>/grafana/i18n/build-ru.js --check` (the scripts work on their own checkout's files); `node <main>/claude-context/scripts/check-dashboard.js --dashboards <wt>/grafana/dashboards` and again with `<wt>/grafana/dashboards/ru` — queries run against the live views; a uid new in the worktree reports `not provisioned` (expected, say so). The live Grafana shows the main folder's files: layout is not visible until merge |
 | `clickhouse/views.sql` | never applied from the worktree (the live stack holds one version of the views; the main folder's dashboards read them). Run the changed view's `SELECT` body (with `cc.` names of unchanged views) through `wsl -d Ubuntu -- bash <main as /mnt/c/...>/linux-server-tools/ch.sh`; panels that need the new columns: "verified after merge" |
 | `docs/`, `mkdocs.yml` | strict build from `<wt>` with the main folder's interpreter: `<main>/.venv/Scripts/python.exe -m mkdocs build --strict -d <scratchpad>/site` |
 | collector, compose, setup scripts | static checks only (parser, `bash -n`, client scripts on scratchpad copies); live run after merge |

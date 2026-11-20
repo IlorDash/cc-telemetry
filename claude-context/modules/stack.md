@@ -10,7 +10,7 @@ The Docker services, how data moves between them, what is exposed and where it i
 | `otel-collector.yaml` | OTLP receivers, processors, clickhouse exporter, pipelines |
 | `.env.example` → `.env` | `CLICKHOUSE_PASSWORD`, `GRAFANA_ADMIN_PASSWORD`; optional `OTLP_BIND`, `GRAFANA_BIND`, `GRAFANA_PORT`, `CLICKHOUSE_VERSION` (`.env` git-ignored, created by `setup-server.ps1` / `setup-server.sh`; only the `.sh` writes the optional keys) |
 | `grafana/provisioning/datasources/clickhouse.yaml` | datasource uid `clickhouse`, native `clickhouse:9000`, user `otel`, db `cc`, password from env |
-| `grafana/provisioning/dashboards/dashboards.yaml` | file provider, `updateIntervalSeconds: 30`, `allowUiUpdates: true` |
+| `grafana/provisioning/dashboards/dashboards.yaml` | file provider, `updateIntervalSeconds: 30`, `allowUiUpdates: true`, `foldersFromFilesStructure: true` (root files → General, `ru/` → folder `ru`) |
 | `clickhouse/init-views.sh`, `clickhouse/views.sql` | see `modules/telemetry-data.md` |
 
 ## Services

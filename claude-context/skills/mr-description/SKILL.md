@@ -42,7 +42,9 @@ Skip a question the arguments or earlier messages already answer.
 ### 1a. PR review gate
 Dispatch **mr-reviewer** (model from `claude-context/agents/mr-reviewer.md` frontmatter) with
 `source`, `base` and `<wt>` if any. Relay its verdict in one line.
-- **BLOCKED** → stop: show the blockers, write no description.
+- **BLOCKED** → stop: show the blockers, write no description. Stale RU dashboard copies are a
+  Blocker of the gate (`sync-rail.js --check` / `build-ru.js --check`); the fix is to run both
+  scripts on the branch and commit the copies.
 - Warnings → go on; list them in the chat report so the user can fix them first.
 - The user may say "skip review" — then skip this step and say so in the report.
 
@@ -74,6 +76,7 @@ Dispatch **mr-reviewer** (model from `claude-context/agents/mr-reviewer.md` fron
 | AI setup (`claude-context/`: agents, skills, hooks, guides, module docs) | **Tooling** — one short item, or leave out when it is only doc upkeep |
 | Anything that needs action on an installed stack or client: re-run a setup script, `views-init`, new `.env` key, new port to open, changed image tag, data newly collected or dropped, removed dashboard or panel | **Upgrade notes** |
 | Refactoring without visible effect, renames, formatting, comments | **Leave out** |
+| Regenerated `grafana/dashboards/ru/*.json` | Not a change of its own: the English change it follows says "both languages" when that matters to the reader |
 
 Describe a change at its real scope ("every dashboard", not "the Sessions dashboard", when the
 shared variable changed everywhere).

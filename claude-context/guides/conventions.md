@@ -22,7 +22,7 @@ re-run and must keep existing data, `.env` and foreign settings keys).
 - Target ClickHouse 22.3 (old ARM servers) through 25.8: never several `USING` joins in one query
   (22.3/23.3 reject them) — join with `ON`. Applies to dashboard queries too.
 
-## Dashboards (`grafana/dashboards/*.json`, seven files)
+## Dashboards (`grafana/dashboards/*.json`, seven files, plus their generated `ru/` copies)
 - Edit the files, keep their 2-space formatting; panel `id`s and `gridPos` stay unique within a
   file. Never reuse the retired ids 6, 12, 25.
 - Variables, `timepicker`, `tags` and `links` are shared: change them in all seven files alike.
@@ -33,6 +33,14 @@ re-run and must keep existing data, `.env` and foreign settings keys).
   '${v}')`. Documented exceptions: `claude-context/modules/dashboard.md`.
 - Variable queries are plain strings; keep `query` and `definition` identical.
 - `rawSql` is one JSON string with `\n` — edit it with exact replacements, then validate the JSON.
+- **Russian copies are generated:** never edit `grafana/dashboards/ru/*.json` by hand. After any
+  change to an English file, to `grafana/rail/` or to `grafana/i18n/` — and after merging another
+  branch that touched them — run `node grafana/rail/sync-rail.js`, then
+  `node grafana/i18n/build-ru.js`, and commit the regenerated copies with the change. New static
+  English text needs a `grafana/i18n/ru.json` entry (`grafana-style.md`, "Russian copies").
+- `isSwitch()` (the EN/RU link matcher) exists in both `sync-rail.js` and `build-ru.js`: change
+  both alike.
+- `.json` files are LF (`.gitattributes`): the scripts write LF and `--check` compares bytes.
 
 ## PowerShell (`*.ps1`) — Windows PowerShell 5.1
 - ASCII only (5.1 reads BOM-less files as ANSI); write JSON/text with

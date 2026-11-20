@@ -35,13 +35,24 @@ Committed changes only. Uncommitted or untracked files are not part of the PR: l
   variants of a setup script got the same change where the docs say they behave alike; `check-dashboard.js` still covers every dashboard file.
 - `claude-context/` changes on the branch: module docs that contradict the final code are
   Warnings (context-auditor fixes them on request); never a Blocker by themselves.
+- **Generated files in sync:** when the branch touches `grafana/dashboards/*.json`, `grafana/rail/`
+  or `grafana/i18n/` (merges from the base included), the committed `grafana/dashboards/ru/*.json`
+  must be what the scripts produce. Run `node <checkout>/grafana/rail/sync-rail.js --check` and
+  `node <checkout>/grafana/i18n/build-ru.js --check` in the checkout holding `source` (the main
+  folder or `<wt>`; the scripts read their own checkout's files). Any `DIFFERS` or a missing
+  translation is a **Blocker** — the copies would ship stale or half-English. A copy edited by
+  hand (a diff in `ru/` with no matching English or dictionary change) is a Blocker too. If that
+  checkout has uncommitted edits in these paths, the result does not show the committed state:
+  compare `git diff <base>...<source> -- grafana/dashboards/ru` with the English diff instead and
+  say so. If `source` is not checked out anywhere, report "not run".
 - A commit message claiming something the code does not do is a Warning (the PR description is
   built from them).
 - Minimal change (`claude-context/guides/conventions.md`): code the branch's purpose does not need
   is a Warning.
 - Live checks: run the cheap read-only ones (JSON parse, PowerShell parser, `bash -n`,
   `node claude-context/scripts/check-dashboard.js` — with `--dashboards <wt>/grafana/dashboards`
-  from the main folder for a worktree branch), and state which ran. There is no developer report
+  from the main folder for a worktree branch — and once more with `--dashboards
+  <checkout>/grafana/dashboards/ru` for the RU copies), and state which ran. There is no developer report
   to check for honesty.
 
 ## Output

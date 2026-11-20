@@ -1,8 +1,9 @@
 # Dashboards — `grafana/dashboards/*.json`
 
-Seven file-provisioned Grafana dashboards: shared variables, the side rail, panels per dashboard,
-fixed panel ids, drill-down links, the query check script. Look of panels (sizes, fonts, titles,
-colours, grid): `guides/grafana-style.md` — not repeated here.
+Seven file-provisioned Grafana dashboards and their generated Russian copies: shared variables,
+the side rail, panels per dashboard, fixed panel ids, drill-down links, the RU build, the query
+check script. Look of panels (sizes, fonts, titles, colours, grid): `guides/grafana-style.md` —
+not repeated here.
 
 ## Files
 
@@ -16,10 +17,14 @@ colours, grid): `guides/grafana-style.md` — not repeated here.
 | `grafana/dashboards/cc-tools.json` | `cc-tools` | Tools & files | calls, rejections, re-reads, big results, Bash, edits |
 | `grafana/dashboards/cc-health.json` | `cc-health` | Health | TTFT, hook time, API errors, request duration |
 | `grafana/rail/rail.json` | — | — | source of the side rail (not provisioned: Grafana would load any `.json` under `grafana/dashboards/`) |
-| `grafana/rail/sync-rail.js` | — | — | copies the rail into every dashboard file; `--check` writes nothing, exit 1 if any differs |
+| `grafana/rail/sync-rail.js` | — | — | copies the rail into every dashboard file, keeps the RU switch link; `--check` writes nothing, exit 1 if any differs |
+| `grafana/dashboards/ru/<file>.json` | `<uid>-ru` | Russian title | generated Russian copy of each English file (never edit by hand); Grafana folder `ru` |
+| `grafana/i18n/build-ru.js` | — | — | builds `ru/*.json` from the English files + `ru.json`; `--check` writes nothing, exit 1 if any differs |
+| `grafana/i18n/ru.json` | — | — | dictionary: `files`, `strings`, `sql.literals`, `sql.fragments` |
 | `claude-context/scripts/check-dashboard.js` | — | — | runs every query of every dashboard file + provisioning checks |
 
-Home page: `GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH` in `docker-compose.yml` → `overview.json`.
+Home page: `GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH` in `docker-compose.yml` → `overview.json`
+(English; there is no Russian home).
 
 ## Common to all seven
 
@@ -30,12 +35,13 @@ Home page: `GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH` in `docker-compose.yml` �
 | `refresh` / `time` | 10 s / `now-7d` → `now`; Overview `now-30d` |
 | `templating` | the five shared variables below, identical in every file; Sessions adds `extra_cols`, `shown_cols`, `session_header` |
 | `timepicker.quick_ranges` | Last 5 minutes, 1 hour, 24 hours, 7 days, 30 days, All (`now-10y`) |
-| `links` | `[]` — navigation is the rail |
+| `links` | only the language switch (`RU` → `/d/<uid>-ru`; the RU copy has `EN` → `/d/<uid>`), `keepTime`, `includeVars` — navigation is the rail; hand-added links are kept |
 | layout | rail x0 w3 (ids 300–399); content x3 w21; no `row` panels (section headers are h1 text panels); only Full HD (1920 px) and wider is supported |
 
 - A custom `quick_ranges` list **replaces** Grafana's default one, so every wanted range (short
   ones too) must be listed (observed on Grafana 12.1, 2026-11-15).
-- Changing the shared variables or the time picker → change all seven files the same way.
+- Changing the shared variables or the time picker → change all seven English files the same way,
+  then rebuild the RU copies.
 
 Grafana re-reads the folder every 30 s (new files too) — edit the files, never save over them from
 the UI. Queries use the ClickHouse plugin's SQL editor (`editorType: sql`); `format` 1 = table,
@@ -98,7 +104,9 @@ rail.json nav[] (uid, title, hint, idBase) + panels[] (idOffset, gridPos.h)
   SubagentHandback/TaskStop) → Run (Bash) → Explore (only Read/Grep/Glob/LS) → Other; no tool
   result = Talk. 225: gap between consecutive requests of a session, red past the 5-min cache TTL.
 - Tips section (412, 220–222, 227, 228) reads `cc.tips`: fixed 7 days, no variables; 222 =
-  `affected IS NOT NULL`, 228 = time tips (`affected IS NULL`).
+  `affected IS NOT NULL`, 228 = time tips (`affected IS NULL`). Their headers come from
+  `displayName` overrides (Category, Title, Text, Scope, Metric) so the RU build can translate them;
+  the overrides still match `byName` on the raw column names.
 - Sessions: 430–433 and 7 follow the range (by `last_prompt`) and account/project/actor/skill but
   **not** the Session variable; 422, 440–444, 100, 101, 8 need one selected session
   (`'${session}' != '__all'`). 7 marks the selected row with `▶`.
@@ -149,19 +157,47 @@ rail.json nav[] (uid, title, hint, idBase) + panels[] (idOffset, gridPos.h)
 - The `agent-outlier` link carries `from`/`to` and the dashboards append `${__url_time_range}`:
   Grafana uses the first pair (observed in the browser, Grafana 12.1, 2026-11-19).
 
+## Russian copies (`grafana/i18n/`)
+
+```
+edit grafana/dashboards/<file>.json (English = the only source)
+  └─ node grafana/rail/sync-rail.js   rail + the RU switch link (only if ru/<file> exists)
+     └─ node grafana/i18n/build-ru.js  ru/<file>.json: uid <uid>-ru, same panel ids, links /d/<uid> → /d/<uid>-ru
+        (both accept --check; "unchanged"/"DIFFERS" per file)
+```
+
+| Translated | Kept as is |
+| --- | --- |
+| dashboard title, quick-range `display`, variable `label` (not when label = name), custom-variable option texts, panel title/description, `displayName` (incl. `options.sortBy[].displayName`), `noValue`, value-mapping `text`, link titles, text-panel nodes (HTML by tag, markdown by line / table cell) | ids, values, `${...}`, markup, matched mapping values, Grafana's own UI (`All`, menus: Grafana is not localized) |
+| SQL (`rawSql`, variable `query`/`definition`): `sql.fragments` (exact text, applied first: plurals, the `cc.tips.link` rewrite to `-ru`), then `sql.literals` (whole quoted literal) | any SQL literal not listed (filters, ids, event names) |
+
+- Strict: a static English string missing from `strings` → exit 1 with the list, nothing written;
+  an `sql` literal/fragment no RU file uses → exit 1; an unused `strings` entry → warning only.
+- Every new static English text (incl. labels built in SQL) needs a `ru.json` entry, or the build stops.
+- Column widths: a table override with `custom.width` is widened when its translated `displayName`
+  (8 px per letter + 40) or a translated value-mapping text (8 px per letter + 25) needs more;
+  rounded up to a multiple of 5, never narrowed.
+- `isSwitch` (type `link`, title `RU`, url `/d/<uid>-ru`) is duplicated in `sync-rail.js` and
+  `build-ru.js` — change both.
+- Any English dashboard change, incl. merging `develop` into a dashboard branch → rerun both scripts;
+  RU copies went stale once after a merge (bar-chart bucket labels missing on RU).
+- Folder `ru` comes from `foldersFromFilesStructure: true` (`modules/stack.md`); a new RU file
+  appears within 30 s, a provider change needs a Grafana restart.
+
 ## Check script — `claude-context/scripts/check-dashboard.js`
 
 ```
 node claude-context/scripts/check-dashboard.js [--account uuid[,uuid]] [--project p] [--session id]
      [--actor a] [--skill s] [--from now-24h] [--url http://localhost:3000] [--dashboards <dir>]
-     (repo root; reads the Grafana password from .env; --dashboards = a worktree copy of the files)
+     (repo root; reads the Grafana password from .env; --dashboards = another folder: a worktree
+      copy, or grafana/dashboards/ru for the RU copies — the default reads only the top-level *.json)
   provisioning: /api/dashboards/uid/<uid> for every file; /api/dashboards/home uid = cc-usage
   queries:      every query variable + panel target of every file via /api/ds/query, named "<uid> ..."
                 other variables (extra_cols, shown_cols, session_header) take their current value / All / first option
   last line:    "all ok (<n> queries + <m> provisioning checks)" or "<k> FAILED (of ...)"; exit 0 / 1
 ```
 
-Rail drift: `node grafana/rail/sync-rail.js --check`.
+Rail drift: `node grafana/rail/sync-rail.js --check`; RU drift: `node grafana/i18n/build-ru.js --check`.
 
 ## Not used (decided 2026-11-15)
 

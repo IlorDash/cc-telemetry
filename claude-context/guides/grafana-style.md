@@ -89,6 +89,26 @@ query (display name), sits above the number; Grafana centres the content vertica
 - State timeline: `rowHeight 0.8`, `showValue never`, legend off.
 - Pie / donut: legend on the right with values.
 
+## Russian copies
+
+Every English dashboard has a generated Russian copy (`grafana/dashboards/ru/`, uid `<uid>-ru`;
+`modules/dashboard.md`). Design the English panel so its copy fits too:
+
+- **Every new static English text needs a `grafana/i18n/ru.json` entry:** title, description,
+  column header (`displayName`), `noValue`, value-mapping text, link title, variable label — in
+  `strings`; a label the query builds in SQL (`'Talk'`, `concat(..., ' runs')`) — in
+  `sql.literals`, or `sql.fragments` when the Russian needs another word order (`label: N`).
+  `build-ru.js` stops on a missing string, so the copy cannot ship half-English.
+- **Name table columns with `displayName`**, never by the raw SQL column name: a raw name cannot be
+  translated. Overrides keep matching `byName` on the raw name.
+- **Column widths:** Russian words are longer. `build-ru.js` widens a fixed-width column whose
+  translated header (8 px per letter + 40) or translated value-mapping text (8 px per letter + 25)
+  would be cut; a label built in SQL is not measured — give that column room in the English
+  file, or keep the Russian literal short (`× ср.`).
+- Keep translated SQL labels short enough for the bar-chart and timeline axes (same rule as the
+  English labels above).
+- Check the RU copy at 1920 px too (`verification.md`).
+
 ## Colours
 
 | Meaning | Colour |
