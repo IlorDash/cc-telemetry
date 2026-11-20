@@ -195,7 +195,11 @@ function trCustomVar(v) {
   }
 }
 
-const isSwitch = (l) => l && l.type === "link" && /^\/d\/[A-Za-z0-9_-]+$/.test(l.url || "");
+// The language switch on an English dashboard: type "link", title "RU", url /d/<any uid>-ru (any, so a
+// switch left over from a renamed uid is still recognised and replaced). The title is checked too, so a
+// hand-added plain link (other title, url without -ru, query params) is kept; a hand-edited switch title
+// cannot be recognised by design. Same rule as in grafana/rail/sync-rail.js - keep the two in sync.
+const isSwitch = (l) => !!l && l.type === "link" && l.title === "RU" && /^\/d\/[A-Za-z0-9_-]+-ru$/.test(l.url);
 
 function build(src) {
   const dash = JSON.parse(JSON.stringify(src.dash));

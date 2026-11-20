@@ -80,7 +80,11 @@ for (const file of files) {
   dash.panels = [...buildRail(entry), ...content];
 
   // EN -> RU switch (dashboard link): only when the Russian copy exists (see grafana/i18n/build-ru.js)
-  const isSwitch = (l) => l && l.type === "link" && /^\/d\/[A-Za-z0-9_-]+$/.test(l.url || "");
+  // Type "link", title "RU", url /d/<any uid>-ru (any, so a switch left over from a renamed uid is still
+  // recognised and replaced). The title is checked too, so a hand-added plain link (other title, url without
+  // -ru, query params) is kept; a hand-edited switch title cannot be recognised by design.
+  // Same rule as in grafana/i18n/build-ru.js - keep the two in sync.
+  const isSwitch = (l) => !!l && l.type === "link" && l.title === "RU" && /^\/d\/[A-Za-z0-9_-]+-ru$/.test(l.url);
   dash.links = (dash.links || []).filter((l) => !isSwitch(l));
   if (fs.existsSync(path.join(dashDir, "ru", file))) {
     dash.links.push({ type: "link", title: "RU", tooltip: "Russian version", url: "/d/" + dash.uid + "-ru", keepTime: true, includeVars: true });
