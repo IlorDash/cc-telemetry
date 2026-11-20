@@ -29,10 +29,10 @@ Committed changes only. Uncommitted or untracked files are not part of the PR: l
 
 ## What the whole-branch view adds
 - Final state, not history: a defect introduced and fixed inside the branch is not a finding.
-- Cross-commit consistency: the README (script steps and options, dashboards, Tips table,
-  Troubleshooting, "What is sent") matches the final code; views and the panels reading them
-  agree on column names; both OS variants of a setup script got the same change where the README
-  says they behave alike; `check-dashboard.js` still covers every dashboard file.
+- Cross-commit consistency: the site pages (`server`, `clients`, `dashboards`, `tips`,
+  `maintenance`, `troubleshooting`, `data`; EN and their `.ru.md` twins) and the README quick
+  start match the final code; views and the panels reading them agree on column names; both OS
+  variants of a setup script got the same change where the docs say they behave alike; `check-dashboard.js` still covers every dashboard file.
 - `claude-context/` changes on the branch: module docs that contradict the final code are
   Warnings (context-auditor fixes them on request); never a Blocker by themselves.
 - A commit message claiming something the code does not do is a Warning (the PR description is

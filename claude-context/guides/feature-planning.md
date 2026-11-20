@@ -25,8 +25,9 @@ Every "implement X" / "fix Y" that is not a trivial change (CLAUDE.md) runs as:
   `cc.* views are ready`, a script run exits 0 and keeps `.env`, a panel shows X on the live
   Grafana. "Code written" is not a result.
 - Every stage leaves the stack working and the dashboards loading; no stage depends on a later one.
-- Order: views (`clickhouse/views.sql`) before the panels that read them; README last or with the
-  stage that changes the behaviour it describes.
+- Order: views (`clickhouse/views.sql`) before the panels that read them; site pages (EN + RU)
+  and README last or with the stage that changes the behaviour they describe; new screenshots
+  (`tools/docs-demo/`) after the panels they show.
 - A small feature where splitting only adds overhead: the section reads
   `Small feature — decomposition not recommended.` It then runs as one stage.
 - Execution, per stage: developer → reviewer (BLOCKED → back to developer; trivial-change rule as
