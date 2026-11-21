@@ -191,6 +191,45 @@ table.
 
 ---
 
+## Change the ClickHouse version
+
+Within one side of the 22.3 boundary the tag changes in place: `25.8` to `26.3`, or `22.3.20.29`
+to another 22.3 release. Between ClickHouse 22.3 (the Raspberry Pi 4 tag) and a newer version
+the existing data volume does not survive: 25.x reads the indexes of parts written by 22.3
+wrongly (the dashboards fail with `CORRUPTED_DATA`), and a volume written by a newer ClickHouse
+does not start on 22.3 at all. So `setup-server.sh` **refuses** such a change while the volume
+holds data, or while ClickHouse does not answer and the volume exists, and stops before it
+writes the tag. There is no switch to force it. Move the data through a dump:
+
+1. Dump the data into a new folder and check that the files are not empty:
+   `BACKUP_DIR=backup/version-change-<date> bash linux-server-tools/backup.sh dump`
+   (with `sudo`: `sudo env BACKUP_DIR=... bash ...`). Under `--update` the dump of the update is
+   already taken; the error names its folder.
+2. Stop the stack: `docker compose down`, **without** `-v`. Clients cannot send until it runs again.
+3. Delete the ClickHouse volume, which is the step that removes the data the dump holds:
+   `docker volume rm <project>_clickhouse-data` (the exact name is in the error message;
+   `docker volume ls` lists it).
+4. Start with the new version: `bash setup-server.sh --clickhouse-version <tag>`, with your other options.
+5. Restore: `BACKUP_DIR=backup/version-change-<date> bash linux-server-tools/backup.sh restore`.
+   The restore goes through the materialized view, so `cc.events_t` is refilled by it. Compare the
+   row counts of the tables with the dump.
+
+If ClickHouse does not answer, the script cannot tell whether the volume holds data and refuses
+as well. A volume that no running ClickHouse ever used (for example the container never started
+on this CPU) holds no data: after `docker compose down` (no `-v`) remove it with
+`docker volume rm` and run the script again. If you changed `CLICKHOUSE_VERSION` in `.env` by
+hand and do not want to switch, put the old value back and run the script again.
+
+On a Windows server with Docker in WSL, run the same commands with `wsl -d Ubuntu --` in front.
+`setup-server.ps1` writes no tag, so in step 4 set `CLICKHOUSE_VERSION=<tag>` in `.env` by hand
+and run `setup-server.ps1`. The script does not check the change on Windows, so do not skip
+step 1.
+
+!!! warning "Back up first"
+    Step 3 deletes the only copy of the data on the server. Do it only after you have checked the dump.
+
+---
+
 ## Recreate the views
 
 The collector writes the raw events to `otel.otel_logs`. The dashboards read the `cc.*` views,
@@ -325,7 +364,7 @@ which recreates the `clickhouse` container in a few seconds; the collector retri
 | Open the server to the LAN (Windows) | `setup-server.ps1 -EnableLan` |
 | Keep the data for another period | Set `RETENTION_DAYS` in `.env` and run the server script, see [Change the retention](#change-the-retention) |
 | Switch the limits of a small server on or off | Set `CLICKHOUSE_LIMITS` (`small` or `none`) and `CLICKHOUSE_CPUS` in `.env` and run the server script, see [Resource limits and logs](#resource-limits-and-logs) |
-| Use another ClickHouse version (Linux) | `bash setup-server.sh --clickhouse-version <tag>`. A data volume written by a newer ClickHouse does not start with an older one |
+| Use another ClickHouse version (Linux) | `bash setup-server.sh --clickhouse-version <tag>`. A change between 22.3 and a newer version is refused while there is data: see [Change the ClickHouse version](#change-the-clickhouse-version) |
 | Change the Grafana admin password | The repo has no switch for it. `GRAFANA_ADMIN_PASSWORD` in `.env` is read by Grafana when it creates its database on the first start, so editing `.env` later does not change the password. Change it in Grafana (your profile), or reset it with `grafana cli admin reset-admin-password` inside the grafana container |
 | Change the ClickHouse password | The repo has no switch for it. `CLICKHOUSE_PASSWORD` in `.env` is applied only when the ClickHouse volume is first created, and the collector, Grafana and `ch.sh` all read it from `.env`. Changing it later breaks the connection |
 

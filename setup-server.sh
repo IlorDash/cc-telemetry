@@ -76,7 +76,9 @@ Grafana (port 3000, admin login) are published on all interfaces and opened in u
   --clickhouse-version <tag>
                      ClickHouse image tag (CLICKHOUSE_VERSION in .env, default 25.8). On an ARM CPU
                      without lrcpc (Raspberry Pi 4) a missing key (or the 23.3.22.3 that an earlier
-                     version of this script wrote, which does not run there) is set to 22.3.20.29
+                     version of this script wrote, which does not run there) is set to 22.3.20.29.
+                     A change between 22.3 and a newer version is refused while the data volume holds
+                     data (or cannot be checked): dump, new volume, restore (the script prints the steps)
   --update           update a running server after a new version is published without losing data.
                      It checks that ClickHouse answers and
                      that the git working tree has no local changes, dumps all data to
@@ -748,6 +750,95 @@ if [ -z "$ch_want" ] && old_arm; then
   elif [ "$ch_cur" = "$OLD_CH_TAG_WRONG" ]; then ch_want="$OLD_CH_TAG"; ch_auto=2
   fi
 fi
+
+# A volume that holds data does not change between ClickHouse 22.3 and a newer version: 25.x reads the skip-index
+# files of parts written by 22.3 wrongly after a mutation (seen: CORRUPTED_DATA "Bad size of marks file ...
+# skp_idx_idx_log_attr_key.mrk3" after the MODIFY TTL of views-init), and a volume written by a newer server does not
+# start on 22.3 at all. So a change across that boundary needs dump -> new volume -> restore, and the script stops
+# before it writes the tag or recreates anything. There is no flag to force it. Changes within one side (25.8 ->
+# 26.3, 22.3.x -> 22.3.y) are fine. The compared old tag is the running server's version when it answers, else .env
+# (empty = the compose default 25.8). Not checked for the ARM auto-pick: the tag it replaces (the compose default
+# 25.8 or 23.3.22.3) does not run on that CPU, so no data was ever written by it.
+CH_DEFAULT_TAG=25.8
+
+# Probes of check_ch_version_change (separate functions so a test can stub them). Empty output = unknown.
+ch_probe_version() { chq 'SELECT version()' 2>/dev/null | tr -d '[:space:]' || true; }
+ch_probe_rows() { chq "SELECT sum(rows) FROM system.parts WHERE database = 'otel' AND active" 2>/dev/null | tr -d '[:space:]' || true; }
+# The name of this compose project's clickhouse-data volume, empty when it does not exist (or the project name
+# cannot be told). The project name comes from compose itself (the `name:` line of `compose config`: folder name or
+# COMPOSE_PROJECT_NAME), else from the label of an existing clickhouse container; the volume is looked up by its
+# exact name <project>_clickhouse-data. No guessing among other projects' volumes.
+ch_probe_volume() {
+  local p cid
+  p="$("${D[@]}" compose config 2>/dev/null | sed -n 's/^name: *//p' | head -n 1 | tr -d '\r"')" || p=''
+  if [ -z "$p" ]; then
+    cid="$("${D[@]}" compose ps -a -q clickhouse 2>/dev/null | head -n 1)" || cid=''
+    [ -z "$cid" ] || p="$("${D[@]}" inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' "$cid" 2>/dev/null)" || p=''
+  fi
+  [ -n "$p" ] || return 0
+  if "${D[@]}" volume inspect "${p}_clickhouse-data" >/dev/null 2>&1; then printf '%s_clickhouse-data\n' "$p"; fi
+}
+
+# Sets CH_CHANGE_KIND: '' = no objection, data = the volume holds rows, unknown = ClickHouse does not answer (or the
+# row count failed) but the volume exists; CH_OLD_SHOWN = the old version for the message, CH_VOLUME = volume name.
+check_ch_version_change() { # old_tag new_tag (empty = compose default)
+  local old="${1:-$CH_DEFAULT_TAG}" new="${2:-$CH_DEFAULT_TAG}" running rows
+  CH_CHANGE_KIND=''; CH_VOLUME=''; CH_OLD_SHOWN="$old"
+  running="$(ch_probe_version)"
+  if [ -n "$running" ]; then old="$running"; CH_OLD_SHOWN="$running"; fi
+  # both on the same side of the 22.3 boundary: nothing to refuse
+  if { is_small_ch "$old" && is_small_ch "$new"; } || { ! is_small_ch "$old" && ! is_small_ch "$new"; }; then return 0; fi
+  if [ -n "$running" ]; then
+    rows="$(ch_probe_rows)"
+    if [[ "$rows" =~ ^[0-9]+$ ]]; then
+      [ "$rows" -gt 0 ] || return 0
+      CH_CHANGE_KIND=data
+    else
+      CH_CHANGE_KIND=unknown
+    fi
+    CH_VOLUME="$(ch_probe_volume)"
+  else
+    CH_VOLUME="$(ch_probe_volume)"
+    [ -z "$CH_VOLUME" ] || CH_CHANGE_KIND=unknown
+  fi
+}
+
+refuse_ch_version_change() { # new_tag
+  local new="${1:-$CH_DEFAULT_TAG}" sudo_='' bk dir vol="${CH_VOLUME:-<project>_clickhouse-data}"
+  [ "${D[0]}" != sudo ] || sudo_='sudo '
+  echo >&2
+  if [ "$CH_CHANGE_KIND" = data ]; then
+    echo "   ClickHouse $CH_OLD_SHOWN -> $new changes the version across the 22.3 boundary, and the data volume holds data." >&2
+  else
+    echo "   ClickHouse $CH_OLD_SHOWN -> $new changes the version across the 22.3 boundary; ClickHouse does not answer, so the script cannot check" >&2
+    echo "   whether the data volume holds data (the volume exists) and assumes it does." >&2
+    echo "   If that volume was never used by a running ClickHouse (for example the container never started on this CPU), it holds no" >&2
+    echo "   data: stop the stack (${sudo_}docker compose down, no -v), remove it with ${sudo_}docker volume rm $vol and run this script again." >&2
+  fi
+  echo "   Such a volume breaks: 25.x reads indexes of parts written by 22.3 wrongly (CORRUPTED_DATA), and a volume written by a newer" >&2
+  echo "   ClickHouse does not start on 22.3. Nothing was changed (.env and the containers are as they were). Move the data instead:" >&2
+  if [ -n "$UPDATE_DIR" ]; then dir="$UPDATE_DIR"; else dir="backup/version-change-$(date +%Y%m%d)"; fi
+  bk="BACKUP_DIR=$dir"; [ -z "$sudo_" ] || bk="sudo env BACKUP_DIR=$dir"
+  if [ -n "$UPDATE_DIR" ]; then
+    echo "   1. The dump from the start of this update is already taken: $UPDATE_DIR" >&2
+  else
+    echo "   1. Dump:           $bk bash linux-server-tools/backup.sh dump   (ClickHouse must answer; check the files are not empty)" >&2
+  fi
+  echo "   2. Stop the stack: ${sudo_}docker compose down   (no -v; the clients cannot send until it runs again)" >&2
+  echo "   3. Delete the old ClickHouse volume (you run it; it deletes the data the dump holds):" >&2
+  echo "                      ${sudo_}docker volume rm $vol" >&2
+  echo "   4. Start with the new version: bash setup-server.sh --clickhouse-version $new   (plus your other options, without --update)" >&2
+  echo "   5. Restore:        $bk bash linux-server-tools/backup.sh restore" >&2
+  echo "      The restore goes through the materialized view, so cc.events_t is refilled by it; check the row counts afterwards." >&2
+  echo "   Changed CLICKHOUSE_VERSION in .env by hand and do not want to switch? Put the old value back there and run this script again." >&2
+  fail "ClickHouse version change across 22.3 refused (see the steps above)."
+}
+
+if [ "$ch_auto" -eq 0 ]; then
+  check_ch_version_change "$ch_cur" "${ch_want:-$ch_cur}"
+  [ -z "$CH_CHANGE_KIND" ] || refuse_ch_version_change "${ch_want:-$ch_cur}"
+fi
+
 if [ -n "$ch_want" ] && [ "$ch_want" != "$ch_cur" ]; then
   set_env CLICKHOUSE_VERSION "$ch_want"
   if [ "$ch_auto" -eq 1 ]; then ok "ARM CPU without lrcpc detected (e.g. Raspberry Pi 4): CLICKHOUSE_VERSION=$ch_want written to .env"

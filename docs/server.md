@@ -105,7 +105,7 @@ needing that, run `sudo usermod -aG docker $USER` and log in again.
 | `--lan` | Publish them on all interfaces again after an earlier `--local-only`. `--enable-lan` is the same |
 | `--lan-ip <addr>` | The LAN address to report, when the script detects the wrong one |
 | `--grafana-port <n>` | Host port of Grafana, 1-65535, default 3000. Kept as `GRAFANA_PORT` in `.env`; use it when 3000 is taken |
-| `--clickhouse-version <tag>` | ClickHouse image tag, kept as `CLICKHOUSE_VERSION` in `.env` (default 25.8) |
+| `--clickhouse-version <tag>` | ClickHouse image tag, kept as `CLICKHOUSE_VERSION` in `.env` (default 25.8). A change between 22.3 and a newer version is refused while there is data, see [Change the ClickHouse version](maintenance.md#change-the-clickhouse-version) |
 | `--update` | Update a running server without losing data. See [Maintenance](maintenance.md#update-the-server) |
 | `--yes` | Do not ask before installing Docker, using `sudo` or enabling the service. `-y` is the same |
 | `--help` | Print the options. `-h` is the same |

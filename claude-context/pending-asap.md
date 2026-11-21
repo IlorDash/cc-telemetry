@@ -8,29 +8,6 @@ hint; `?` = cause not confirmed.
 
 ## Bugs
 
-- **H?** **Corrupted skip index after switching an existing volume from 22.3 to 25.8.** After the
-  update, every query that uses the skip index `idx_log_attr_key` of `otel.otel_logs` fails:
-  `Bad size of marks file '.../20261119_2731_3911_469_3913/skp_idx_idx_log_attr_key.mrk3': 48,
-  must be: 24 (CORRUPTED_DATA)`. `CHECK TABLE` passes every part.
-  - Effect: everything that reads `cc.session_meta` (`LogAttributes['session.id'] != ''`) fails:
-    14 of 123 queries of `check-dashboard.js` (the `session` variable of every dashboard,
-    Sessions panels 7, 430–433, Recent sessions 37); `cc-refresh` fails every run, so
-    `cc.session_project_t` and `cc.tips_t` stay empty (projects `unknown`, no tips).
-  - Cause, narrowed: every part of `otel_logs` got the mutation version `_3913` at 12:43:06,
-    when `views-init` ran `ALTER TABLE ... MODIFY TTL` on 25.8 over parts written by 22.3. The
-    same `MODIFY TTL` on parts written by 25.8 (develop → branch test below, parts `_8`) leaves
-    them readable, so the trigger is the 22.3 parts: either the mutation keeps 22.3 index marks
-    that 25.8 reads differently, or 25.8 fails on those parts anyway (not reproduced without the
-    mutation).
-  - Affects only a version change of an existing volume (22.3 → newer); the Pi stays on 22.3,
-    fresh 25.8 installs and the develop → branch update on 25.8 are fine.
-  - Fix: document that changing `CLICKHOUSE_VERSION` from 22.3 needs dump → new volume → restore
-    (`docs/maintenance` + `.ru`, the `--clickhouse-version` help of `setup-server.sh`); or let
-    `setup-server.sh` refuse / warn when the tag changes from 22.3 on a non-empty volume. Repair of
-    a broken stack without data loss, to check: `ALTER TABLE otel.otel_logs MATERIALIZE INDEX
-    idx_log_attr_key` (and the other skip indexes), then `docker compose restart cc-refresh`.
-    On the dev PC it was repaired by dump → new volume → restore (see "Test log" below).
-
 ## Small things and hints
 
 - **L** **`--update` from WSL on a checkout made by Windows git fails at once.** WSL git (no
