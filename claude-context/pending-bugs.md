@@ -116,6 +116,10 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
   scripts' views-init wait (90 × 2 s after `compose up -d`).
 - **?** `backup.sh restore` refilling `cc.events_t` (through `cc.events_mv`, or the next views-init
   backfill) follows from the code but was not run.
+- **M?** `backup.sh restore` sends each `<table>.native` as one `INSERT`: `otel.otel_logs` and
+  `cc.events_t` (via `cc.events_mv`) are day-partitioned, so a squashed block spanning more than 100
+  days likely fails with `max_partitions_per_insert_block`; the restore is step 5 of the version
+  change that `refuse_ch_version_change` prints. Unverified.
 - **L?** A row from a client whose clock is more than 30 s ahead, arriving while a month pass
   runs, may be inserted by both the MV and the backfill (duplicate in `cc.events_t`); rare, not
   observed.
