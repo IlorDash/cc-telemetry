@@ -9,8 +9,7 @@
 | Ваш сервер | Как запускать команды `docker compose ...` и `bash linux-server-tools/...` |
 | --- | --- |
 | Linux | Как есть. Добавьте `sudo`, если вы не в группе `docker` |
-| Windows, Docker в WSL | Поставьте перед командой `wsl -d Ubuntu --`, из PowerShell (подставьте имя своего дистрибутива, если он не `Ubuntu`) |
-| Windows, Docker Desktop | `docker compose ...` работает как есть в PowerShell. Вспомогательные скрипты из `linux-server-tools/` — это bash-скрипты, и здесь они описаны только для Linux и для Docker в WSL |
+| Windows | Поставьте перед командой `wsl -d Ubuntu --`, из PowerShell (подставьте имя своего дистрибутива, если он не `Ubuntu`) |
 
 ---
 
@@ -305,7 +304,7 @@ echo "SELECT table, formatReadableSize(sum(bytes_on_disk)) AS size, sum(rows) AS
 `docker compose restart clickhouse` и запустите скрипт снова.
 
 На Windows их никто не перечисляет. После перезапуска ClickHouse выведите таблицы и удалите
-ненужные (`ch.sh` выполняется внутри WSL; с Docker Desktop запускайте его так же в Git Bash или WSL):
+ненужные (`ch.sh` выполняется внутри WSL):
 
 ```powershell
 "SELECT name, total_rows, formatReadableSize(total_bytes) AS size FROM system.tables WHERE database = 'system' AND match(name, '_log(_[0-9]+)?$') ORDER BY total_bytes DESC" | wsl -d Ubuntu -- bash linux-server-tools/ch.sh

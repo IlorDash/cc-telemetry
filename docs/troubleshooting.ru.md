@@ -14,10 +14,9 @@
 приложите:
 
 - полный вывод упавшего скрипта с первой строки, а не только последнее сообщение;
-- сведения о сервере: Linux или Windows, а для Windows — работает ли Docker в Docker Desktop или в
-  WSL;
-- вывод этих команд на сервере, из папки `cc-telemetry` (с префиксом `wsl -d Ubuntu --`, если
-  Docker работает в WSL):
+- сведения о сервере: Linux или Windows;
+- вывод этих команд на сервере, из папки `cc-telemetry` (с префиксом `wsl -d Ubuntu --` на
+  сервере с Windows):
 
     ```bash
     git log -1 --oneline
@@ -46,13 +45,13 @@
 
 | Сообщение или симптом | Причина | Что делать |
 | --- | --- | --- |
-| `No Docker found. Install Docker Desktop ...` | Windows: не найден ни Docker Desktop, ни дистрибутив WSL | Установите что-то одно и запустите скрипт снова |
-| `Docker Desktop is not running. Start it and run this script again.` | Windows: Docker Desktop не отвечает | Запустите его, дождитесь готовности, запустите скрипт снова |
-| `Both Docker Desktop and Docker Engine in WSL ... Run the script again with -Mode wsl ... or -Mode desktop ...` | Windows: отвечают оба движка, и скрипт не может понять, где стек (при первой установке стека ещё нет) | Запустите скрипт снова с `-Mode wsl` или `-Mode desktop` |
+| `The docker in WSL 'Ubuntu' is Docker Desktop (its WSL integration is on). Docker Desktop is not supported ...` | Windows: Docker Desktop установлен, и его интеграция с WSL включена для дистрибутива, поэтому `docker` в WSL обращается к Docker Desktop. Docker Desktop не поддерживается (известная проблема); стеку нужен Docker Engine внутри WSL | Отключите интеграцию: Docker Desktop, Settings, Resources, WSL integration, выключите дистрибутив. Затем в WSL выполните `sudo systemctl restart docker.socket docker` и запустите скрипт снова (он поставит Docker Engine в WSL, если его там нет) |
+| `Docker Desktop is not supported (known issue). Use Docker Engine inside WSL2 ...` | Windows: указан `-Mode desktop` | Запустите скрипт без `-Mode` |
+| `WSL distro 'Ubuntu' not found (wsl -l -v). ...` | Windows: нет дистрибутива WSL2 с таким именем | Установите его (от администратора: `wsl --install -d Ubuntu`, перезагрузка) или передайте его имя в `-Distro`, затем запустите скрипт снова |
 | `systemd is off in WSL 'Ubuntu'. ...` | Windows: без systemd скрипт не может установить Docker в WSL | Сделайте, что сказано в сообщении: добавьте `[boot]` и `systemd=true` в `/etc/wsl.conf`, выполните `wsl --terminate Ubuntu`, запустите скрипт снова |
 | `TCP port 3000 is already in use by another program, so Grafana cannot publish it. ...` | Linux: порт Grafana занят другой программой | `bash setup-server.sh --grafana-port 3001` |
 | `WARN GRAFANA_BIND was missing and OTLP_BIND=0.0.0.0: Grafana is now published on 0.0.0.0, ...` | Linux: в `.env` от старой версии есть `OTLP_BIND`, но нет `GRAFANA_BIND`, поэтому Grafana теперь доступна из сети | Чтобы оставить Grafana только на этом ПК, задайте `GRAFANA_BIND=127.0.0.1` в `.env` и запустите скрипт снова или используйте `--local-only`. См. [страницу сервера](server.md#порты-и-доступ-на-linux) |
-| `TCP port 3000 is already in use ...` или `docker compose` видит пустой стек, в WSL (`WARN docker here talks to Docker Desktop, ...`) | Интеграция Docker Desktop с WSL подменила сокет Docker в дистрибутиве, и `docker` обращается к Docker Desktop, а стек работает в собственном Docker Engine дистрибутива (`docker version` показывает `Docker Desktop`) | Отключите интеграцию Docker Desktop с WSL для этого дистрибутива (Settings, Resources, WSL integration), затем `sudo systemctl restart docker.socket docker`. Если вы намеренно используете Docker Desktop, предупреждение можно игнорировать |
+| `TCP port 3000 is already in use ...` или `docker compose` видит пустой стек, в WSL (`WARN docker here talks to Docker Desktop, ...`) | Интеграция Docker Desktop с WSL подменила сокет Docker в дистрибутиве, и `docker` обращается к Docker Desktop, а стек работает в собственном Docker Engine дистрибутива (`docker version` показывает `Docker Desktop`) | Отключите интеграцию Docker Desktop с WSL для этого дистрибутива (Settings, Resources, WSL integration), затем `sudo systemctl restart docker.socket docker`. |
 | `permission denied` для `docker` | Linux: вы не в группе `docker` | `sudo usermod -aG docker $USER`, затем войдите заново |
 | `views-init did not finish cleanly (<state>)` | Представления `cc.*` не созданы | Прочитайте лог `views-init`, который напечатал скрипт, и запустите скрипт снова; если повторится — сообщите об ошибке |
 | `Grafana does not answer yet; check: docker compose logs grafana` | Grafana ещё запускается или не скачался её плагин ClickHouse (нет интернета при первом запуске) | Подождите минуту и откройте Grafana; восстановите интернет и выполните `docker compose restart grafana` |

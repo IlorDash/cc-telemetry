@@ -13,9 +13,9 @@ If a row says to report it, or nothing here matches, open an issue at
 [github.com/IlorDash/cc-telemetry/issues](https://github.com/IlorDash/cc-telemetry/issues) with:
 
 - the full output of the script that failed, from the first line, not only the last message;
-- your server: Linux or Windows, and for Windows whether Docker runs in Docker Desktop or in WSL;
+- your server: Linux or Windows;
 - the output of these commands on the server, from the `cc-telemetry` folder (put
-  `wsl -d Ubuntu --` in front when Docker runs in WSL):
+  `wsl -d Ubuntu --` in front on a Windows server):
 
     ```bash
     git log -1 --oneline
@@ -44,13 +44,13 @@ The messages of the install scripts, with the cause and the fix of each, are on
 
 | Message or symptom | Cause | What to do |
 | --- | --- | --- |
-| `No Docker found. Install Docker Desktop ...` | Windows: neither Docker Desktop nor a WSL distro was found | Install one of them, then run the script again |
-| `Docker Desktop is not running. Start it and run this script again.` | Windows: Docker Desktop does not answer | Start it, wait until it is ready, run the script again |
-| `Both Docker Desktop and Docker Engine in WSL ... Run the script again with -Mode wsl ... or -Mode desktop ...` | Windows: both engines answer and the script cannot tell which one holds the stack (on a first install it has no stack to go by) | Run the script again with `-Mode wsl` or `-Mode desktop` |
+| `The docker in WSL 'Ubuntu' is Docker Desktop (its WSL integration is on). Docker Desktop is not supported ...` | Windows: Docker Desktop is installed and its WSL integration is on for the distro, so `docker` in WSL talks to Docker Desktop. Docker Desktop is not supported (known issue); the stack needs Docker Engine inside WSL | Turn the integration off: Docker Desktop, Settings, Resources, WSL integration, switch off the distro. Then, in WSL, `sudo systemctl restart docker.socket docker`, and run the script again (it installs Docker Engine in WSL if there is none) |
+| `Docker Desktop is not supported (known issue). Use Docker Engine inside WSL2 ...` | Windows: `-Mode desktop` was passed | Run the script without `-Mode` |
+| `WSL distro 'Ubuntu' not found (wsl -l -v). ...` | Windows: no WSL2 distro of that name | Install one (admin: `wsl --install -d Ubuntu`, reboot) or pass its name as `-Distro`, then run the script again |
 | `systemd is off in WSL 'Ubuntu'. ...` | Windows: the script cannot install Docker into WSL without systemd | Do what the message says: add `[boot]` and `systemd=true` to `/etc/wsl.conf`, run `wsl --terminate Ubuntu`, run the script again |
 | `TCP port 3000 is already in use by another program, so Grafana cannot publish it. ...` | Linux: another program uses the Grafana port | `bash setup-server.sh --grafana-port 3001` |
 | `WARN GRAFANA_BIND was missing and OTLP_BIND=0.0.0.0: Grafana is now published on 0.0.0.0, ...` | Linux: `.env` from an older version has `OTLP_BIND` but no `GRAFANA_BIND`, so Grafana is now reachable from the LAN | To keep Grafana on this PC, set `GRAFANA_BIND=127.0.0.1` in `.env` and run the script again, or use `--local-only`. See [the server page](server.md#ports-and-access-on-linux) |
-| `TCP port 3000 is already in use ...`, or `docker compose` sees an empty stack, in WSL (`WARN docker here talks to Docker Desktop, ...`) | Docker Desktop's WSL integration replaced the Docker socket of the distro, so `docker` talks to Docker Desktop while the stack runs in the native Docker Engine of the distro (`docker version` shows `Docker Desktop`) | Turn off Docker Desktop's WSL integration for this distro (Settings, Resources, WSL integration), then `sudo systemctl restart docker.socket docker`. If you use Docker Desktop on purpose, ignore the warning |
+| `TCP port 3000 is already in use ...`, or `docker compose` sees an empty stack, in WSL (`WARN docker here talks to Docker Desktop, ...`) | Docker Desktop's WSL integration replaced the Docker socket of the distro, so `docker` talks to Docker Desktop while the stack runs in the native Docker Engine of the distro (`docker version` shows `Docker Desktop`) | Turn off Docker Desktop's WSL integration for this distro (Settings, Resources, WSL integration), then `sudo systemctl restart docker.socket docker`. |
 | `permission denied` for `docker` | Linux: you are not in the `docker` group | `sudo usermod -aG docker $USER`, then log in again |
 | `views-init did not finish cleanly (<state>)` | The `cc.*` views were not created | Read the `views-init` log the script printed, run the script again; if it repeats, report it |
 | `Grafana does not answer yet; check: docker compose logs grafana` | Grafana is still starting, or its ClickHouse plugin could not be downloaded (no internet on the first start) | Wait a minute and open Grafana; restore the internet and run `docker compose restart grafana` |

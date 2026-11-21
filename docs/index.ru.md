@@ -43,7 +43,7 @@ Grafana показывает семь дашбордов. Панель слев�
 
 | Роль | Windows | Linux |
 | --- | --- | --- |
-| Сервер (один раз) | скрипт PowerShell, Docker Desktop или Docker Engine в WSL2 | скрипт bash, Docker Engine |
+| Сервер (один раз) | скрипт PowerShell, Docker Engine в WSL2 | скрипт bash, Docker Engine |
 | Клиент (каждый ПК) | скрипт PowerShell | скрипт bash |
 
 Сервер и клиенты общаются только по OTLP поверх TCP, поэтому подходит любое сочетание,

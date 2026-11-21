@@ -9,8 +9,7 @@ Run every command from the `cc-telemetry` folder on the server PC.
 | Your server | How to run the `docker compose ...` and `bash linux-server-tools/...` commands |
 | --- | --- |
 | Linux | As they are. Add `sudo` if you are not in the `docker` group |
-| Windows, Docker in WSL | Put `wsl -d Ubuntu --` in front, from PowerShell (use your distro name if it is not `Ubuntu`) |
-| Windows, Docker Desktop | `docker compose ...` works as it is in PowerShell. The helper scripts in `linux-server-tools/` are bash scripts and are documented here only for Linux and for Docker in WSL |
+| Windows | Put `wsl -d Ubuntu --` in front, from PowerShell (use your distro name if it is not `Ubuntu`) |
 
 ---
 
@@ -303,7 +302,7 @@ written, the running ClickHouse has not loaded the config yet: run
 `docker compose restart clickhouse` and the script again.
 
 On Windows nothing lists them. After a restart of ClickHouse, list the tables and drop the ones you
-do not need (`ch.sh` runs inside WSL; with Docker Desktop run it in Git Bash or WSL the same way):
+do not need (`ch.sh` runs inside WSL):
 
 ```powershell
 "SELECT name, total_rows, formatReadableSize(total_bytes) AS size FROM system.tables WHERE database = 'system' AND match(name, '_log(_[0-9]+)?$') ORDER BY total_bytes DESC" | wsl -d Ubuntu -- bash linux-server-tools/ch.sh

@@ -7,8 +7,8 @@ Grafana. Устанавливается он один раз одним скри
 
 | Что нужно | Сервер на Windows | Сервер на Linux |
 | --- | --- | --- |
-| Система | Windows 10 22H2 или Windows 11 с Docker Desktop (бэкенд WSL2) **либо** более старая Windows 10 с WSL2 | Дистрибутив с systemd |
-| Docker | Docker Desktop, запущенный до старта скрипта; либо Docker Engine внутри дистрибутива Ubuntu в WSL2 с включённым systemd (скрипт ставит его сам) | Docker Engine с плагином compose; на Debian, Ubuntu и производных скрипт установит его, если его нет |
+| Система | Windows 10 или 11 с WSL2 и дистрибутивом Ubuntu | Дистрибутив с systemd |
+| Docker | Docker Engine внутри дистрибутива Ubuntu в WSL2 с включённым systemd (скрипт ставит его сам). Docker Desktop не поддерживается (известная проблема) | Docker Engine с плагином compose; на Debian, Ubuntu и производных скрипт установит его, если его нет |
 | Оболочка | Windows PowerShell | bash, от обычного пользователя |
 | Интернет | При первом запуске: скачиваются образы и плагин ClickHouse для Grafana | То же |
 | Порты | На этом ПК свободны `4317` (OTLP gRPC), `4318` (OTLP HTTP, названия сессий) и `3000` (Grafana) | То же; для Grafana можно выбрать другой порт |
@@ -21,7 +21,15 @@ compose](https://docs.docker.com/engine/install/).
 
 ## Установка на Windows
 
-1. Запустите Docker Desktop. С Docker Engine в WSL запускать ничего не нужно.
+1. Убедитесь, что установлены WSL2 и дистрибутив Ubuntu (`wsl -l -v`; иначе в PowerShell от
+   администратора: `wsl --install -d Ubuntu`, затем перезагрузка). Сервер работает на Docker
+   Engine внутри этого дистрибутива; запускать ничего не нужно.
+
+    !!! warning "Docker Desktop не поддерживается (известная проблема)"
+        Если установлен Docker Desktop, отключите его интеграцию с WSL для дистрибутива (Docker
+        Desktop > Settings > Resources > WSL integration). При включённой интеграции `docker`
+        внутри WSL обращается к Docker Desktop, и скрипт останавливается с сообщением об этом.
+
 2. Скачайте репозиторий и откройте его папку в PowerShell:
 
     ```powershell
@@ -36,11 +44,9 @@ compose](https://docs.docker.com/engine/install/).
     powershell -ExecutionPolicy Bypass -File .\setup-server.ps1
     ```
 
-4. Если Docker Desktop не найден, а в дистрибутиве WSL нет Docker, скрипт спросит `Docker is not
-   installed in WSL 'Ubuntu'. Install Docker Engine there now? [Y/n]`. Ответьте `Y` или
-   запустите скрипт с `-Yes`, чтобы вопроса не было.
-   Если отвечают и Docker Desktop, и Docker Engine в WSL, а стек ещё не установлен, скрипт
-   останавливается: добавьте к команде `-Mode desktop` или `-Mode wsl`.
+4. Если в дистрибутиве WSL нет Docker, скрипт спросит `Docker is not installed in WSL 'Ubuntu'.
+   Install Docker Engine there now? [Y/n]`. Ответьте `Y` или запустите скрипт с `-Yes`, чтобы
+   вопроса не было.
 5. Дождитесь шага `Done`. Он выводит адрес Grafana и команду для клиента.
 6. Чтобы принимать данные с других ПК, запустите скрипт ещё раз с `-EnableLan`. Скрипт запросит
    права администратора через UAC; подтвердите запрос.
@@ -62,9 +68,9 @@ compose](https://docs.docker.com/engine/install/).
 
 | Параметр | Что делает |
 | --- | --- |
-| `-Mode <mode>` | Где работает Docker: `auto` (по умолчанию), `desktop` или `wsl`. `auto` берёт Docker Desktop, если он отвечает, иначе дистрибутив WSL. Если отвечают оба, берёт тот, где этот стек уже есть (сначала запущенные контейнеры, затем любые контейнеры, затем тома), и останавливается с сообщением про `-Mode wsl` и `-Mode desktop`, если стек есть в обоих или ни в одном; остальные два значения отключают определение |
-| `-Distro <name>` | Дистрибутив WSL для режима `wsl` (по умолчанию `Ubuntu`) |
-| `-EnableLan` | Принимать данные с других ПК: правила брандмауэра и, для WSL, проброс портов (права администратора через UAC) |
+| `-Mode <mode>` | `auto` (по умолчанию) или `wsl`: оба значения означают Docker Engine внутри WSL2. `desktop` отклоняется: Docker Desktop не поддерживается |
+| `-Distro <name>` | Дистрибутив WSL (по умолчанию `Ubuntu`) |
+| `-EnableLan` | Принимать данные с других ПК: правила брандмауэра и проброс портов в WSL (права администратора через UAC) |
 | `-LanIp <address>` | LAN-адрес, который нужно использовать и вывести, если скрипт определил его неверно |
 | `-Yes` | Установить Docker в WSL без вопроса |
 
@@ -183,12 +189,12 @@ Docker открывает порты собственными правилами
 
 | Шаг | Windows | Linux |
 | --- | --- | --- |
-| 1. Docker | Находит Docker Desktop или Docker Engine в WSL; предлагает установить его в WSL | Проверяет, что `docker`, плагин compose и демон отвечают; на Debian и Ubuntu предлагает их установить |
+| 1. Docker | Находит Docker Engine в WSL (предлагает установить его там) и останавливается, если `docker` там — это Docker Desktop | Проверяет, что `docker`, плагин compose и демон отвечают; на Debian и Ubuntu предлагает их установить |
 | 2. `.env` | Создаёт его со случайными паролями; существующий `.env` не трогает | То же, и записывает `OTLP_BIND`, `GRAFANA_BIND` и `GRAFANA_PORT`, а также ключи `RETENTION_DAYS`, `CLICKHOUSE_LIMITS` и `CLICKHOUSE_CPUS`, если их нет |
 | 3. Стек | Запускает его и ждёт, пока создадутся представления `cc.*` | Останавливается, если порт Grafana занят (занятый 4317 или 4318 — лишь предупреждение), затем запускает стек, ждёт представления и применяет срок хранения — TTL (см. [Место на диске и срок хранения](maintenance.md#место-на-диске-и-срок-хранения)) |
 | 4. Проверки | Grafana на `localhost:3000`, OTLP на `localhost:4317` и `localhost:4318` | То же на опубликованных адресах; также проверяет, что служба `docker` стартует при загрузке |
-| 5. Дальше | Только WSL: запускает скрытый keepalive и добавляет его в папку «Автозагрузка» (`cc-telemetry-keepalive.vbs`), чтобы WSL не остановил стек | Режим LAN: правила брандмауэра и LAN-адрес сервера |
-| 6. `-EnableLan` | Правила брандмауэра для TCP 4317 и 4318 (частные сети) и, для WSL, проброс обоих портов с LAN-адреса | (часть шага 5) |
+| 5. Дальше | Запускает скрытый keepalive и добавляет его в папку «Автозагрузка» (`cc-telemetry-keepalive.vbs`), чтобы WSL не остановил стек | Режим LAN: правила брандмауэра и LAN-адрес сервера |
+| 6. `-EnableLan` | Правила брандмауэра для TCP 4317 и 4318 (частные сети) и проброс обоих портов с LAN-адреса в WSL | (часть шага 5) |
 
 На Windows Grafana опубликована только на `localhost`; скрипт никогда не открывает её для сети.
 
@@ -225,10 +231,9 @@ Docker открывает порты собственными правилами
 
     | Сообщение | Причина | Что делать |
     | --- | --- | --- |
-    | `No Docker found. Install Docker Desktop (Windows 10 22H2+ / Windows 11), or on older Windows install WSL2 with Ubuntu (admin: wsl --install -d Ubuntu), reboot, and run this script again.` | Windows: не найден ни Docker Desktop, ни дистрибутив WSL | Установите что-то одно и запустите скрипт снова |
-    | `Docker Desktop is not running. Start it and run this script again.` | Windows: указан `-Mode desktop`, а Docker не отвечает | Запустите Docker Desktop и дождитесь готовности |
-    | `Both Docker Desktop and Docker Engine in WSL hold this stack ...`, `... are running this stack ...` или `... are usable and neither has this stack yet. Run the script again with -Mode wsl (Docker Engine in WSL) or -Mode desktop (Docker Desktop).` | Windows, `-Mode auto`: отвечают оба движка, и скрипт не может понять, какой ваш; при первой установке с обоими он не может выбрать вовсе | Запустите скрипт снова с `-Mode wsl` или `-Mode desktop`; следующие запуски выберут движок, где лежит стек |
-    | `WSL distro 'Ubuntu' not found (wsl -l -v). Use -Distro <name>.` | Windows: нет дистрибутива с таким именем | Передайте имя из `wsl -l -v` в `-Distro` |
+    | `The docker in WSL 'Ubuntu' is Docker Desktop (its WSL integration is on). Docker Desktop is not supported ...` | Windows: у дистрибутива включена интеграция Docker Desktop с WSL | Отключите её, перезапустите Docker в WSL и запустите скрипт снова: см. [Устранение неполадок](troubleshooting.md#установка-сервера) |
+    | `Docker Desktop is not supported (known issue). Use Docker Engine inside WSL2 ...` | Windows: указан `-Mode desktop` | Запустите скрипт без `-Mode` |
+    | `WSL distro 'Ubuntu' not found (wsl -l -v). Use -Distro <name>. ...` | Windows: нет дистрибутива с таким именем | Передайте имя из `wsl -l -v` в `-Distro` или установите WSL2 с Ubuntu (от администратора: `wsl --install -d Ubuntu`, затем перезагрузка) |
     | `systemd is off in WSL 'Ubuntu'. Add to /etc/wsl.conf:  [boot]  systemd=true  then run 'wsl --terminate Ubuntu' and this script again.` | Windows: без systemd скрипт не может установить Docker | Сделайте то, что написано в сообщении |
     | `Docker installation in WSL failed, see the output above.` или `Docker installation failed, see the output above.` | Установщик Docker завершился с ошибкой | Прочитайте вывод над сообщением и устраните ошибку |
     | `Docker was installed but does not answer. Run: wsl -d <distro> -- docker info` | Windows: Docker установлен в WSL, но не запускается | Выполните команду из сообщения и прочитайте ошибку |

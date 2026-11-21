@@ -42,7 +42,7 @@ the time range and the variables.
 
 | Role | Windows | Linux |
 | --- | --- | --- |
-| Server (once) | PowerShell script, Docker Desktop or Docker Engine in WSL2 | bash script, Docker Engine |
+| Server (once) | PowerShell script, Docker Engine in WSL2 | bash script, Docker Engine |
 | Client (every PC) | PowerShell script | bash script |
 
 The server and the clients only talk OTLP over TCP, so any mix works, for example a Linux server
