@@ -59,7 +59,7 @@ whenever it finds one (also before `-EnableLan`). Use that address when you [con
 
 | Option | What it does |
 | --- | --- |
-| `-Mode <mode>` | Where Docker runs: `auto` (default), `desktop` or `wsl`. `auto` uses Docker Desktop if it answers, otherwise a WSL distro; the other two skip the detection |
+| `-Mode <mode>` | Where Docker runs: `auto` (default), `desktop` or `wsl`. `auto` uses Docker Desktop if it answers, otherwise a WSL distro. When both answer, it takes the one that already holds this stack (running containers first, then any containers, then volumes) and stops with a message naming `-Mode wsl` and `-Mode desktop` if both do or neither does; the other two values skip the detection |
 | `-Distro <name>` | The WSL distro for `wsl` mode (default `Ubuntu`) |
 | `-EnableLan` | Accept data from other PCs: firewall rules and, for WSL, port forwards (admin rights through UAC) |
 | `-LanIp <address>` | The LAN address to use and print, when the script detects the wrong one |
@@ -162,6 +162,12 @@ yourself with `ufw delete allow <port>/tcp` or `firewall-cmd --remove-port=<port
     instead of 365 (`RETENTION_DAYS`), and resource limits for ClickHouse (`CLICKHOUSE_LIMITS=small`,
     `CLICKHOUSE_CPUS=2`). See [Disk use and retention](maintenance.md#disk-use-and-retention) and
     [Resource limits and logs](maintenance.md#resource-limits-and-logs).
+
+    These defaults follow the ClickHouse tag, not the hardware: 22.3 gives 180 days, the small
+    limits and 2 CPUs, any other tag 365 days, no limits and 0. An x86 PC whose `.env` pins 22.3
+    therefore gets the small-server values too. To get the others, change the tag first (see
+    [Change the ClickHouse version](maintenance.md#change-the-clickhouse-version)) or set the keys
+    in `.env` by hand.
 
 ---
 

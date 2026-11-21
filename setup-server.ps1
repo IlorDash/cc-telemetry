@@ -75,6 +75,49 @@ function Test-WslDocker {
   return ($LASTEXITCODE -eq 0)
 }
 
+# Compose project of this folder: its lower-cased name, as docker compose names it.
+function Get-ProjectName {
+  return ((Split-Path $root -Leaf).ToLower() -replace '[^a-z0-9_-]', '')
+}
+
+# What an engine holds of this compose project: running containers, all containers, volumes.
+# $Engine is 'desktop' or 'wsl'. Read-only queries.
+function Get-ProjectState([string]$Engine) {
+  $f = "label=com.docker.compose.project=$(Get-ProjectName)"
+  if ($Engine -eq 'wsl') {
+    $states = @(wsl.exe -d $Distro -- docker ps -a --filter $f --format '{{.State}}' 2>$null)
+    $vols = @(wsl.exe -d $Distro -- docker volume ls -q --filter $f 2>$null)
+  } else {
+    $states = @(docker ps -a --filter $f --format '{{.State}}' 2>$null)
+    $vols = @(docker volume ls -q --filter $f 2>$null)
+  }
+  $states = @($states | Where-Object { $_ -and "$_".Trim() })
+  $vols = @($vols | Where-Object { $_ -and "$_".Trim() })
+  return @{
+    Running = @($states | Where-Object { "$_".Trim() -eq 'running' }).Count
+    Any     = $states.Count
+    Volumes = $vols.Count
+  }
+}
+
+# Auto mode when both Docker Desktop and the WSL engine answer: the engine that already holds this project.
+# Running containers first, then any containers, then volumes; both or neither -> no choice (Error).
+# Returns @{ Mode = 'desktop'|'wsl'|$null; Error = <text>|$null }. Pure: the states come from the caller.
+function Select-EngineByProject($Desktop, $Wsl) {
+  $choice = 'Run the script again with -Mode wsl (Docker Engine in WSL) or -Mode desktop (Docker Desktop).'
+  if ($Desktop.Running -gt 0 -and $Wsl.Running -gt 0) {
+    return @{ Mode = $null; Error = "Both Docker Desktop and Docker Engine in WSL are running this stack. $choice" }
+  }
+  foreach ($k in 'Running', 'Any', 'Volumes') {
+    if ($Desktop[$k] -gt 0 -and $Wsl[$k] -eq 0) { return @{ Mode = 'desktop'; Error = $null } }
+    if ($Wsl[$k] -gt 0 -and $Desktop[$k] -eq 0) { return @{ Mode = 'wsl'; Error = $null } }
+  }
+  if ($Desktop.Any -gt 0 -or $Wsl.Any -gt 0 -or $Desktop.Volumes -gt 0 -or $Wsl.Volumes -gt 0) {
+    return @{ Mode = $null; Error = "Both Docker Desktop and Docker Engine in WSL hold this stack, and it is not clear which one to use. $choice" }
+  }
+  return @{ Mode = $null; Error = "Both Docker Desktop and Docker Engine in WSL are usable and neither has this stack yet. $choice" }
+}
+
 function Compose {
   if ($script:Mode -eq 'wsl') { & wsl.exe -d $Distro --cd $root -- docker compose @args }
   else { & docker compose @args }
@@ -134,7 +177,16 @@ if ($LanOnly) {
 # ---------------------------------------------------------------- 1. Docker
 Step 'Docker'
 if ($Mode -eq 'auto') {
-  if (Test-DesktopDocker) { $Mode = 'desktop' }
+  if (Test-DesktopDocker) {
+    $Mode = 'desktop'
+    # Both engines answer (Docker Desktop and Docker Engine in WSL): use the one that already holds this stack.
+    if ((Test-DistroExists) -and (Test-WslDocker)) {
+      $pick = Select-EngineByProject (Get-ProjectState 'desktop') (Get-ProjectState 'wsl')
+      if ($pick.Error) { Fail $pick.Error }
+      $Mode = $pick.Mode
+      Ok "Docker Desktop and Docker Engine in WSL both answer; this stack is in $(if ($Mode -eq 'wsl') { 'Docker Engine in WSL' } else { 'Docker Desktop' })"
+    }
+  }
   elseif (Test-DistroExists) { $Mode = 'wsl' }
   else {
     Fail ("No Docker found. Install Docker Desktop (Windows 10 22H2+ / Windows 11), or on older Windows install WSL2 " +

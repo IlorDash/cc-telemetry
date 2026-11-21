@@ -271,6 +271,21 @@ if [ "${D[0]}" = sudo ]; then
 fi
 compose() { "${D[@]}" compose "$@"; }
 
+# WSL with Docker Desktop's WSL integration on: its docker.sock replaces the one of a native Docker Engine
+# in the same distro, so `docker` here may show an empty engine while the stack runs in the other one.
+warn_docker_desktop() {
+  local plat
+  plat="$("${D[@]}" version --format '{{.Server.Platform.Name}}' 2>/dev/null)" || return 0
+  case "$plat" in *'Docker Desktop'*) ;; *) return 0 ;; esac
+  grep -qiE 'microsoft|wsl' "${PROC_VERSION_FILE:-/proc/version}" 2>/dev/null || return 0
+  if systemctl is-active --quiet docker 2>/dev/null || [ -e /run/docker.pid ] || pgrep -x dockerd >/dev/null 2>&1; then
+    warn 'docker here talks to Docker Desktop, but a native Docker Engine also runs in this distro: the stack may be in the other engine.'
+    warn '  To use the native engine: turn off Docker Desktop WSL integration for this distro, then run: sudo systemctl restart docker.socket docker'
+  fi
+  return 0
+}
+warn_docker_desktop
+
 # ---------------------------------------------------------------- .env helpers
 get_env() { # KEY -> value (CR stripped); empty when the key is missing
   grep "^$1=" .env | tail -n 1 | cut -d= -f2- | tr -d '\r' || true
@@ -387,7 +402,7 @@ save_retention_baseline() { # dir
 # bash reads a script while it runs, and git pull rewrites this file: everything after the pull is in
 # this one function, which ends with exec (nothing of the old file is read afterwards).
 run_update() {
-  local dir prev now up repass=() a
+  local dir prev now up repass=() a gc=()
   step 'Update: checks'
   [ -f .env ] || fail '.env not found: this folder is not a configured server yet. Run: bash setup-server.sh'
   load_retention
@@ -397,10 +412,18 @@ run_update() {
   prev=''; up=''
   if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
-      git status --short --untracked-files=no >&2
-      fail 'The git working tree has local changes (listed above): the pull could fail or merge them. Commit, stash or revert them (git stash), then run --update again.'
+      # A checkout made by Windows git (CRLF) used from WSL: git without core.autocrlf sees every text file
+      # as modified. When only the line endings differ, go on and give the pull the same setting.
+      if [ -z "$(git -c core.autocrlf=true status --porcelain --untracked-files=no)" ]; then
+        gc=(-c core.autocrlf=true)
+      else
+        git status --short --untracked-files=no >&2
+        fail 'The git working tree has local changes (listed above): the pull could fail or merge them. Commit, stash or revert them (git stash), then run --update again. If only line endings differ (a Windows checkout used from WSL), run: git config core.autocrlf true'
+      fi
     fi
-    ok 'git working tree is clean (.env and backup/ are git-ignored)'
+    if [ "${#gc[@]}" -gt 0 ]; then ok 'git working tree differs from HEAD only in line endings (a Windows checkout, CRLF): treated as clean, git runs with core.autocrlf=true'
+    else ok 'git working tree is clean (.env and backup/ are git-ignored)'
+    fi
     prev="$(git rev-parse --short HEAD)"
     up="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null)" || up=''
   else
@@ -437,7 +460,9 @@ run_update() {
 
   step 'Update: code'
   if [ -n "$up" ]; then
-    git pull --ff-only || fail 'git pull --ff-only failed (a diverged branch or no network). The stack was not touched.'
+    # Never wait for a user name or password: no prompt, no terminal input.
+    GIT_TERMINAL_PROMPT=0 git "${gc[@]+"${gc[@]}"}" pull --ff-only </dev/null \
+      || fail 'git pull --ff-only failed (a diverged branch, no network, or no credentials for the remote: for a private repository set up a credential helper or an SSH key for git in this system, or run git pull yourself and then --update). The stack was not touched.'
     now="$(git rev-parse --short HEAD)"
     UPD_PREV="$prev"
     if [ "$now" = "$prev" ]; then ok "already up to date ($now)"
