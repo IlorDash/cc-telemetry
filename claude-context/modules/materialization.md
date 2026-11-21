@@ -77,7 +77,9 @@ views.sql                                                             → "cc.* 
 - Views are applied last, so a view never reads a half-filled table. views-init never runs
   `refresh.sql`.
 - Live check (2026-11-21, ClickHouse 22.3.20.29): `cc.events_t` count = `claude-code` rows of
-  `otel.otel_logs`, no duplicate `(session_id, seq, ts)`.
+  `otel.otel_logs`, no duplicate `(session_id, seq, ts)`. Same on 25.8.33.6 (2026-11-21, after
+  `--update`): count equal, 0 duplicates, a second views-init added nothing, `cc-refresh`
+  `refresh ok` (`cc.session_project_t` one row per session, `cc.tips_t` filled).
 
 ## cc-refresh (`refresh-loop.sh`, `refresh.sql`)
 

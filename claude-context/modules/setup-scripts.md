@@ -20,11 +20,17 @@ LAN path. `--update` and `apply_retention`: `modules/server-update.md`.
 
 ```
 1 Docker   auto: docker on PATH answers → desktop; else WSL distro exists → wsl
+                both answer (Docker Desktop + docker in the distro) → Select-EngineByProject over
+                Get-ProjectState of each (label com.docker.compose.project=<folder lower-case>):
+                running containers > any containers > volumes, the engine that alone has it wins;
+                both / neither → Fail naming -Mode wsl / -Mode desktop
            wsl: no docker → check PID 1 = systemd → ask (or -Yes) → wsl -u root install-docker.sh
                 → wsl --terminate (docker group)
 2 .env     created with two random 32-hex passwords (UTF-8 no BOM, LF); existing file kept
 3 stack    docker compose up -d (direct wsl.exe / docker call, not the Compose wrapper); fails →
-           Compose logs --tail 50 views-init, then Fail; poll views-init until Exited, must be 0
+           Compose logs --tail 50 views-init, then Fail; poll views-init until Exited, must be 0;
+           "Reload changed configuration": restart otel-collector / grafana whose config is newer
+           than the running container (`modules/server-update.md`)
 4 checks   GET localhost:3000/api/health; TCP localhost:4317 and :4318
 5 wsl      write <Startup>/cc-telemetry-keepalive.vbs (hidden wsl --exec sleep infinity), start it if not running
 6 -EnableLan  not admin → relaunch itself elevated (UAC) with -LanOnly, transcript in %TEMP%\cc-telemetry-lan.log
@@ -42,6 +48,8 @@ LAN path. `--update` and `apply_retention`: `modules/server-update.md`.
 - WSL stops a distro ~15 s after the last Windows-started process exits — hence the keepalive.
 - WSL2 on Windows 10 has no mirrored networking: the port is on `localhost` only, hence portproxy.
 - Desktop mode is untested (pending-bugs.md).
+- Auto mode used to take Docker Desktop whenever it answered and started a second stack there next
+  to the one in WSL (observed 2026-11-21, Docker Desktop 4.44): hence the project-based pick.
 
 ## setup-server.sh (Linux)
 
@@ -51,12 +59,16 @@ args       --local-only | --lan (= --enable-lan), --lan-ip <IPv4>, --grafana-por
 1 Docker   docker info ok → docker; "permission denied" → sudo docker for this run (warn: docker group)
            daemon down → fail; docker/compose missing on Ubuntu/Debian(-like) → ask → sudo install-docker.sh
            other distro → fail with the docs link
+           warn_docker_desktop: server platform "Docker Desktop" + WSL kernel + a native dockerd
+           (systemd unit / pid file / process) → warn: the stack may be in the other engine
   --update → run_update (`modules/server-update.md`), ends in exec
 2 .env     missing → created (umask 077, two random 32-hex); then only the managed keys:
            OTLP_BIND          flag (lan 0.0.0.0 / local 127.0.0.1) > kept > 0.0.0.0
            GRAFANA_BIND       flag > kept > OTLP_BIND as resolved (warns when that newly opens Grafana)
            GRAFANA_PORT       --grafana-port > kept (validated) > 3000; busy by another program → fail
            CLICKHOUSE_VERSION flag > old ARM: missing → 22.3.20.29, 23.3.22.3 → 22.3.20.29 (warn) > kept
+                              not the ARM auto-pick: check_ch_version_change → refuse_ch_version_change
+                              (before set_env, below)
            4317/4318 busy by another program → warn only
            warn: tag ≥ 22.10 on old ARM; tag < 24 = out of support
            resolve_key (missing → default written once, present → kept; then validated, bad → fail):
@@ -64,8 +76,8 @@ args       --local-only | --lan (= --enable-lan), --lan-ip <IPv4>, --grafana-por
            CLICKHOUSE_LIMITS  22.3.* → small, else none        small | none
            CLICKHOUSE_CPUS    22.3.* → 2, else 0 (no limit)    ^[0-9]+(\.[0-9]+)?$
 3 stack    LAN note when a bind is not local; compose up -d (fails → logs --tail 50 views-init, fail);
-           poll views-init until exited (90 × 2 s), must be 0; then apply_retention (`modules/server-update.md`);
-           [update re-run: reload_changed_config]
+           poll views-init until exited (90 × 2 s), must be 0; then apply_retention and
+           reload_changed_config, both on every run (`modules/server-update.md`)
 4 checks   http <bind|127.0.0.1>:<GRAFANA_PORT>/api/health; TCP 4317, 4318; docker enabled at boot (ask → enable)
 5 LAN      only if OTLP_BIND or GRAFANA_BIND is not 127.0.0.1/localhost
            lan_ports = 4317 4318 (OTLP_BIND not local) + GRAFANA_PORT (GRAFANA_BIND not local)
@@ -84,13 +96,19 @@ args       --local-only | --lan (= --enable-lan), --lan-ip <IPv4>, --grafana-por
   rules added earlier.
 - Old ARM = `uname -m` is `aarch64` and the `/proc/cpuinfo` `Features` line lacks `lrcpc`
   (no `Features` line → not old). Any other `CLICKHOUSE_VERSION` value is the user's and stays.
+- Version-change refusal across 22.3 (`check_ch_version_change`): `modules/server-update.md`.
+- Why `warn_docker_desktop`: Docker Desktop's WSL integration replaced the distro's docker socket,
+  so `docker` saw an empty engine while the stack ran in the native one; the run stopped only at
+  "port 3000 already in use" (observed 2026-11-21). Fix is the user's: integration off for the
+  distro, `sudo systemctl restart docker.socket docker`.
 - `confirm`: `--yes` answers yes; no terminal answers no. `as_root`: direct as root, else `sudo`.
   Exception: the retention question of `apply_retention` is not `confirm` — `--yes` does not answer it.
 
 ### apply_retention and --update
 
-In `modules/server-update.md`: `apply_retention` (every run, after views-init exited 0) and
-`--update` (`run_update`, `reload_changed_config`, `finish_update`, EXIT trap). Linux only.
+In `modules/server-update.md`: `apply_retention` and `reload_changed_config` (every run, after
+views-init exited 0), the ClickHouse version-change refusal (step 2) and `--update`
+(`run_update`, `finish_update`, EXIT trap). Linux only, except the reload (`.ps1` too).
 
 ## Clients
 

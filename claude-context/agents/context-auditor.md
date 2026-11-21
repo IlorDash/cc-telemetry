@@ -65,7 +65,7 @@ All under `claude-context/`.
 | `modules/materialization.md` | `clickhouse/schema.sql`, `backfill.sql`, `refresh.sql`, `refresh-loop.sh`, `init-views.sh`: tables, MV, backfill, `cc-refresh`, migration |
 | `modules/dashboard.md` | `grafana/dashboards/*.json` (seven dashboards): variables, rows, panels, links; `scripts/check-dashboard.js` |
 | `modules/setup-scripts.md` | `setup-server.ps1`, `setup-server.sh`, `client/setup-client.ps1`, `client/setup-client.sh`, `client/*.json`, `linux-server-tools/*.sh` |
-| `modules/server-update.md` | `setup-server.sh` `--update` (`run_update`, `finish_update`, `reload_changed_config`) and `apply_retention` (`apply_events_t_ttl`, `warn_old_query_logs`) |
+| `modules/server-update.md` | `setup-server.sh` `--update` (`run_update`, `finish_update`, `reload_changed_config`) and `apply_retention` (`apply_events_t_ttl`, `warn_old_system_logs`), the ClickHouse version-change refusal |
 | `modules/docs-site.md` | `mkdocs.yml`, `docs/` (structure, page → source map; not the page text), `VERSION`, `hooks/app_version.py`, `ci/`, `.github/workflows/docs.yml`, `tools/docs-demo/` |
 | `pending-bugs.md` | suspected bugs and unverified behaviour, grouped by area |
 

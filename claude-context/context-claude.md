@@ -10,7 +10,7 @@ Branch flow: feature branches → `develop` → `main`; the user guide site publ
 | --- | --- |
 | client | a PC whose Claude Code sessions are recorded; configured per user by `client/setup-client.ps1` (Windows) or `client/setup-client.sh` (Linux) |
 | server | the PC running the Docker stack; configured by `setup-server.ps1` (Windows) or `setup-server.sh` (Linux) |
-| desktop / wsl mode | Windows only: Docker Desktop vs Docker Engine inside a WSL2 distro (`setup-server.ps1 -Mode`) |
+| desktop / wsl mode | Windows only: Docker Desktop vs Docker Engine inside a WSL2 distro (`setup-server.ps1 -Mode`); `auto` with both answering picks the engine that holds this compose project, else fails asking for `-Mode` |
 | event | one OTLP log record from Claude Code, `LogAttributes['event.name']` (`api_request`, `tool_result`, ...) |
 | `project`, `host` | resource attributes the client sets via `OTEL_RESOURCE_ATTRIBUTES`; not sent by Claude Code itself |
 | project label / effective project | `project_label` = the explicit `project=` attribute; `project` = label, else inferred (`cc.session_project`: folder of the session's `cwd`, else tool-call paths), else `unknown` |
@@ -20,7 +20,7 @@ Branch flow: feature branches → `develop` → `main`; the user guide site publ
 | skill attribution | tool call → skill via `tool_result.request_id` → `api_request.skill.name` |
 | keepalive | hidden `wsl.exe --exec sleep infinity` that keeps the WSL distro (and Docker) running |
 | empty session | startup-only `session.id` from a VS Code extension process: no prompt, no request; hidden on the dashboard |
-| update | `setup-server.sh --update`: safety dump + row counts, `git pull --ff-only`, re-run, restart of collector/Grafana when their config changed, row-count check |
+| update | `setup-server.sh --update`: safety dump + row counts, `git pull --ff-only`, re-run (which, like every run of either setup script, restarts collector/Grafana when their config is newer than the container), row-count check |
 | backfill | `clickhouse/backfill.sql`: copies `otel.otel_logs` rows missing from `cc.events_t` (not a backfill from transcripts) |
 | refresh | `cc-refresh` service rebuilding `cc.session_project_t` and `cc.tips_t` every 300 s; the inferred project of a new session and the tips lag ≤ 5 min |
 | retention | `RETENTION_DAYS`-day TTL (`.env`; 180 for ClickHouse 22.3 via `setup-server.sh`, else 365) on `otel.*` and `cc.events_t` (day partitions); views-init sets it where none exists, `setup-server.sh` `apply_retention` (every run) adds or changes it; Windows: no change of an existing TTL |
@@ -94,7 +94,7 @@ Details: `modules/docs-site.md`.
 | `modules/materialization.md` | `cc.events_t` + `cc.events_mv` (`clickhouse/schema.sql`), backfill (`backfill.sql`, `init-views.sh`), `cc-refresh` (`refresh.sql`, `refresh-loop.sh`), migration rule, health checks |
 | `modules/dashboard.md` | `grafana/dashboards/*.json` (7 dashboards) + `ru/` copies: uids, shared variables, side rail (`grafana/rail/`), panels, fixed panel ids, drill-down links, RU build (`grafana/i18n/`), `check-dashboard.js` |
 | `modules/setup-scripts.md` | `setup-server.ps1`, `setup-server.sh` (steps, `.env` keys, LAN), `client/setup-client.{ps1,sh}` (incl. the session-meta hook), `client/*.json`, `linux-server-tools/*.sh`, keepalive, LAN access |
-| `modules/server-update.md` | `setup-server.sh --update` (safety dump, pull, re-run, `reload_changed_config`, row-count check) and `apply_retention` (retention TTL of `otel.*` and `cc.events_t`; runs on every `setup-server.sh` run, not only `--update`) |
+| `modules/server-update.md` | `setup-server.sh --update` (safety dump, pull, re-run, row-count check), and on every run: `apply_retention` (retention TTL of `otel.*` and `cc.events_t`, leftover system log tables), `reload_changed_config` (also `.ps1`), the ClickHouse version-change refusal across 22.3 |
 | `modules/docs-site.md` | `mkdocs.yml`, `docs/` (EN + RU pages, assets, css), `VERSION`, `hooks/app_version.py`, `ci/`, `.github/workflows/docs.yml`, `tools/docs-demo/`, the short `README.md`; page → source map |
 
 ## Key conventions (details in `guides/`, index in CLAUDE.md)

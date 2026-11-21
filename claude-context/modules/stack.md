@@ -31,12 +31,12 @@ definition changes, so an edited file is picked up as follows:
 
 | Host path | Service | Picked up by |
 | --- | --- | --- |
-| `otel-collector.yaml` | `otel-collector` | restart (`setup-server.sh --update` does it when the file changed) |
+| `otel-collector.yaml` | `otel-collector` | restart (both setup scripts do it on every run when the file is newer than the running container) |
 | `grafana/provisioning/` | `grafana` | restart (same, for any file under it) |
 | `grafana/dashboards/` | `grafana` | re-read every 30 s |
 | `clickhouse/` | `views-init` | next views-init run (`compose up -d` starts it again; or `compose run --rm views-init`) |
-| `clickhouse/` | `cc-refresh` | `refresh.sql`: next run (re-read each loop); `refresh-loop.sh`: only on a restart of `cc-refresh` — `--update` does not restart it |
-| `clickhouse/config.d/common.xml`, `clickhouse/users.d/common.xml`, `clickhouse/limits/<CLICKHOUSE_LIMITS>/{config,users}.xml` (single files; the limits pair long syntax, `create_host_path: false`: a mistyped value fails instead of creating a directory) | `clickhouse` | edited file: `compose restart clickhouse` by hand, `setup-server.sh --update` does not restart it; a changed `CLICKHOUSE_LIMITS` / `CLICKHOUSE_CPUS` changes the service definition → `compose up -d` recreates `clickhouse` |
+| `clickhouse/` | `cc-refresh` | `refresh.sql`: next run (re-read each loop); `refresh-loop.sh`: only on a restart of `cc-refresh` — the setup scripts do not restart it |
+| `clickhouse/config.d/common.xml`, `clickhouse/users.d/common.xml`, `clickhouse/limits/<CLICKHOUSE_LIMITS>/{config,users}.xml` (single files; the limits pair long syntax, `create_host_path: false`: a mistyped value fails instead of creating a directory) | `clickhouse` | edited file: `compose restart clickhouse` by hand, the setup scripts do not restart it; a changed `CLICKHOUSE_LIMITS` / `CLICKHOUSE_CPUS` changes the service definition → `compose up -d` recreates `clickhouse` |
 
 All services but `views-init` are `restart: unless-stopped`; in wsl mode they come up when the
 docker service starts with the distro; on Linux `setup-server.sh` checks (and offers to enable)
@@ -50,19 +50,25 @@ the docker service at boot.
 | `22.3.20.29` | old ARM (`aarch64` without `lrcpc`, Raspberry Pi 4): ClickHouse needs ARMv8.2 since 22.10; 23.3 and 25.8 die there with `Illegal instruction`. Any `22.3.*` tag = small server for the `setup-server.sh` defaults (`RETENTION_DAYS=180`, `CLICKHOUSE_LIMITS=small`, `CLICKHOUSE_CPUS=2`; else 365 / `none` / 0) |
 
 - The stack (collector schema, views, all dashboard queries) runs on 22.3.20.29, 23.3 and 25.8;
-  the materialized layer (`schema.sql`, `backfill.sql`, `refresh.sql`, 2026-11-18) only on
-  22.3.20.29 so far (`pending-bugs.md`). 22.3.20.29 is the tag picked for ARMv8.0 CPUs such as the Raspberry Pi 4. Verify on the
+  the materialized layer (`schema.sql`, `backfill.sql`, `refresh.sql`, 2026-11-18) on 22.3.20.29
+  and 25.8.33.6 (2026-11-21), not 23.3 (`pending-bugs.md`). 22.3.20.29 is the tag picked for ARMv8.0 CPUs such as the Raspberry Pi 4. Verify on the
   version the servers in use run (`server-state.local.md`).
-- A data volume written by a newer ClickHouse does not start with an older one: change the tag
-  via `linux-server-tools/backup.sh dump` → empty volume (`down -v`: the user's "yes" only) →
-  new tag → `restore`.
+- A data volume does not cross the 22.3 boundary: 25.x read the skip-index files of parts written
+  by 22.3 wrongly after a mutation (views-init's `MODIFY TTL`): every query using
+  `idx_log_attr_key` of `otel.otel_logs` failed with `CORRUPTED_DATA` "Bad size of marks file"
+  while `CHECK TABLE` passed — `cc.session_meta`, the session variable and panels, `cc-refresh`
+  (observed 22.3.20.29 → 25.8.33.6, 2026-11-21; the same `MODIFY TTL` on parts written by 25.8 is
+  fine). A volume written by a newer ClickHouse does not start on 22.3. So change the tag across
+  it via `linux-server-tools/backup.sh dump` → `down` + `volume rm` of the ClickHouse volume (the
+  user's "yes" only) → new tag → `restore`; `setup-server.sh` refuses otherwise
+  (`modules/server-update.md`). Within one side the tag changes in place.
 
 ## ClickHouse config: always on (`common.xml`) and limits (`limits/small/`)
 
 | File | Setting | Value |
 | --- | --- | --- |
 | `config.d/common.xml` | `logger`: `level` / `size` / `count` (merged into the image's `<logger>`, log paths kept) | `warning` / 10M / 2 (image default `trace` / 1000M / 10) |
-| `config.d/common.xml` | `asynchronous_metric_log`, `metric_log`, `query_thread_log`, `part_log`, `session_log`, `trace_log`, `text_log`, `query_log`, `query_views_log` | `remove="1"` (not written) |
+| `config.d/common.xml` | `asynchronous_metric_log`, `metric_log`, `query_thread_log`, `part_log`, `session_log`, `trace_log`, `text_log`, `query_log`, `query_views_log`; for 25.x also `error_log`, `query_metric_log`, `processors_profile_log`, `asynchronous_insert_log`, `iceberg_metadata_log`, `opentelemetry_span_log`, `crash_log`, `backup_log`, `s3queue_log`, `blob_storage_log` (an unknown name is ignored by 22.3) | `remove="1"` (not written); one line per log — `setup-server.sh` reads this list |
 | `users.d/common.xml` | `log_queries`, `log_query_views` | 0 |
 | `limits/small/config.xml` | `max_server_memory_usage` / `mark_cache_size` / `uncompressed_cache_size` | 3 GB / 256 MiB / 0 |
 | `limits/small/config.xml` | `max_concurrent_queries` | 8 |
@@ -83,8 +89,12 @@ only the `common.xml` rows apply; `cpus` 0.
   preprocessed config shows it merged with the log paths kept, and `clickhouse-server.log` stopped
   growing after the restart (observed on 22.3.20.29, 2026-11-19). Errors also go to
   `clickhouse-server.err.log`.
-- Leftover `system.query_log*` / `system.query_views_log*` tables of a server that logged queries
-  before are not dropped by anything: `setup-server.sh` prints the `DROP` command (`modules/server-update.md`).
+- Before the 25.x lines, 25.8 still wrote `processors_profile_log` (a row set per query) and
+  `error_log` (observed 25.8.33.6, 2026-11-21). Tables of an install on the image defaults stay
+  after the logs are removed (~1 week of 22.3: `query_thread_log` 887 MiB, `trace_log` 406 MiB,
+  `asynchronous_metric_log` 309 MiB, observed 2026-11-21); nothing drops them: `setup-server.sh`
+  `warn_old_system_logs` lists every leftover (incl. `_N` copies) with the `DROP` command
+  (`modules/server-update.md`); Windows: the query on the maintenance page.
 - With `small`, a dashboard query needing more than 1.5 GB fails instead of slowing the server
   down; the backfill runs per month of data for the same reason (on every server).
 

@@ -10,8 +10,9 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
 - **M** `Enable-Lan` deletes every `portproxy` entry on port 4317 or 4318 whose listen address is
   not the current LAN IP — also a forward the user added on purpose for a second adapter. Only one
   LAN address can be served.
-- **M?** Desktop mode never ran (no Docker Desktop on the test PC): `Test-DesktopDocker`, `Compose`
-  without `wsl`, the summary output.
+- **M?** Desktop mode never ran to the end: one cut-off auto-mode run (2026-11-21, Docker Desktop
+  4.44) got as far as `compose up -d` creating the containers; the views-init wait, the reload
+  step, the checks and the summary output in desktop mode are unverified.
 - **L** `Get-LanIp` takes the up adapter with a default gateway and the lowest interface metric; a
   full-tunnel VPN (default gateway on the VPN adapter) can win and get the firewall/portproxy.
 - **L** Keepalive detection matches any `wsl.exe` running `sleep infinity`, whatever the distro: with
@@ -31,14 +32,12 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
 - **M?** Unverified on a physical Linux host: the Docker install path (`install-docker.sh` on
   Ubuntu/Debian and derivatives) and the ufw / firewalld rule paths.
 
-- **M?** `reload_changed_config` restarts only `otel-collector` and `grafana`: a pulled change to
+- **M?** `reload_changed_config` restarts only `otel-collector` and `grafana`: a changed
   `clickhouse/config.d/common.xml`, `clickhouse/users.d/common.xml` or
   `clickhouse/limits/<CLICKHOUSE_LIMITS>/{config,users}.xml` leaves
   `clickhouse` running on the old values (its service definition is unchanged, so `compose up -d`
   does not recreate it). Both are single-file bind mounts: git replaces the file, the running
   container likely keeps the old inode until a restart (unverified).
-- **?** `apply_retention` was never exercised by a real `--update` run (dump → `ttl-recent.tsv` →
-  TTL change → `finish_update` with the exact recent-row check).
 
 ## setup-client.ps1
 
@@ -58,7 +57,8 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
   unconfirmed (2026-11-14: no events for ~50 min after a restart, cause unknown).
   A plain `setup-server.sh --update` (`compose up -d`) recreates only changed containers, so the
   collector restarts only when its service definition (image tag, environment, ports) changes,
-  or when the pulled commits changed `otel-collector.yaml` (`reload_changed_config`).
+  or when `otel-collector.yaml` is newer than the running container (`reload_changed_config`,
+  every run of either setup script; a file only touched restarts it too).
 - **?** On a fresh install (no exporter `ttl` any more) the `otel.*` TTL comes only from
   views-init (`init-views.sh`: ≤ 60 s wait for 5 `otel_metrics_*` tables, then `ALTER ... MODIFY TTL`
   where none exists). Not run on a fresh volume, and not on 25.8 at all.
@@ -74,10 +74,6 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
   was not measured); in 25.8 it is a server-level setting, so in a profile it is likely ignored and
   the 2-thread merge limit does not apply on a 25.8 server with `CLICKHOUSE_LIMITS=small` (set by
   hand: `setup-server.sh` picks `small` only for 22.3). Unverified on 25.8.
-- **L** Stale `system.query_log*` / `system.query_views_log*` tables (e.g. `query_log_0`, left on 22.3 by
-  the old `query_log` TTL, ~78k rows observed 2026-11-17) stay on servers that had them, as the log is
-  now off. `setup-server.sh` only warns with the `DROP TABLE ... SYNC` command; dropping needs the
-  user's "yes".
 
 ## AI setup (`claude-context/settings.json`)
 
@@ -98,7 +94,8 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
   project in an unusual layout (`/data/x/y/`) is named after its first folder (`data`).
 - **L** `cc.tips` `repeated-read` puts `cc.tool_calls.path` in the title: a file outside the
   project keeps its absolute path there.
-- **?** `cc.tips` rules (now in `refresh.sql`) verified only on ClickHouse 22.3; 25.8 untested.
+- **?** `cc.tips` rules (now in `refresh.sql`) ran on 25.8.33.6 (`refresh ok`, 15 rows, 2026-11-21)
+  but were not compared rule by rule with the 22.3 result.
 - **?** `cc.tips` rules `cache`, `agent-outlier`, `slow-ttft` have not fired on real data yet
   (2026-11-19, still none 2026-11-21): SQL and thresholds unconfirmed.
 - **?** `api_error` is in the live data now (12 events, all `status_code` 429, Claude Code
@@ -108,10 +105,11 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
 
 ## materialization (`clickhouse/schema.sql`, `backfill.sql`, `refresh.sql`, `cc-refresh`)
 
-- **?** Run only on ClickHouse 22.3.20.29 (2026-11-18): `schema.sql`, the backfill, `refresh.sql`
-  (`EXCHANGE TABLES`) and the new views never ran on 23.3 or 25.8.
+- **?** Run on ClickHouse 22.3.20.29 (2026-11-18) and 25.8.33.6 (2026-11-21): `schema.sql`, the
+  backfill, `refresh.sql` (`EXCHANGE TABLES`) and the new views never ran on 23.3.
 - **?** The day-partitioned `cc.events_t` (`PARTITION BY toDate(ts)`, TTL, `ttl_only_drop_parts`)
-  is proven only on 22.3.20.29; ClickHouse 25.8 untested.
+  is proven only on 22.3.20.29; on 25.8.33.6 it was created, filled and got its TTL (2026-11-21),
+  but no partition has been dropped by the TTL there yet.
 - **?** The `throwIf` abort path of `refresh.sql` (duplicate `session_id` → no swap, old table
   kept, next run drops the leftover `_new`) was never triggered.
 - **?** A very large first backfill (upgrade over a big history) was not timed against the setup
