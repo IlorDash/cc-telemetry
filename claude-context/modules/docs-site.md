@@ -86,14 +86,15 @@ quick start (commands, requirements, ports) changes.
 | --- | --- |
 | `generate.py` | made-up `otel.otel_logs` rows (JSONEachRow, stdout), fixed seed; `--now`, `--days 30`; stdlib only |
 | `otel_logs.sql` | DDL of `otel.otel_logs` (the collector creates it on the real server) |
-| `demo.sh up\|down` | containers `cc-demo-clickhouse`, `cc-demo-grafana`, network `cc-demo-net`; ClickHouse in tmpfs, not published; Grafana on `127.0.0.1:13000`; loads `clickhouse/views.sql`, mounts the whole `grafana/dashboards/` read-only (EN + `ru/` copies), home `overview.json`; `down` removes exactly those |
+| `demo.sh up\|down` | containers `cc-demo-clickhouse`, `cc-demo-grafana`, network `cc-demo-net`; ClickHouse in tmpfs, not published; Grafana on `127.0.0.1:13000`; `up` loads `otel_logs.sql` → `clickhouse/schema.sql` (`__RETENTION_DAYS__` = 3650) → the generated rows (MV `cc.events_mv` fills `cc.events_t` on insert, no `backfill.sql`) → `clickhouse/views.sql` → `clickhouse/refresh.sql` once (stdout discarded); mounts the whole `grafana/dashboards/` read-only (EN + `ru/` copies), home `overview.json`; `down` removes exactly those |
 | `check.js` | runs `check-dashboard.js` against the demo (temp copy with the fixed demo password) |
 | `screenshots.js` | Playwright function (needs a runner passing `page`): 1920 px, dark theme; one run, two passes: EN uids → `docs/assets/*.png`, then `<uid>-ru` → `docs/assets/ru/*.png` (same names and ranges); `session-selected` follows the first session link by title (`Open session` / `Открыть сессию`) |
 
 - Run from the repo root: `wsl -d Ubuntu -- bash tools/docs-demo/demo.sh up`.
 - The demo passwords in `demo.sh` are fixed throwaway values; it never touches the live stack.
-- `demo.sh` hardcodes `clickhouse-server:25.8` and `grafana:12.1.0` — keep in step with
-  `docker-compose.yml`.
+- `demo.sh` images: `clickhouse/clickhouse-server:${CH_DEMO_VERSION:-25.8}` (on a Raspberry Pi 4:
+  `CH_DEMO_VERSION=22.3.20.29`) and hardcoded `grafana/grafana:12.1.0` — keep the default tags in
+  step with `docker-compose.yml`.
 
 ## Local preview
 

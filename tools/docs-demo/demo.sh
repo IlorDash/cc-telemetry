@@ -19,7 +19,7 @@ GF=cc-demo-grafana
 CH_PASS=demo-clickhouse
 GF_PASS=demo-grafana
 GF_PORT=13000
-CH_IMAGE=clickhouse/clickhouse-server:25.8   # same default tag as docker-compose.yml
+CH_IMAGE=clickhouse/clickhouse-server:${CH_DEMO_VERSION:-25.8}   # default = tag of docker-compose.yml; override on old ARM (e.g. 22.3.20.29)
 GF_IMAGE=grafana/grafana:12.1.0
 PROV=/tmp/cc-demo-provisioning
 DATA=/tmp/cc-demo-data
@@ -49,11 +49,18 @@ up() {
   done
 
   chq --multiquery < "$HERE/otel_logs.sql"
+  # The cc layer in the order of clickhouse/init-views.sh. schema.sql comes BEFORE the rows are inserted:
+  # the materialized view cc.events_mv then fills cc.events_t on insert, so no backfill.sql is needed
+  # (the demo data is static). Retention 3650 days keeps every generated row. refresh.sql reads the
+  # views, so it runs after views.sql; its stdout is only the "0" of a safety check (errors go to stderr).
+  sed "s/__RETENTION_DAYS__/3650/g" "$REPO/clickhouse/schema.sql" | chq --multiquery
   mkdir -p "$DATA"
   python3 "$HERE/generate.py" > "$DATA/logs.jsonl"
   chq --query "INSERT INTO otel.otel_logs FORMAT JSONEachRow" < "$DATA/logs.jsonl"
   chq --multiquery < "$REPO/clickhouse/views.sql"
-  echo "rows loaded: $(chq -q 'SELECT count() FROM otel.otel_logs')"
+  chq --multiquery < "$REPO/clickhouse/refresh.sql" >/dev/null
+  echo "rows loaded: $(chq -q 'SELECT count() FROM otel.otel_logs')," \
+       "cc.events_t: $(chq -q 'SELECT count() FROM cc.events_t')"
 
   # provisioning copy: the repo's dashboards provider, a datasource pointed at the demo ClickHouse
   mkdir -p "$PROV/dashboards" "$PROV/datasources"

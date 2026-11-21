@@ -133,10 +133,3 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
 - **?** A real `setup-server.sh --update` across the `cc-usage.json` → `overview.json` rename is
   untested: the home path changes in the `grafana` env (recreated by `compose up -d`) while the
   provider picks up the new file only within 30 s — possibly a short window without the dashboard.
-
-## docs demo (`tools/docs-demo/`)
-
-- **M?** `demo.sh up` loads only `otel_logs.sql`, the generated rows and `clickhouse/views.sql`; since
-  the merge the views read `cc.events_t`, `cc.session_project_t` and `cc.tips_t`, which only
-  `schema.sql` (+ `backfill.sql`, `refresh.sql`) create — so `views.sql` likely fails on the demo and
-  no screenshots or `check.js` run is possible. Not run on this branch (found by reading, 2026-11-21).

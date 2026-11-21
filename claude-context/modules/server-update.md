@@ -20,7 +20,6 @@ has neither. The rest of the script (steps, `.env`, LAN): `modules/setup-scripts
 ```
 RETENTION_DAYS = n from .env (step 2, validated ^[1-9][0-9]*$); WINDOW = n - 1
 update re-run, no ttl-recent.tsv yet (update started from an older script) → save_retention_baseline, before any TTL
-CHECK_WINDOW = check_window_days = min(n, numeric TTLs the tables have now) - 1   (before any TTL change)
 ttl_state per otel.otel_logs, otel.otel_metrics_*, cc.events_t (engine_full):
   ' TTL <col> + toIntervalDay(<d>)' → d;  no ' TTL ' → none;  anything else → other
   d = n → skip;  other → warn "TTL this script did not write", left as it is
@@ -38,8 +37,10 @@ warn_old_query_logs
 - Re-run after success = no-op: every part reads its state from `system.tables`.
 - A changed `RETENTION_DAYS` is applied here on the next run: longer at once, shorter under the
   old-rows question above. views-init only sets a TTL where there is none, never changes one.
-- `CHECK_WINDOW`: a shorter TTL still in place keeps deleting until changed, so the `--update`
-  data check compares only rows younger than the shortest of the new and the current TTLs.
+- Check window: `check_window_days` = min(n, numeric TTLs the tables have now) - 1, called only by
+  `save_retention_baseline` (before any TTL change) and stored as the `#cutoff` of `ttl-recent.tsv`;
+  `finish_update` reads that cutoff. A shorter TTL still in place keeps deleting until changed, so
+  the `--update` data check compares only rows younger than the shortest of the new and current TTLs.
 - `warn_old_query_logs`: `log_queries` = 1 → warn to `compose restart clickhouse` and re-run;
   else per `system.query_log*` / `system.query_views_log*` table prints rows, size and
   `echo 'DROP TABLE system.<name> SYNC' | [sudo ]bash linux-server-tools/ch.sh` — never drops.
