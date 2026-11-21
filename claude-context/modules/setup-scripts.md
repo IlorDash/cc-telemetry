@@ -7,7 +7,7 @@ LAN path. `--update` and `apply_retention`: `modules/server-update.md`.
 
 | Path | Role |
 | --- | --- |
-| `setup-server.ps1` | Windows server setup (Docker Desktop or WSL2), re-runnable; doubles as a health check |
+| `setup-server.ps1` | Windows server setup (Docker Engine inside WSL2 only), re-runnable; doubles as a health check |
 | `setup-server.sh` | Linux server setup, re-runnable; `--update` updates a running server |
 | `client/setup-client.ps1` | per-user client setup on Windows, re-runnable; embeds and installs the session-meta hook `session-meta.ps1` |
 | `client/setup-client.sh` | per-user client setup on Linux (python3, or jq ≥ 1.6), re-runnable; embeds and installs `session-meta.sh` |
@@ -19,37 +19,40 @@ LAN path. `--update` and `apply_retention`: `modules/server-update.md`.
 ## setup-server.ps1 (Windows)
 
 ```
-1 Docker   auto: docker on PATH answers → desktop; else WSL distro exists → wsl
-                both answer (Docker Desktop + docker in the distro) → Select-EngineByProject over
-                Get-ProjectState of each (label com.docker.compose.project=<folder lower-case>):
-                running containers > any containers > volumes, the engine that alone has it wins;
-                both / neither → Fail naming -Mode wsl / -Mode desktop
-           wsl: no docker → check PID 1 = systemd → ask (or -Yes) → wsl -u root install-docker.sh
-                → wsl --terminate (docker group)
+0 -Mode   desktop → Fail (not supported); not auto|wsl → Fail; then $Mode = wsl (before -LanOnly)
+1 Docker   distro missing → Fail (-Distro, wsl --install -d Ubuntu)
+           docker in the distro answers → Assert-NotDockerDesktop
+           no docker → check PID 1 = systemd → ask (or -Yes) → wsl -u root install-docker.sh
+                → wsl --terminate (docker group) → must answer → Assert-NotDockerDesktop
+           Assert-NotDockerDesktop: `docker version --format '{{.Server.Platform.Name}}'` in the
+                distro contains "Docker Desktop" → Fail: turn the WSL integration off for the
+                distro, `sudo systemctl restart docker.socket docker`, re-run (nothing written yet)
 2 .env     created with two random 32-hex passwords (UTF-8 no BOM, LF); existing file kept
-3 stack    docker compose up -d (direct wsl.exe / docker call, not the Compose wrapper); fails →
+3 stack    docker compose up -d (direct wsl.exe call, not the Compose wrapper); fails →
            Compose logs --tail 50 views-init, then Fail; poll views-init until Exited, must be 0;
            "Reload changed configuration": restart otel-collector / grafana whose config is newer
            than the running container (`modules/server-update.md`)
 4 checks   GET localhost:3000/api/health; TCP localhost:4317 and :4318
-5 wsl      write <Startup>/cc-telemetry-keepalive.vbs (hidden wsl --exec sleep infinity), start it if not running
-6 -EnableLan  not admin → relaunch itself elevated (UAC) with -LanOnly, transcript in %TEMP%\cc-telemetry-lan.log
+5 keepalive write <Startup>/cc-telemetry-keepalive.vbs (hidden wsl --exec sleep infinity), start it if not running
+6 -EnableLan  not admin → relaunch itself elevated (UAC) with -LanOnly -Mode wsl, transcript in %TEMP%\cc-telemetry-lan.log
            per port in $otlpPorts (4317, 4318):
              firewall rule "OTLP <port> (Claude Code telemetry)" Private (a re-run adds a missing one)
-             wsl: portproxy <LAN_IP>:<port> → 127.0.0.1:<port>, deletes other *:<port> forwards
+             portproxy <LAN_IP>:<port> → 127.0.0.1:<port>, deletes other *:<port> forwards
              TCP test <LAN_IP>:<port>
            warn if the LAN profile is Public
 ```
-- Params: `-Mode auto|desktop|wsl`, `-Distro` (`Ubuntu`), `-EnableLan`, `-LanIp`, `-Yes`, internal `-LanOnly`.
+- Params: `-Mode auto|wsl` (plain string, checked by the script), `-Distro` (`Ubuntu`), `-EnableLan`, `-LanIp`, `-Yes`, internal `-LanOnly`.
 - Writes no bind/port keys: compose defaults apply (4317, 4318 on `0.0.0.0`, Grafana `127.0.0.1:3000`);
   the checks assume Grafana on `localhost:3000`.
 - LAN IP = IPv4 of the up adapter with a default gateway and the lowest interface metric.
-- Compose in wsl mode: `wsl -d <distro> --cd <repo> -- docker compose …`.
+- Compose: always `wsl -d <distro> --cd <repo> -- docker compose …`.
 - WSL stops a distro ~15 s after the last Windows-started process exits — hence the keepalive.
 - WSL2 on Windows 10 has no mirrored networking: the port is on `localhost` only, hence portproxy.
-- Desktop mode is untested (pending-bugs.md).
-- Auto mode used to take Docker Desktop whenever it answered and started a second stack there next
-  to the one in WSL (observed 2026-11-21, Docker Desktop 4.44): hence the project-based pick.
+- Why Docker Desktop is not supported: its WSL integration (on for the default distro) makes
+  `docker` in the distro talk to Docker Desktop itself; the removed engine choice then saw two
+  engines holding one stack, or neither on a first install, and stopped (observed 2026-11-21,
+  Docker Desktop 4.44). `Assert-NotDockerDesktop` uses the same test as `warn_docker_desktop` (Linux).
+- Do not re-add a desktop branch without solving that detection (known limitation, release 1.0.0).
 
 ## setup-server.sh (Linux)
 
@@ -159,7 +162,7 @@ run        stdin transcript_path → projects root = its grandparent; silent, al
 ## Client reachability
 
 ```
-Windows server: client ──TCP 4317/4318──► LAN IP ── firewall (Private profile) ── [wsl: portproxy] ── 127.0.0.1:<port> ── wslrelay ── collector
+Windows server: client ──TCP 4317/4318──► LAN IP ── firewall (Private profile) ── portproxy ── 127.0.0.1:<port> ── wslrelay ── collector
 Linux server:   client ──TCP 4317/4318──► LAN IP ── Docker publish on OTLP_BIND (ufw/firewalld bypassed) ── collector
 ```
 - A server set up before 4318 was published: Claude Code telemetry still arrives, session meta does

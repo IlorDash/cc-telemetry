@@ -58,10 +58,8 @@ feature branch ──PR──► develop ──PR──► main ──push──
   newest first; also a row in `index`'s "Where to start". A version still in preparation carries an
   "in preparation" banner tagged `<!-- unreleased` instead of a date — allowed on `develop`,
   blocks the PR into `main` and the `main` build. Set the date and remove both before the merge.
-- Now: only `release-1-0-0` (`.md` + `.ru.md`), unreleased: no date line; `!!! info "In
-  preparation"` / `"В подготовке"`, then the `<!-- unreleased: ... -->` marker below it. Fine on
-  `develop`; the marker check exits 1, so the PR into `main` is blocked until the date line is
-  back and banner + marker are removed.
+- Now: only `release-1-0-0` (`.md` + `.ru.md`), dated (released 21 November 2026), no banner or
+  marker; sections incl. "Known limitations" (Docker Desktop not supported on a Windows server).
 
 ## Page → source of truth
 

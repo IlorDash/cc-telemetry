@@ -10,7 +10,7 @@ Branch flow: feature branches → `develop` → `main`; the user guide site publ
 | --- | --- |
 | client | a PC whose Claude Code sessions are recorded; configured per user by `client/setup-client.ps1` (Windows) or `client/setup-client.sh` (Linux) |
 | server | the PC running the Docker stack; configured by `setup-server.ps1` (Windows) or `setup-server.sh` (Linux) |
-| desktop / wsl mode | Windows only: Docker Desktop vs Docker Engine inside a WSL2 distro (`setup-server.ps1 -Mode`); `auto` with both answering picks the engine that holds this compose project, else fails asking for `-Mode` |
+| wsl mode | Windows server: Docker Engine inside a WSL2 distro, the only engine `setup-server.ps1` supports (`-Mode auto` = `wsl`); Docker Desktop is a known issue: `-Mode desktop` is refused, its WSL integration answering in the distro stops the run |
 | event | one OTLP log record from Claude Code, `LogAttributes['event.name']` (`api_request`, `tool_result`, ...) |
 | `project`, `host` | resource attributes the client sets via `OTEL_RESOURCE_ATTRIBUTES`; not sent by Claude Code itself |
 | project label / effective project | `project_label` = the explicit `project=` attribute; `project` = label, else inferred (`cc.session_project`: folder of the session's `cwd`, else tool-call paths), else `unknown` |
@@ -36,7 +36,7 @@ Branch flow: feature branches → `develop` → `main`; the user guide site publ
 
 ```
 Claude Code (client, env from ~/.claude/settings.json + <project>/.claude/settings.local.json)
-   │ OTLP gRPC :4317 (no auth; LAN only)            [wsl mode: portproxy <LAN_IP>:<port> → 127.0.0.1:<port>
+   │ OTLP gRPC :4317 (no auth; LAN only)            [Windows: portproxy <LAN_IP>:<port> → 127.0.0.1:<port>
    │                                                 for 4317 and 4318]
    │ + async UserPromptSubmit hook <settings dir>/cc-telemetry/session-meta.{ps1,sh}:
    │   OTLP/JSON POST :4318/v1/logs, service.name cc-session-meta (title, branch, cwd)

@@ -95,8 +95,8 @@ client settings env ──OTLP :4317──► otel-collector (drop_response) ─
           cc.tool_calls, cc.sessions, cc.prompts; cc.tips = cc.tips_t
    Grafana: datasource uid clickhouse, 7 dashboards, home = uid cc-usage (overview.json)
             (file-provisioned from grafana/dashboards/, re-read every 30 s)
-setup-server.ps1: Docker (desktop | wsl + install-docker.sh) → .env → compose up → views-init → checks
-                  → keepalive (wsl) → -EnableLan (UAC: firewall + portproxy)
+setup-server.ps1: Docker in WSL (+ install-docker.sh, Assert-NotDockerDesktop) → .env → compose up
+                  → views-init → checks → keepalive → -EnableLan (UAC: firewall + portproxy)
 setup-server.sh:  Docker Engine (install if missing) → .env → compose up → views-init → checks
                   (--lan / --local-only, --update = git pull + re-run + config reload)
 client/setup-client.ps1 | .sh: merge env into user settings.json + project settings.local.json, per user

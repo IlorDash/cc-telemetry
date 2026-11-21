@@ -7,7 +7,7 @@
 
 cc-telemetry is a local usage-statistics stack for Claude Code: clients export OpenTelemetry
 events (OTLP gRPC :4317) to a server PC running OTel Collector → ClickHouse → Grafana in Docker
-(Windows: Docker Desktop or Docker Engine inside WSL2; Linux: native Docker Engine). Setup scripts
+(Windows: Docker Engine inside WSL2; Linux: native Docker Engine). Setup scripts
 for each OS: server `setup-server.ps1` / `setup-server.sh` (also `--update` on Linux), client
 `client/setup-client.ps1` / `client/setup-client.sh`; server and client OS can be mixed.
 The public user guide is the bilingual MkDocs site (`docs/<page>.md` + `.ru.md` twin, published to

@@ -144,7 +144,7 @@ metrics: otlp → memory_limiter → batch → clickhouse
 | Port | Where | Who reaches it |
 | --- | --- | --- |
 | Grafana (`GRAFANA_PORT`, 3000) | `GRAFANA_BIND` (unset → `127.0.0.1`); `setup-server.sh` writes `0.0.0.0` unless `--local-only` | Windows: the server PC only; Linux: the LAN by default |
-| 4317, 4318 | both follow `OTLP_BIND` (unset → `0.0.0.0`). wsl mode: Windows `localhost`, LAN via one firewall rule + portproxy per port; Linux: `setup-server.sh` writes `0.0.0.0` or `127.0.0.1` (`--local-only`) | clients: 4317 Claude Code (gRPC), 4318 the session-meta hook (OTLP/JSON `POST /v1/logs`) |
+| 4317, 4318 | both follow `OTLP_BIND` (unset → `0.0.0.0`). Windows (wsl mode): `localhost`, LAN via one firewall rule + portproxy per port; Linux: `setup-server.sh` writes `0.0.0.0` or `127.0.0.1` (`--local-only`) | clients: 4317 Claude Code (gRPC), 4318 the session-meta hook (OTLP/JSON `POST /v1/logs`) |
 | 9000/8123 | container network only | collector, grafana, views-init, cc-refresh |
 
 On Linux Docker's own iptables rules bypass ufw/firewalld: the bind address, not a firewall rule,

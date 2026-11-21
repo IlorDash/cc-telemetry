@@ -10,9 +10,9 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
 - **M** `Enable-Lan` deletes every `portproxy` entry on port 4317 or 4318 whose listen address is
   not the current LAN IP — also a forward the user added on purpose for a second adapter. Only one
   LAN address can be served.
-- **M?** Desktop mode never ran to the end: one cut-off auto-mode run (2026-11-21, Docker Desktop
-  4.44) got as far as `compose up -d` creating the containers; the views-init wait, the reload
-  step, the checks and the summary output in desktop mode are unverified.
+- **?** `Assert-NotDockerDesktop` is verified by code only: the stop with the integration on, the
+  second check after the `-Yes` install, and `-EnableLan` (now always portproxy, relaunch with
+  `-Mode wsl`) after the change never ran on a Windows PC.
 - **L** `Get-LanIp` takes the up adapter with a default gateway and the lowest interface metric; a
   full-tunnel VPN (default gateway on the VPN adapter) can win and get the firewall/portproxy.
 - **L** Keepalive detection matches any `wsl.exe` running `sleep infinity`, whatever the distro: with
@@ -21,8 +21,8 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
 
 - **?** The new `compose up -d` failure path (print views-init log, then `Fail`) never ran: the
   `.ps1` was not executed after the change (Linux test machine only).
-- **L** Step 3 calls `wsl.exe ... docker compose up -d` / `docker compose up -d` directly,
-  duplicating the `Compose` wrapper's mode switch: a change to the wrapper must be repeated there.
+- **L** Step 3 calls `wsl.exe ... docker compose up -d` directly, duplicating the `Compose`
+  wrapper's command line: a change to the wrapper must be repeated there.
 
 - **L** The final summary prints `.\setup-client.ps1` for other PCs, while in the repo the file is
   `client\setup-client.ps1` (right only for a copied file).
