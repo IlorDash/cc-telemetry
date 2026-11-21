@@ -10,7 +10,7 @@
 #     A value already in .env is kept.
 #  3. Starts the stack and waits until the cc.* views are created.
 #     After the views are ready: the retention TTL on otel.* and cc.events_t (a no-op when already in place;
-#     a changed RETENTION_DAYS is applied to the existing tables) and a hint about leftover system.query_log tables.
+#     a changed RETENTION_DAYS is applied to the existing tables) and a hint about leftover system log tables.
 #  4. Checks Grafana and the OTLP ports (:4317, :4318) on this PC; checks that Docker starts at boot.
 #  5. LAN (the default, Linux servers are usually headless): 4317, 4318 and Grafana are published on
 #     all interfaces and opened in ufw / firewalld; prints the server address and the client commands.
@@ -579,22 +579,38 @@ apply_events_t_ttl() {
   fi
 }
 
-# Old system.query_log tables are not written any more once ClickHouse runs with the current config. Deleting
-# data needs the user's yes: only report them, with the command.
-warn_old_query_logs() {
-  local lq rows name nrows size pre=''
+# The system logs that clickhouse/config.d/common.xml switches off (its `<name remove="1"/>` lines, the one list)
+# are not written any more once ClickHouse runs with that config; the tables of an older install stay (a
+# rotated copy is name_0, name_1, ...). Deleting data needs the user's yes: only report them, with the command.
+# "No longer written" = no row newer than the server start. A table that is still written: the running
+# ClickHouse has not loaded the config yet.
+warn_old_system_logs() {
+  local logs rx rows name nrows size bytes total=0 n=0 pre='' still tcol
   [ "${D[0]}" != sudo ] || pre='sudo '
-  lq="$(chq "SELECT value FROM system.settings WHERE name = 'log_queries'")" || return 0
-  rows="$(chq "SELECT name, total_rows, formatReadableSize(total_bytes) FROM system.tables WHERE database = 'system' AND (startsWith(name, 'query_log') OR startsWith(name, 'query_views_log')) ORDER BY name")" || return 0
+  logs="$(sed -n 's/^[[:space:]]*<\([a-z_][a-z_]*\)[[:space:]]*remove="1"[[:space:]]*\/>.*/\1/p' "$ROOT/clickhouse/config.d/common.xml" | paste -sd'|' -)" || return 0
+  [ -n "$logs" ] || return 0
+  rx="^($logs)(_[0-9]+)?\$"
+  rows="$(chq "SELECT name, total_rows, formatReadableSize(total_bytes), total_bytes FROM system.tables WHERE database = 'system' AND match(name, '$rx') ORDER BY name")" || return 0
   [ -n "$rows" ] || return 0
-  if [ "$lq" = 1 ]; then
-    warn 'log_queries is 1: the running ClickHouse still writes system.query_log (it has not loaded clickhouse/config.d and users.d yet, or you enabled it on purpose). To switch it off: docker compose restart clickhouse, then re-run this script.'
-    return 0
-  fi
-  while IFS=$'\t' read -r name nrows size; do
+  while IFS=$'\t' read -r name nrows size bytes; do
+    [ -n "$name" ] || continue
+    # The time column differs per log (opentelemetry_span_log has only finish_time_us). No usable column or a
+    # failed query: the test is skipped for this table, which is still listed below.
+    tcol="$(chq "SELECT multiIf(has(groupArray(name), 'event_time'), 'event_time', has(groupArray(name), 'event_time_microseconds'), 'toDateTime(event_time_microseconds)', has(groupArray(name), 'finish_time_us'), 'toDateTime(intDiv(finish_time_us, 1000000))', '') FROM system.columns WHERE database = 'system' AND table = '$name'")" || tcol=''
+    [ -n "$tcol" ] || continue
+    still="$(chq "SELECT max($tcol) >= now() - toIntervalSecond(uptime()) FROM system.\`$name\`")" || still=''
+    if [ "$still" = 1 ]; then
+      warn "system.$name is still written: the running ClickHouse has not loaded clickhouse/config.d yet. Restart it: docker compose restart clickhouse, then re-run this script."
+      return 0
+    fi
+  done <<<"$rows"
+  while IFS=$'\t' read -r name nrows size bytes; do
     [ -n "$name" ] || continue
     warn "system.$name ($nrows rows, $size) is no longer written; delete it to free the disk space: echo 'DROP TABLE system.$name SYNC' | ${pre}bash linux-server-tools/ch.sh"
+    [[ "$bytes" =~ ^[0-9]+$ ]] && total=$((total + bytes))
+    n=$((n + 1))
   done <<<"$rows"
+  [ "$n" -le 1 ] || warn "together $n old system log tables take $(chq "SELECT formatReadableSize($total)" || echo "$total bytes")"
 }
 
 apply_retention() {
@@ -638,7 +654,7 @@ apply_retention() {
         [Yy]*) ;;
         *)
           warn "retention skipped: $old rows are older than $RETENTION_DAYS days and the TTL would delete them (--yes does not agree to that, and a terminal is needed to ask). Run: bash setup-server.sh --update (dumps first, then applies the retention), or dump (bash linux-server-tools/backup.sh dump) and re-run in a terminal."
-          warn_old_query_logs
+          warn_old_system_logs
           return 0 ;;
       esac
     fi
@@ -651,7 +667,7 @@ apply_retention() {
     ok "$tbl: TTL $RETENTION_DAYS days set"
   done
   case " ${todo[*]-} " in *" otel."*) ;; *) ok "otel.* tables: nothing to change in the TTL ($RETENTION_DAYS days)" ;; esac
-  warn_old_query_logs
+  warn_old_system_logs
 }
 
 if [ "$UPDATE" -eq 1 ]; then run_update; fi

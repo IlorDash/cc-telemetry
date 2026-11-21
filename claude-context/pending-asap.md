@@ -31,23 +31,7 @@ hint; `?` = cause not confirmed.
     idx_log_attr_key` (and the other skip indexes), then `docker compose restart cc-refresh`.
     On the dev PC it was repaired by dump → new volume → restore (see "Test log" below).
 
-- **M** **ClickHouse 25.8 still writes two system logs.** `clickhouse/config.d/common.xml` removes
-  nine logs but not `processors_profile_log` (one row set per query: grew 886 → 53 349 rows during
-  one `check-dashboard.js` run) and `error_log`. The PR description says no system logs are
-  written on every server. Fix: add `<processors_profile_log remove="1"/>` and
-  `<error_log remove="1"/>` to `common.xml` (an unknown element is ignored by 22.3); check the
-  list against `system.tables` of a fresh 25.8 after an hour (also `latency_log`,
-  `query_metric_log`, `blob_storage_log`, `backup_log` if they appear).
-
 ## Small things and hints
-
-- **M** **Leftover system logs are much bigger than `query_log`.** `warn_old_query_logs` reports
-  only `system.query_log*` / `query_views_log*` (98 MiB here). The tables of the other removed
-  logs stay too and are not mentioned: `query_thread_log` 887 MiB, `trace_log` 406 MiB,
-  `asynchronous_metric_log` 309 MiB, `metric_log` 63 MiB, `session_log` 4.6 MiB, `part_log`
-  0.6 MiB (dev PC, ~1 week of 22.3 with the image defaults; the Pi likely similar). Fix: list every
-  `system.*_log*` table of a log that `common.xml` removes, with its size and the `DROP` command;
-  same in the guide (maintenance, EN + RU).
 
 - **L** **`--update` from WSL on a checkout made by Windows git fails at once.** WSL git (no
   `core.autocrlf`) sees every text file as modified (CRLF), so the clean-tree check stops with

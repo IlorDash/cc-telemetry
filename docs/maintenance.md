@@ -256,8 +256,22 @@ Edit `RETENTION_DAYS` in `.env`, then run the server script again.
 | Linux | `setup-server.sh` changes the TTL of the existing tables. A longer period needs no question. A shorter one deletes the rows older than the new period: a plain run asks at the terminal (default no; `--yes` does not answer it; without a terminal it skips the step with a warning), `--update` goes ahead after its dump |
 | Windows | `views-init` sets the TTL only on `otel.*` tables that have none and have no rows older than the period. Change an existing TTL yourself (below) |
 
-On Linux, `setup-server.sh` also lists the old `system.query_log*` and `system.query_views_log*`
-tables, which are no longer written, with a `DROP TABLE` command for each; it does not delete them.
+On Linux, `setup-server.sh` also lists the old system log tables (`query_log`, `text_log`,
+`trace_log`, `metric_log` and the others [switched off below](#resource-limits-and-logs), with their
+rotated copies `query_log_0`, ...) that an older install left behind, with rows, size and a
+`DROP TABLE` command for each, and the total size; it does not delete them. If a log is still
+written, the running ClickHouse has not loaded the config yet: run
+`docker compose restart clickhouse` and the script again.
+
+On Windows nothing lists them. After a restart of ClickHouse, list the tables and drop the ones you
+do not need (`ch.sh` runs inside WSL; with Docker Desktop run it in Git Bash or WSL the same way):
+
+```powershell
+"SELECT name, total_rows, formatReadableSize(total_bytes) AS size FROM system.tables WHERE database = 'system' AND match(name, '_log(_[0-9]+)?$') ORDER BY total_bytes DESC" | wsl -d Ubuntu -- bash linux-server-tools/ch.sh
+"DROP TABLE system.text_log SYNC" | wsl -d Ubuntu -- bash linux-server-tools/ch.sh
+```
+
+Tables of logs that you switched on yourself, and an empty one, are also in that list.
 
 To change it by hand, run the SQL through `ch.sh` (replace `180`; dump first when the period gets
 shorter):
@@ -280,10 +294,12 @@ ClickHouse 22.3, `none` and `0` otherwise; without the keys the stack uses `none
 are ClickHouse's own defaults. The limits are in `clickhouse/limits/small/`. A dashboard query that
 needs more than 1.5 GB fails instead of slowing the server down.
 
-On every server, ClickHouse writes no system logs, `query_log` included, and its text log is kept
-at level `warning`, 10 MB per file and two older files (`clickhouse/config.d/common.xml` and
-`clickhouse/users.d/common.xml`). The collector writes events to ClickHouse every 30 seconds, so
-a new event reaches the dashboards up to 30 seconds late.
+On every server, ClickHouse writes no system logs (`query_log`, `processors_profile_log`,
+`error_log`, `trace_log` and the rest that a ClickHouse version enables by default), and its
+text log is kept at level `warning`, 10 MB per file and two older files
+(`clickhouse/config.d/common.xml` and `clickhouse/users.d/common.xml`). The collector writes
+events to ClickHouse every 30 seconds, so a new event reaches the dashboards up to 30 seconds
+late.
 
 After editing one of these XML files run `docker compose restart clickhouse`. A change of
 `CLICKHOUSE_LIMITS` or `CLICKHOUSE_CPUS` needs `bash setup-server.sh` or `docker compose up -d`,

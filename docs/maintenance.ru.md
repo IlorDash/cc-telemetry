@@ -257,9 +257,22 @@ echo "SELECT table, formatReadableSize(sum(bytes_on_disk)) AS size, sum(rows) AS
 | Linux | `setup-server.sh` меняет TTL существующих таблиц. Более долгий срок вопросов не требует. Более короткий удаляет строки старше нового срока: обычный запуск спрашивает в терминале (по умолчанию «нет»; `--yes` на этот вопрос не отвечает; без терминала шаг пропускается с предупреждением), `--update` продолжает после своей копии |
 | Windows | `views-init` ставит TTL только на таблицы `otel.*`, у которых его нет и в которых нет строк старше срока. Существующий TTL меняйте сами (ниже) |
 
-На Linux `setup-server.sh` также перечисляет старые таблицы `system.query_log*` и
-`system.query_views_log*`, в которые больше не пишется, с командой `DROP TABLE` для каждой; сам он
-их не удаляет.
+На Linux `setup-server.sh` также перечисляет старые таблицы системных журналов (`query_log`,
+`text_log`, `trace_log`, `metric_log` и другие, [отключённые ниже](#ограничения-ресурсов-и-журналы),
+вместе с ротированными копиями `query_log_0`, ...), оставшиеся от прежней установки: со строками,
+размером и командой `DROP TABLE` для каждой, и общий размер; сам он их не удаляет. Если журнал
+всё ещё пишется, работающий ClickHouse ещё не загрузил конфиг: выполните
+`docker compose restart clickhouse` и запустите скрипт снова.
+
+На Windows их никто не перечисляет. После перезапуска ClickHouse выведите таблицы и удалите
+ненужные (`ch.sh` выполняется внутри WSL; с Docker Desktop запускайте его так же в Git Bash или WSL):
+
+```powershell
+"SELECT name, total_rows, formatReadableSize(total_bytes) AS size FROM system.tables WHERE database = 'system' AND match(name, '_log(_[0-9]+)?$') ORDER BY total_bytes DESC" | wsl -d Ubuntu -- bash linux-server-tools/ch.sh
+"DROP TABLE system.text_log SYNC" | wsl -d Ubuntu -- bash linux-server-tools/ch.sh
+```
+
+В списке будут и таблицы журналов, которые вы включили сами, и пустые.
 
 Чтобы изменить его вручную, выполните SQL через `ch.sh` (замените `180`; если срок сокращается,
 сначала сделайте копию):
@@ -282,10 +295,12 @@ ClickHouse 22.3, иначе `none` и `0`; без ключей стек испо
 ClickHouse по умолчанию. Ограничения лежат в `clickhouse/limits/small/`. Запрос дашборда, которому
 нужно больше 1,5 ГБ, завершается с ошибкой, а не замедляет сервер.
 
-На любом сервере ClickHouse не пишет системные журналы, включая `query_log`, а его текстовый лог
-ограничен уровнем `warning`, 10 МБ на файл и двумя старыми файлами (`clickhouse/config.d/common.xml`
-и `clickhouse/users.d/common.xml`). Коллектор записывает события в ClickHouse раз в 30 секунд,
-поэтому новое событие попадает в дашборды с задержкой до 30 секунд.
+На любом сервере ClickHouse не пишет системные журналы (`query_log`, `processors_profile_log`,
+`error_log`, `trace_log` и остальные, которые версия ClickHouse включает по умолчанию), а его
+текстовый лог ограничен уровнем `warning`, 10 МБ на файл и двумя старыми файлами
+(`clickhouse/config.d/common.xml` и `clickhouse/users.d/common.xml`). Коллектор записывает
+события в ClickHouse раз в 30 секунд, поэтому новое событие попадает в дашборды с задержкой до
+30 секунд.
 
 После правки одного из этих XML-файлов выполните `docker compose restart clickhouse`. Изменению
 `CLICKHOUSE_LIMITS` или `CLICKHOUSE_CPUS` нужен `bash setup-server.sh` или `docker compose up -d`:

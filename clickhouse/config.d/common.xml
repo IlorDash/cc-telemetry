@@ -19,4 +19,16 @@
   <text_log remove="1"/>
   <query_log remove="1"/>
   <query_views_log remove="1"/>
+  <!-- Enabled in the ClickHouse 25.x image config only (a name this server does not know is ignored). One line
+       per log, no wildcard: setup-server.sh reads this list to find the leftover tables of an older install. -->
+  <error_log remove="1"/>
+  <query_metric_log remove="1"/>
+  <processors_profile_log remove="1"/>
+  <asynchronous_insert_log remove="1"/>
+  <iceberg_metadata_log remove="1"/>
+  <opentelemetry_span_log remove="1"/>
+  <crash_log remove="1"/>
+  <backup_log remove="1"/>
+  <s3queue_log remove="1"/>
+  <blob_storage_log remove="1"/>
 </clickhouse>
