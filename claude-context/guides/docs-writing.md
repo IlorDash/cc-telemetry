@@ -9,8 +9,8 @@ ASCII flow diagrams, short "do not do this" callouts; no narrative prose, no mar
 Claude Code actually sends, which service owns what, what is exposed, what happens on failure,
 what was verified and on which version — not what a name already says. Repo-root-relative paths
 in backticks. **Bugs and unverified behaviour only in `pending-bugs.md`**; a module may at most say
-"see pending-bugs.md". **Observed facts** (what a Claude Code version sent, how Windows/WSL
-behaved) are authoritative: write them with their source (`observed on Claude Code 2.1.323,
+"see pending-bugs.md". **Observed facts** (what a Claude Code version sent, how Windows/WSL or a
+Linux host behaved) are authoritative: write them with their source (`observed on Claude Code 2.1.323,
 <date>`), never invent them. English. **No personal data** in tracked files — PC names, IPs, user
 names, networks, the user's other projects go to `server-state.local.md` (git-ignored).
 
@@ -20,7 +20,8 @@ mention of the AI setup. Describe behaviour, not features. Every failure gets an
 the reader does next. Second person, present tense, active voice; one fact per sentence;
 paragraphs of 1–4 sentences. No marketing words (simply, just, easily, powerful, seamless), no
 hedging, no meta text. Identifiers, paths, commands, options in backticks. Commands are
-copy-pasteable from the repo root (PowerShell for Windows, bash for Linux). Markdown tables use
+copy-pasteable from the repo root (PowerShell for Windows, bash for Linux; where both apply, give
+both or say how they differ, e.g. the `wsl -d Ubuntu --` prefix). Markdown tables use
 `| --- |` separators (the user's markdownlint).
 
 **Site pages (`docs/<page>.md` + `docs/<page>.ru.md`)** — the detailed user guide; which page

@@ -1,0 +1,22 @@
+<!-- Server config for every ClickHouse version and machine: keep the disk quiet. Drop the system logs nobody
+     reads (query_log included) and keep the text log small (the image default `trace` wrote ~135 MB a day to
+     an SD card). The resource limits of a small server are separate: clickhouse/limits/. -->
+<clickhouse>
+  <!-- Merged into the image's <logger>: only these three change, the log paths stay.
+       Errors also go to clickhouse-server.err.log. -->
+  <logger>
+    <level>warning</level>
+    <size>10M</size>
+    <count>2</count>
+  </logger>
+
+  <asynchronous_metric_log remove="1"/>
+  <metric_log remove="1"/>
+  <query_thread_log remove="1"/>
+  <part_log remove="1"/>
+  <session_log remove="1"/>
+  <trace_log remove="1"/>
+  <text_log remove="1"/>
+  <query_log remove="1"/>
+  <query_views_log remove="1"/>
+</clickhouse>

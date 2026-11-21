@@ -32,8 +32,9 @@ Home page: `GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH` in `docker-compose.yml` �
 | --- | --- |
 | `tags` | `cc`, `claude-code`, `otel` |
 | `schemaVersion` | 39 |
-| `refresh` / `time` | 10 s / `now-7d` → `now`; Overview `now-30d` |
+| `refresh` / `time` | 5 m / `now-24h` → `now` in every file, `ru/` copies too (Grafana refuses intervals below 1 m: `GF_DASHBOARDS_MIN_REFRESH_INTERVAL`) |
 | `templating` | the five shared variables below, identical in every file; Sessions adds `extra_cols`, `shown_cols`, `session_header` |
+| `timepicker.refresh_intervals` | `1m`, `5m`, `15m`, `1h` (nothing below the 1 m minimum) |
 | `timepicker.quick_ranges` | Last 5 minutes, 1 hour, 24 hours, 7 days, 30 days, All (`now-10y`) |
 | `links` | only the language switch (`RU` → `/d/<uid>-ru`; the RU copy has `EN` → `/d/<uid>`), `keepTime`, `includeVars` — navigation is the rail; hand-added links are kept |
 | layout | rail x0 w3 (ids 300–399); content x3 w21; no `row` panels (section headers are h1 text panels); only Full HD (1920 px) and wider is supported |
@@ -214,3 +215,6 @@ Rail drift: `node grafana/rail/sync-rail.js --check`; RU drift: `node grafana/i1
 - Session lists and counts (Sessions, Overview 37, the Session variable) keep sessions with a model
   request (`requests > 0`); Prompts keeps prompts with one.
 - Prompt text exists only when the client sets `OTEL_LOG_USER_PROMPTS`; otherwise `(text not logged)`.
+- Tips (Efficiency Tips section, rail tiles) and the inferred project of unlabelled sessions
+  (`project` variable and every per-project panel) come from tables `cc-refresh` rebuilds every
+  300 s: up to 5 min behind the other panels (`modules/materialization.md`).

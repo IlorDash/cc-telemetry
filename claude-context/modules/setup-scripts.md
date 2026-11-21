@@ -1,7 +1,7 @@
 # Setup scripts — server, clients, Linux helpers
 
-How `setup-server.ps1` / `setup-server.sh` and the client scripts work, the Linux helpers, the
-update flow and the LAN path.
+How `setup-server.ps1` / `setup-server.sh` and the client scripts work, the Linux helpers and the
+LAN path. `--update` and `apply_retention`: `modules/server-update.md`.
 
 ## Files
 
@@ -23,7 +23,8 @@ update flow and the LAN path.
            wsl: no docker → check PID 1 = systemd → ask (or -Yes) → wsl -u root install-docker.sh
                 → wsl --terminate (docker group)
 2 .env     created with two random 32-hex passwords (UTF-8 no BOM, LF); existing file kept
-3 stack    docker compose up -d; poll views-init until Exited, must be 0
+3 stack    docker compose up -d (direct wsl.exe / docker call, not the Compose wrapper); fails →
+           Compose logs --tail 50 views-init, then Fail; poll views-init until Exited, must be 0
 4 checks   GET localhost:3000/api/health; TCP localhost:4317 and :4318
 5 wsl      write <Startup>/cc-telemetry-keepalive.vbs (hidden wsl --exec sleep infinity), start it if not running
 6 -EnableLan  not admin → relaunch itself elevated (UAC) with -LanOnly, transcript in %TEMP%\cc-telemetry-lan.log
@@ -50,7 +51,7 @@ args       --local-only | --lan (= --enable-lan), --lan-ip <IPv4>, --grafana-por
 1 Docker   docker info ok → docker; "permission denied" → sudo docker for this run (warn: docker group)
            daemon down → fail; docker/compose missing on Ubuntu/Debian(-like) → ask → sudo install-docker.sh
            other distro → fail with the docs link
-  --update → run_update (below), ends in exec
+  --update → run_update (`modules/server-update.md`), ends in exec
 2 .env     missing → created (umask 077, two random 32-hex); then only the managed keys:
            OTLP_BIND          flag (lan 0.0.0.0 / local 127.0.0.1) > kept > 0.0.0.0
            GRAFANA_BIND       flag > kept > OTLP_BIND as resolved (warns when that newly opens Grafana)
@@ -58,7 +59,13 @@ args       --local-only | --lan (= --enable-lan), --lan-ip <IPv4>, --grafana-por
            CLICKHOUSE_VERSION flag > old ARM: missing → 22.3.20.29, 23.3.22.3 → 22.3.20.29 (warn) > kept
            4317/4318 busy by another program → warn only
            warn: tag ≥ 22.10 on old ARM; tag < 24 = out of support
-3 stack    LAN note when a bind is not local; compose up -d; poll views-init until exited, must be 0
+           resolve_key (missing → default written once, present → kept; then validated, bad → fail):
+           RETENTION_DAYS     22.3.* tag → 180, else 365        ^[1-9][0-9]*$
+           CLICKHOUSE_LIMITS  22.3.* → small, else none        small | none
+           CLICKHOUSE_CPUS    22.3.* → 2, else 0 (no limit)    ^[0-9]+(\.[0-9]+)?$
+3 stack    LAN note when a bind is not local; compose up -d (fails → logs --tail 50 views-init, fail);
+           poll views-init until exited (90 × 2 s), must be 0; then apply_retention (`modules/server-update.md`);
+           [update re-run: reload_changed_config]
 4 checks   http <bind|127.0.0.1>:<GRAFANA_PORT>/api/health; TCP 4317, 4318; docker enabled at boot (ask → enable)
 5 LAN      only if OTLP_BIND or GRAFANA_BIND is not 127.0.0.1/localhost
            lan_ports = 4317 4318 (OTLP_BIND not local) + GRAFANA_PORT (GRAFANA_BIND not local)
@@ -70,35 +77,20 @@ args       --local-only | --lan (= --enable-lan), --lan-ip <IPv4>, --grafana-por
 ```
 - `get_env`: last `KEY=` line, `\r` stripped. `set_env`: `sed` replace or append; a CRLF `.env`
   stays CRLF. No other line of `.env` is read or written.
+- The three resolve_key keys are written once and kept: a later `CLICKHOUSE_VERSION` change does
+  not change them (a shorter retention deletes data). `setup-server.ps1` writes none of them:
+  Windows runs on the compose defaults (365 / `none` / 0).
 - A re-run without `--lan`/`--local-only` keeps the binds; `--local-only` never removes firewall
   rules added earlier.
 - Old ARM = `uname -m` is `aarch64` and the `/proc/cpuinfo` `Features` line lacks `lrcpc`
   (no `Features` line → not old). Any other `CLICKHOUSE_VERSION` value is the user's and stays.
 - `confirm`: `--yes` answers yes; no terminal answers no. `as_root`: direct as root, else `sudo`.
+  Exception: the retention question of `apply_retention` is not `confirm` — `--yes` does not answer it.
 
-### --update
+### apply_retention and --update
 
-```
-run_update   (all post-pull code is in this function, parsed before the pull; ends in exec)
-  checks     .env exists; ClickHouse answers (ch.sh SELECT 1); no tracked local changes; prev = HEAD; upstream?
-  dump       backup/pre-update-<YYYYmmdd-HHMMSS>/; free space (df) vs sum(data_uncompressed_bytes)
-             of active otel parts: less → fail, < 1.5× → warn; BACKUP_DIR=<dir> backup.sh dump; rowcounts.tsv
-  code       upstream → git pull --ff-only; no upstream / no repo → warn, files as they are
-  exec       CCT_UPDATE=1 CCT_UPDATE_DIR=<dir> CCT_UPDATE_PREV=<prev> bash setup-server.sh <args minus --update>
-re-run       steps 2–6; in step 3 after views-init exited 0 → reload_changed_config (below)
-             then finish_update: every table rows now ≥ before, else LOST banner + restore command, exit 1
-             after a pull prints the rollback: git checkout <prev> && bash setup-server.sh
-EXIT trap    failing exit once the dump folder is set → prints it (+ rollback command after a pull)
-```
-- `CCT_UPDATE_DIR` is honoured only with `CCT_UPDATE=1`, under `backup/`, without `..`, as an
-  existing folder; the three variables are unset at start.
-- `reload_changed_config` (only with dump folder + prev): `git diff --name-only <prev> HEAD` →
-  `otel-collector.yaml` → `compose restart otel-collector`; `grafana/provisioning/*` →
-  `compose restart grafana`; ok line per service, else "nothing to restart". git fails → warn
-  (restart by hand), continue; restart fails → fail (EXIT trap prints dump folder + rollback).
-- No reload needed: `clickhouse/` (views) — `compose up -d` starts the exited one-shot views-init
-  again on every run; `grafana/dashboards/` — Grafana re-reads it every 30 s.
-- Nothing is removed (no `down -v`); earlier dumps stay. With `sudo docker` the dump files belong to root.
+In `modules/server-update.md`: `apply_retention` (every run, after views-init exited 0) and
+`--update` (`run_update`, `reload_changed_config`, `finish_update`, EXIT trap). Linux only.
 
 ## Clients
 

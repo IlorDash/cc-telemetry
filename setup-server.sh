@@ -5,7 +5,12 @@
 #  2. .env with random passwords (an existing .env is kept) and the bind addresses
 #     OTLP_BIND (ports 4317 and 4318) and GRAFANA_BIND (Grafana), the Grafana host port GRAFANA_PORT (default
 #     3000) and, on ARM CPUs too old for current ClickHouse (Raspberry Pi 4), CLICKHOUSE_VERSION.
+#     Also RETENTION_DAYS, CLICKHOUSE_LIMITS and CLICKHOUSE_CPUS: with ClickHouse 22.3 (the Raspberry Pi tag)
+#     180 days and the small-server limits (CLICKHOUSE_LIMITS=small, 2 CPUs), otherwise 365 days and no limits.
+#     A value already in .env is kept.
 #  3. Starts the stack and waits until the cc.* views are created.
+#     After the views are ready: the retention TTL on otel.* and cc.events_t (a no-op when already in place;
+#     a changed RETENTION_DAYS is applied to the existing tables) and a hint about leftover system.query_log tables.
 #  4. Checks Grafana and the OTLP ports (:4317, :4318) on this PC; checks that Docker starts at boot.
 #  5. LAN (the default, Linux servers are usually headless): 4317, 4318 and Grafana are published on
 #     all interfaces and opened in ufw / firewalld; prints the server address and the client commands.
@@ -47,6 +52,12 @@ UPD_DIR="$UPDATE_DIR"   # while set, a failing run prints the dump folder (and t
 UPD_PREV="$UPDATE_PREV"
 OLD_CH_TAG=22.3.20.29   # last release of ClickHouse 22.3, the newest tag known to run on ARMv8.0 (Raspberry Pi 4); ClickHouse needs ARMv8.2 since 22.10
 OLD_CH_TAG_WRONG=23.3.22.3   # what earlier versions of this script wrote on old ARM: dies there with "Illegal instruction"
+# Retention in days: RETENTION_DAYS in .env is the one source (load_retention; the default follows the ClickHouse
+# version: 22.3 = 180, else 365). It reaches cc.events_t (the placeholder of clickhouse/schema.sql), otel.*
+# (init-views.sh, apply_retention) and the --update check. WINDOW_DAYS = RETENTION_DAYS - 1: rows younger than
+# that cannot be removed by the TTL while the script runs (the data checks compare only those).
+RETENTION_DAYS=365
+WINDOW_DAYS=364
 
 usage() {
   cat <<'EOF'
@@ -72,16 +83,31 @@ Grafana (port 3000, admin login) are published on all interfaces and opened in u
                      backup/pre-update-<time>/ (earlier dumps stay), records the row count per table,
                      runs `git pull --ff-only` (skipped with a warning when there is no upstream), runs
                      this script again from the updated file with your other options, and finally
-                     checks that no table has fewer rows than before. Nothing is ever removed
-                     (no `down -v`, volumes stay). Rollback: git checkout <previous commit>, then
-                     bash setup-server.sh
+                     checks that no row the retention TTL cannot remove is missing (it counts
+                     the rows younger than a cutoff fixed at dump time before and after; older rows
+                     may be removed by the TTL and are only reported). Nothing is
+                     removed by the script itself (no `down -v`, volumes stay). Rollback: git checkout
+                     <previous commit>, then bash setup-server.sh
   --yes              do not ask before installing Docker, using sudo or enabling the docker service
+                     (it never agrees to a retention TTL deleting rows older than RETENTION_DAYS outside
+                     --update: that needs a terminal and your answer, or --update with its dump)
   --help             this text
 
 Without --local-only / --lan an existing .env keeps its OTLP_BIND and GRAFANA_BIND; a missing
 OTLP_BIND becomes 0.0.0.0, a missing GRAFANA_BIND copies OTLP_BIND (0.0.0.0 if that is missing too).
 Any bind other than 127.0.0.1 / localhost counts as reachable from the LAN. Firewall rules added
 earlier are not removed by --local-only.
+
+Retention and limits (keys of .env, edit them and run this script again; an existing value is kept):
+  RETENTION_DAYS       days the data is kept (TTL of otel.* and cc.events_t). Missing: 180 with
+                       ClickHouse 22.3 (CLICKHOUSE_VERSION 22.3.*, the Raspberry Pi tag), else 365.
+                       A longer value is applied to the existing tables at once; a shorter one deletes
+                       the rows older than that: it asks first (see --yes), --update dumps before.
+  CLICKHOUSE_LIMITS    small = memory, thread and merge limits of a small server (clickhouse/limits/small/),
+                       none = ClickHouse defaults. Missing: small with 22.3, else none.
+  CLICKHOUSE_CPUS      CPU cores of the ClickHouse container, 0 = no limit. Missing: 2 with 22.3, else 0.
+                       A changed CLICKHOUSE_LIMITS / CLICKHOUSE_CPUS recreates the clickhouse container
+                       (a few seconds) in this run.
 EOF
 }
 
@@ -243,6 +269,39 @@ if [ "${D[0]}" = sudo ]; then
 fi
 compose() { "${D[@]}" compose "$@"; }
 
+# ---------------------------------------------------------------- .env helpers
+get_env() { # KEY -> value (CR stripped); empty when the key is missing
+  grep "^$1=" .env | tail -n 1 | cut -d= -f2- | tr -d '\r' || true
+}
+set_env() { # KEY value
+  # A .env with CRLF endings (edited on Windows) keeps them: no mixed line endings.
+  local cr=''
+  if grep -q $'\r' .env; then cr=$'\r'; fi
+  if grep -q "^$1=" .env; then
+    sed -i "s/^$1=.*/$1=$2$cr/" .env
+  else
+    # keep the last line of .env terminated before appending
+    if [ -s .env ] && [ -n "$(tail -c 1 .env)" ]; then printf '%s\n' "$cr" >> .env; fi
+    printf '%s=%s%s\n' "$1" "$2" "$cr" >> .env
+  fi
+}
+
+# ClickHouse 22.3 (OLD_CH_TAG, the Raspberry Pi 4 tag) is the small server: its defaults are 180 days and the limits.
+is_small_ch() { [[ "$1" =~ ^22\.3(\.|$) ]]; }
+
+# Sets RETENTION_DAYS and WINDOW_DAYS from .env; a missing key takes the default of the ClickHouse version
+# (argument, else the one in .env). Used before .env is completed (run_update) and by step 2.
+load_retention() { # [version]
+  local v
+  v="$(get_env RETENTION_DAYS)"
+  if [ -z "$v" ]; then
+    if is_small_ch "${1-$(get_env CLICKHOUSE_VERSION)}"; then v=180; else v=365; fi
+  fi
+  [[ "$v" =~ ^[1-9][0-9]*$ ]] || fail "RETENTION_DAYS=$v in .env is not a number of days (1 or more). Fix it and run this script again."
+  RETENTION_DAYS="$v"
+  WINDOW_DAYS=$((v - 1))
+}
+
 # ---------------------------------------------------------------- update (--update)
 # Runs a helper script as the docker user: tool [VAR=value ...] bash <script> [args]
 tool() { if [ "${D[0]}" = sudo ]; then sudo env "$@"; else env "$@"; fi; }
@@ -257,12 +316,79 @@ row_counts() {
   done
 }
 
+# Runs the SQL given as the argument through ch.sh and prints the result.
+chq() { printf '%s\n' "$1" | tool bash "$ROOT/linux-server-tools/ch.sh"; }
+
+# The time expression the retention TTL of a table is based on (empty: no TTL for it here).
+ttl_col() { # table
+  case "$1" in
+    otel_logs) echo TimestampTime ;;
+    otel_metrics_*) echo 'toDateTime(TimeUnix)' ;;
+    events_t) echo 'toDateTime(ts)' ;;
+  esac
+}
+
+# "<table><TAB><rows>" for every otel.* table that has a TTL column: rows with that time >= the cutoff.
+# The TTL cannot remove those, so the data check of --update compares them exactly.
+recent_row_counts() { # cutoff ('YYYY-MM-DD hh:mm:ss', server time zone)
+  local tables t col n
+  tables="$(chq 'SHOW TABLES FROM otel')" || return 1
+  for t in $tables; do
+    col="$(ttl_col "$t")"
+    [ -n "$col" ] || continue
+    n="$(chq "SELECT count() FROM otel.$t WHERE $col >= toDateTime('$1')")" || return 1
+    printf '%s\t%s\n' "$t" "$n"
+  done
+}
+
+# The TTL of a managed table (db, name) from system.tables: the number of days, "none" (no TTL) or "other"
+# (a TTL this script does not manage: a different column, an hour interval, a DELETE WHERE ...).
+ttl_state() { # db table
+  local ef re=' TTL (TimestampTime|toDateTime\((ts|Timestamp|TimeUnix)\)) \+ toIntervalDay\(([0-9]+)\)( SETTINGS|$)'
+  ef="$(chq "SELECT engine_full FROM system.tables WHERE database = '$1' AND name = '$2'")" || return 1
+  if [[ "$ef" != *' TTL '* ]]; then echo none
+  elif [[ "$ef" =~ $re ]]; then echo "${BASH_REMATCH[3]}"
+  else echo other
+  fi
+}
+
+# "<db><TAB><table>" of every table the retention TTL covers.
+ttl_tables() {
+  chq "SELECT database, name FROM system.tables WHERE (database = 'otel' AND (name = 'otel_logs' OR startsWith(name, 'otel_metrics_'))) OR (database = 'cc' AND name = 'events_t') ORDER BY database, name"
+}
+
+# The number of days that the data checks use: rows younger than that cannot be removed by any TTL while the
+# script runs. That is the shortest of the retention to apply and the TTLs the tables have now (a shorter TTL
+# that is still in place keeps deleting until it is changed). Call it before any TTL is changed.
+check_window_days() {
+  local min="$RETENTION_DAYS" list db t s
+  list="$(ttl_tables)" || return 1
+  while IFS=$'\t' read -r db t; do
+    [ -n "$t" ] || continue
+    s="$(ttl_state "$db" "$t")" || return 1
+    if [[ "$s" =~ ^[0-9]+$ ]] && [ "$s" -lt "$min" ]; then min="$s"; fi
+  done <<<"$list"
+  echo $((min - 1))
+}
+
+# Writes <dir>/ttl-recent.tsv: first line "#cutoff<TAB><check window ago>", then recent_row_counts of
+# that cutoff. finish_update counts again with the same cutoff. Must run before any TTL is applied.
+save_retention_baseline() { # dir
+  local cutoff rows win
+  win="$(check_window_days)" || return 1
+  cutoff="$(chq "SELECT toString(now() - INTERVAL $win DAY)")" || return 1
+  rows="$(recent_row_counts "$cutoff")" || return 1
+  { printf '#cutoff\t%s\n' "$cutoff"; [ -z "$rows" ] || printf '%s\n' "$rows"; } > "$1/ttl-recent.tsv.tmp" \
+    && mv "$1/ttl-recent.tsv.tmp" "$1/ttl-recent.tsv"
+}
+
 # bash reads a script while it runs, and git pull rewrites this file: everything after the pull is in
 # this one function, which ends with exec (nothing of the old file is read afterwards).
 run_update() {
   local dir prev now up repass=() a
   step 'Update: checks'
   [ -f .env ] || fail '.env not found: this folder is not a configured server yet. Run: bash setup-server.sh'
+  load_retention
   echo 'SELECT 1' | tool bash "$ROOT/linux-server-tools/ch.sh" >/dev/null 2>&1 \
     || fail 'ClickHouse does not answer, so no safety dump is possible. Start the stack (docker compose up -d), wait until it is healthy and run --update again.'
   ok 'ClickHouse answers'
@@ -303,6 +429,7 @@ run_update() {
   UPD_DIR="$dir"
   tool BACKUP_DIR="$dir" bash "$ROOT/linux-server-tools/backup.sh" dump || fail 'The safety dump failed (see above). Nothing was changed.'
   row_counts > "$dir/rowcounts.tsv" || fail 'Could not count the rows. Nothing was changed.'
+  save_retention_baseline "$dir" || fail 'Could not count the rows. Nothing was changed.'
   ok "dump and row counts saved in $dir (earlier dumps are kept)"
   [ "${D[0]}" != sudo ] || ok "docker runs through sudo, so the dump files in $dir belong to root (read or delete them with sudo)"
 
@@ -326,9 +453,11 @@ run_update() {
   fail 'could not start setup-server.sh again'
 }
 
-# Last step of the re-run: no table has fewer rows than before the update.
+# Last step of the re-run: no row the retention TTL cannot remove is gone. Tables with a baseline in
+# ttl-recent.tsv: the rows with time >= the stored cutoff must not be fewer (exact); older rows may shrink
+# through the TTL and are only reported. Other tables (or no baseline): the total must not be smaller.
 finish_update() {
-  local post t n now bad=0 restore="BACKUP_DIR=$UPDATE_DIR"
+  local post rec_post cutoff='' t n now rb rn gone bad=0 restore="BACKUP_DIR=$UPDATE_DIR"
   # sudo resets the environment: the variable must go through env, after sudo
   [ "${D[0]}" != sudo ] || restore="sudo env BACKUP_DIR=$UPDATE_DIR"
   step 'Update: data check'
@@ -336,12 +465,30 @@ finish_update() {
     warn "no row counts in $UPDATE_DIR (empty stack before the update?): nothing to compare"
   else
     post="$(row_counts)" || fail 'could not count the rows after the update.'
+    if [ -r "$UPDATE_DIR/ttl-recent.tsv" ]; then
+      cutoff="$(awk -F'\t' '$1 == "#cutoff" { print $2 }' "$UPDATE_DIR/ttl-recent.tsv")"
+    fi
+    if [ -n "$cutoff" ]; then rec_post="$(recent_row_counts "$cutoff")" || fail 'could not count the rows after the update.'; fi
     while IFS=$'\t' read -r t n; do
       [ -n "$t" ] || continue
       now="$(printf '%s\n' "$post" | awk -F'\t' -v t="$t" '$1 == t { print $2 }')"
+      rb=''; rn=''
+      if [ -n "$cutoff" ]; then
+        rb="$(awk -F'\t' -v t="$t" '$1 == t { print $2 }' "$UPDATE_DIR/ttl-recent.tsv")"
+        rn="$(printf '%s\n' "$rec_post" | awk -F'\t' -v t="$t" '$1 == t { print $2 }')"
+      fi
       if ! [[ "$n" =~ ^[0-9]+$ ]]; then bad=1; printf '   FAIL %s: the row count before the update is not a number (%s), cannot compare\n' "$t" "$n" >&2
       elif [ -z "$now" ]; then bad=1; printf '   LOST %s: %s rows before, table missing now\n' "$t" "$n" >&2
       elif ! [[ "$now" =~ ^[0-9]+$ ]]; then bad=1; printf '   FAIL %s: the row count now is not a number (%s), cannot compare\n' "$t" "$now" >&2
+      elif [[ "$rb" =~ ^[0-9]+$ ]]; then
+        if ! [[ "$rn" =~ ^[0-9]+$ ]]; then bad=1; printf '   FAIL %s: the count of rows since %s is not a number now (%s), cannot compare\n' "$t" "$cutoff" "$rn" >&2
+        elif [ "$rn" -lt "$rb" ]; then bad=1; printf '   LOST %s: %s rows newer than %s before, %s now (the retention TTL cannot remove them)\n' "$t" "$rb" "$cutoff" "$rn" >&2
+        else
+          gone=$(( (n - rb) - (now - rn) ))
+          if [ "$gone" -gt 0 ]; then printf '   OK   %s: %s rows before, %s now (%s older than %s days removed by the retention TTL)\n' "$t" "$n" "$now" "$gone" "$RETENTION_DAYS"
+          else printf '   OK   %s: %s rows before, %s now\n' "$t" "$n" "$now"
+          fi
+        fi
       elif [ "$now" -lt "$n" ]; then bad=1; printf '   LOST %s: %s rows before, %s now\n' "$t" "$n" "$now" >&2
       else printf '   OK   %s: %s rows before, %s now\n' "$t" "$n" "$now"
       fi
@@ -390,6 +537,113 @@ reload_changed_config() {
   if [ "${#restart[@]}" -eq 0 ]; then ok 'no collector or Grafana provisioning change: nothing to restart'; fi
 }
 
+# ---- retention: TTL of the otel.* tables and of cc.events_t --------------------------------------------------
+# Every part reads its own state from system.tables, so a re-run is a no-op once the TTL is in place. Runs after
+# views-init, which creates cc.events_t with the TTL of clickhouse/schema.sql and sets the TTL of otel.* tables
+# that have none; here a changed RETENTION_DAYS is applied to the existing tables.
+
+# The TTL expression of cc.events_t from schema.sql (no second copy of the definition), with the retention
+# placeholder replaced like init-views.sh does.
+events_ttl_expr() {
+  awk '/^CREATE TABLE IF NOT EXISTS cc\.events_t$/ { p = 1 } p && /^TTL / { sub(/^TTL /, ""); print } p && /;[[:space:]]*$/ { exit }' "$ROOT/clickhouse/schema.sql" \
+    | sed "s/__RETENTION_DAYS__/$RETENTION_DAYS/g"
+}
+
+# Sets or changes the TTL of cc.events_t when it differs from RETENTION_DAYS; a TTL this script did not write stays.
+apply_events_t_ttl() {
+  local ttl_expr cur_ttl
+  ttl_expr="$(events_ttl_expr)"
+  [ -n "$ttl_expr" ] || fail 'Could not read the TTL of cc.events_t from clickhouse/schema.sql.'
+  [ "$(chq 'EXISTS TABLE cc.events_t')" = 1 ] || { warn 'cc.events_t does not exist: nothing to change.'; return 0; }
+  cur_ttl="$(ttl_state cc events_t)" || fail 'Could not read the TTL of cc.events_t.'
+  if [ "$cur_ttl" = "$RETENTION_DAYS" ]; then
+    ok "cc.events_t: TTL $RETENTION_DAYS days, nothing to change"
+  elif [ "$cur_ttl" = other ]; then
+    warn 'cc.events_t has a TTL that this script did not write: left as it is.'
+  else
+    chq "ALTER TABLE cc.events_t MODIFY TTL $ttl_expr" >/dev/null || fail 'Could not set the TTL of cc.events_t.'
+    [ "$cur_ttl" != none ] || chq 'ALTER TABLE cc.events_t MODIFY SETTING ttl_only_drop_parts = 1' >/dev/null || fail 'Could not set ttl_only_drop_parts of cc.events_t.'
+    if [ "$cur_ttl" = none ]; then ok "cc.events_t: TTL $RETENTION_DAYS days set"
+    else ok "cc.events_t: TTL changed from $cur_ttl to $RETENTION_DAYS days"
+    fi
+  fi
+}
+
+# Old system.query_log tables are not written any more once ClickHouse runs with the current config. Deleting
+# data needs the user's yes: only report them, with the command.
+warn_old_query_logs() {
+  local lq rows name nrows size pre=''
+  [ "${D[0]}" != sudo ] || pre='sudo '
+  lq="$(chq "SELECT value FROM system.settings WHERE name = 'log_queries'")" || return 0
+  rows="$(chq "SELECT name, total_rows, formatReadableSize(total_bytes) FROM system.tables WHERE database = 'system' AND (startsWith(name, 'query_log') OR startsWith(name, 'query_views_log')) ORDER BY name")" || return 0
+  [ -n "$rows" ] || return 0
+  if [ "$lq" = 1 ]; then
+    warn 'log_queries is 1: the running ClickHouse still writes system.query_log (it has not loaded clickhouse/config.d and users.d yet, or you enabled it on purpose). To switch it off: docker compose restart clickhouse, then re-run this script.'
+    return 0
+  fi
+  while IFS=$'\t' read -r name nrows size; do
+    [ -n "$name" ] || continue
+    warn "system.$name ($nrows rows, $size) is no longer written; delete it to free the disk space: echo 'DROP TABLE system.$name SYNC' | ${pre}bash linux-server-tools/ch.sh"
+  done <<<"$rows"
+}
+
+apply_retention() {
+  local list db t col n old=0 todo=() tbl answer st
+  step "Storage: retention ($RETENTION_DAYS days)"
+  # The baseline of the --update data check: taken before any TTL is applied (an update that started from an
+  # older script has not written it).
+  if [ -n "$UPDATE_DIR" ] && [ ! -e "$UPDATE_DIR/ttl-recent.tsv" ]; then
+    save_retention_baseline "$UPDATE_DIR" || fail 'Could not count the rows younger than the retention.'
+  fi
+  # Tables whose TTL is not RETENTION_DAYS days: no TTL, a shorter one (lengthening deletes nothing and needs
+  # no question) or a longer one (shortening deletes the rows older than the new retention, like no TTL does).
+  # A TTL this script did not write is left alone.
+  list="$(ttl_tables)" || fail 'Could not read system.tables.'
+  while IFS=$'\t' read -r db t; do
+    [ -n "$t" ] || continue
+    st="$(ttl_state "$db" "$t")" || fail "Could not read the TTL of $db.$t."
+    case "$st" in
+      "$RETENTION_DAYS") continue ;;
+      other) warn "$db.$t has a TTL that this script did not write: left as it is."; continue ;;
+    esac
+    todo+=("$db.$t")
+    if [ "$st" = none ] || [ "$st" -gt "$RETENTION_DAYS" ]; then
+      col="$(ttl_col "$t")"
+      n="$(chq "SELECT count() FROM $db.$t WHERE $col < now() - INTERVAL $WINDOW_DAYS DAY")" || fail "Could not count the old rows of $db.$t."
+      [[ "$n" =~ ^[0-9]+$ ]] || fail "Unexpected row count for $db.$t: $n"
+      old=$((old + n))
+    fi
+  done <<<"$list"
+  # The TTL deletes data: an update has just dumped it; otherwise ask.
+  if [ "$old" -gt 0 ]; then
+    if [ -n "$UPDATE_DIR" ]; then
+      ok "$old rows are older than $RETENTION_DAYS days: the retention TTL removes them (the safety dump in $UPDATE_DIR keeps them)"
+    else
+      # Deleting data: --yes does not answer this question, only a person at a terminal does (default no).
+      answer=n
+      if [ -t 0 ]; then
+        read -r -p "   $old rows are older than $RETENTION_DAYS days and will be deleted by the retention TTL (otel.* and cc.events_t). Back up first: bash linux-server-tools/backup.sh dump. Apply the retention now? [y/N] " answer || answer=n
+      fi
+      case "$answer" in
+        [Yy]*) ;;
+        *)
+          warn "retention skipped: $old rows are older than $RETENTION_DAYS days and the TTL would delete them (--yes does not agree to that, and a terminal is needed to ask). Run: bash setup-server.sh --update (dumps first, then applies the retention), or dump (bash linux-server-tools/backup.sh dump) and re-run in a terminal."
+          warn_old_query_logs
+          return 0 ;;
+      esac
+    fi
+  fi
+  apply_events_t_ttl
+  for tbl in "${todo[@]+"${todo[@]}"}"; do
+    case "$tbl" in otel.*) ;; *) continue ;; esac
+    t="${tbl#otel.}"
+    chq "ALTER TABLE $tbl MODIFY TTL $(ttl_col "$t") + toIntervalDay($RETENTION_DAYS)" >/dev/null || fail "Could not set the TTL of $tbl."
+    ok "$tbl: TTL $RETENTION_DAYS days set"
+  done
+  case " ${todo[*]-} " in *" otel."*) ;; *) ok "otel.* tables: nothing to change in the TTL ($RETENTION_DAYS days)" ;; esac
+  warn_old_query_logs
+}
+
 if [ "$UPDATE" -eq 1 ]; then run_update; fi
 
 # ---------------------------------------------------------------- 2. .env
@@ -404,22 +658,7 @@ fi
 
 # OTLP_BIND decides where Docker publishes 4317 and 4318. On Linux Docker's own iptables rules bypass ufw/firewalld,
 # so the firewall cannot hide a port: the bind address is the real switch. GRAFANA_BIND does the same for
-# Grafana. Only these two lines of .env are read or written.
-get_env() { # KEY -> value (CR stripped); empty when the key is missing
-  grep "^$1=" .env | tail -n 1 | cut -d= -f2- | tr -d '\r' || true
-}
-set_env() { # KEY value
-  # A .env with CRLF endings (edited on Windows) keeps them: no mixed line endings.
-  local cr=''
-  if grep -q $'\r' .env; then cr=$'\r'; fi
-  if grep -q "^$1=" .env; then
-    sed -i "s/^$1=.*/$1=$2$cr/" .env
-  else
-    # keep the last line of .env terminated before appending
-    if [ -s .env ] && [ -n "$(tail -c 1 .env)" ]; then printf '%s\n' "$cr" >> .env; fi
-    printf '%s=%s%s\n' "$1" "$2" "$cr" >> .env
-  fi
-}
+# Grafana. Only the keys named in this script are read or written (get_env / set_env, above).
 
 # Decides one key: a flag sets it; no flag keeps a present value; a missing value gets $3 (default).
 # Sets the global BIND_RESULT.
@@ -503,6 +742,31 @@ if [[ "$ch_ver" =~ ^([0-9]+)\.([0-9]+) ]]; then
   fi
 fi
 
+# Retention and resource limits. ClickHouse 22.3 (OLD_CH_TAG: the Raspberry Pi 4 tag) is the small server: 180 days
+# and the limits (clickhouse/limits/small/, 2 CPUs); every other version gets 365 days and no limits. The default
+# is written once and then kept, so a later change of CLICKHOUSE_VERSION does not change the retention behind
+# your back (a shorter retention deletes data). Edit the values in .env and run this script again to change them.
+if is_small_ch "$ch_ver"; then rd_def=180; lim_def=small; cpu_def=2; else rd_def=365; lim_def=none; cpu_def=0; fi
+resolve_key() { # KEY default what: writes the default when the key is missing, else keeps the value (validated by the caller)
+  local cur
+  cur="$(get_env "$1")"
+  if [ -z "$cur" ]; then
+    set_env "$1" "$2"
+    ok "$1=$2 written to .env ($3)"
+    KEY_RESULT="$2"
+  else
+    ok "$1=$cur kept ($3)"
+    KEY_RESULT="$cur"
+  fi
+}
+resolve_key RETENTION_DAYS "$rd_def" 'days the data is kept'
+[[ "$KEY_RESULT" =~ ^[1-9][0-9]*$ ]] || fail "RETENTION_DAYS=$KEY_RESULT in .env is not a number of days (1 or more). Fix it and run this script again."
+RETENTION_DAYS="$KEY_RESULT"; WINDOW_DAYS=$((RETENTION_DAYS - 1))
+resolve_key CLICKHOUSE_LIMITS "$lim_def" 'small = limits of a small server, none = ClickHouse defaults'
+case "$KEY_RESULT" in small|none) ;; *) fail "CLICKHOUSE_LIMITS=$KEY_RESULT in .env must be small or none. Fix it and run this script again." ;; esac
+resolve_key CLICKHOUSE_CPUS "$cpu_def" 'CPU cores of the ClickHouse container, 0 = no limit'
+[[ "$KEY_RESULT" =~ ^[0-9]+(\.[0-9]+)?$ ]] || fail "CLICKHOUSE_CPUS=$KEY_RESULT in .env is not a number (0 = no limit). Fix it and run this script again."
+
 # ---------------------------------------------------------------- 3. stack
 step 'Stack'
 if [ "$lan_on" -eq 1 ]; then
@@ -511,7 +775,7 @@ if [ "$lan_on" -eq 1 ]; then
   is_local_bind "$grafana_bind" || echo "     Grafana $grafana_port on $grafana_bind"
   echo '     Plain HTTP, OTLP without authentication. To keep them on this PC only: re-run with --local-only.'
 fi
-compose up -d || fail 'docker compose up failed, see the output above.'
+compose up -d || { compose logs --tail 50 views-init || true; fail 'docker compose up failed (cc-refresh waits for views-init: its log is above), see the output above.'; }
 state=''
 for _ in $(seq 1 90); do
   state="$(compose ps -a views-init --format '{{.State}} {{.ExitCode}}' | head -n 1)" || state=''
@@ -521,6 +785,7 @@ done
 if [ "$state" = 'exited 0' ]; then ok 'cc.* views are ready'
 else compose logs views-init || true; fail "views-init did not finish cleanly ($state)"
 fi
+apply_retention
 reload_changed_config
 
 # ---------------------------------------------------------------- 4. checks

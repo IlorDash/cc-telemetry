@@ -11,6 +11,7 @@ It is worth a look and may be fine for your work.
 
 - The window is **fixed to the last 7 days**. Tips ignore the dashboard time range and the
   variables.
+- The server recomputes the tips every 5 minutes, so they are as old as the last refresh.
 - The thresholds are first guesses. There is no way to dismiss a tip: it disappears when the
   pattern leaves the 7-day window.
 - There is no rule for repeated Bash commands: the telemetry carries only the first word of a
@@ -44,8 +45,9 @@ session) already chosen. The rules table is repeated at the bottom of **Efficien
 | `slow-hook` | A hook's mean duration over 500 ms, with at least 10 runs (hook) | Hooks run synchronously and delay every matching tool call: speed the hook up or make it async | **Health**, **Hook time** |
 | `slow-ttft` | Mean time to first token over 3 s, with at least 10 requests (project, model) | Long contexts or a busy provider; compare the days in the panel | **Health**, **Time to first token by day** |
 
-The rules are the `cc.tips` view in `clickhouse/views.sql`. To change a number, edit it there and
-run `docker compose run --rm views-init`.
+The rules are in `clickhouse/refresh.sql`, which the `cc-refresh` service runs every 5 minutes into
+the table behind the `cc.tips` view. To change a number, edit it there; the next refresh applies it
+(or `docker compose restart cc-refresh` at once).
 
 ---
 

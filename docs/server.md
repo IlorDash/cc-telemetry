@@ -12,7 +12,7 @@ You install it once with one script; the script is safe to run again.
 | Shell | Windows PowerShell | bash, as your normal user |
 | Internet | On the first start: the images and the Grafana ClickHouse plugin are downloaded | The same |
 | Ports | `4317` (OTLP gRPC), `4318` (OTLP HTTP, session titles), `3000` (Grafana) free on this PC | The same; Grafana can use another port |
-| Disk | Space for the Docker images and for the data, which is kept indefinitely and grows with use | The same |
+| Disk | Space for the Docker images and for the data, which is kept for 365 days and grows with use (see [Disk use and retention](maintenance.md#disk-use-and-retention)) | The same; 180 days on a Raspberry Pi 4 |
 
 Other Linux distributions: install [Docker Engine with the compose
 plugin](https://docs.docker.com/engine/install/) yourself first.
@@ -158,6 +158,10 @@ yourself with `ufw delete allow <port>/tcp` or `firewall-cmd --remove-port=<port
     ClickHouse images newer than 22.3 stop with `Illegal instruction` on an ARM CPU without the
     `lrcpc` feature. On such a CPU the script writes `CLICKHOUSE_VERSION=22.3.20.29` to `.env`
     and warns. ClickHouse 22.3 is long out of support: use it on a trusted LAN only.
+    With 22.3 the script also writes the settings of a small server: a retention of 180 days
+    instead of 365 (`RETENTION_DAYS`), and resource limits for ClickHouse (`CLICKHOUSE_LIMITS=small`,
+    `CLICKHOUSE_CPUS=2`). See [Disk use and retention](maintenance.md#disk-use-and-retention) and
+    [Resource limits and logs](maintenance.md#resource-limits-and-logs).
 
 ---
 
@@ -166,8 +170,8 @@ yourself with `ufw delete allow <port>/tcp` or `firewall-cmd --remove-port=<port
 | Step | Windows | Linux |
 | --- | --- | --- |
 | 1. Docker | Finds Docker Desktop, or Docker Engine in WSL; offers to install it in WSL | Checks that `docker`, the compose plugin and the daemon answer; offers to install them on Debian and Ubuntu |
-| 2. `.env` | Creates it with random passwords; an existing `.env` is kept | The same, and writes `OTLP_BIND`, `GRAFANA_BIND` and `GRAFANA_PORT` |
-| 3. Stack | Starts it and waits until the `cc.*` views are created | Stops if the Grafana port is taken (a busy 4317 or 4318 is only a warning), then starts the stack and waits for the views |
+| 2. `.env` | Creates it with random passwords; an existing `.env` is kept | The same, and writes `OTLP_BIND`, `GRAFANA_BIND` and `GRAFANA_PORT`, and the keys `RETENTION_DAYS`, `CLICKHOUSE_LIMITS` and `CLICKHOUSE_CPUS` when they are missing |
+| 3. Stack | Starts it and waits until the `cc.*` views are created | Stops if the Grafana port is taken (a busy 4317 or 4318 is only a warning), then starts the stack, waits for the views and applies the retention TTL (see [Disk use and retention](maintenance.md#disk-use-and-retention)) |
 | 4. Checks | Grafana on `localhost:3000`, OTLP on `localhost:4317` and `localhost:4318` | The same on the published addresses; also checks that the `docker` service starts at boot |
 | 5. After that | WSL only: starts a hidden keepalive and adds it to the Startup folder (`cc-telemetry-keepalive.vbs`), so WSL does not stop the stack | LAN mode: firewall rules and the server's LAN address |
 | 6. `-EnableLan` | Firewall rules for TCP 4317 and 4318 (Private networks) and, for WSL, a port forward of both from the LAN address | (part of step 5) |

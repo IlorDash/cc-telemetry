@@ -98,9 +98,9 @@ pick a session.
 
 | Setting | Value |
 | --- | --- |
-| Default range | Last 7 days; **Overview** opens with the last 30 days |
+| Default range | Last 24 hours |
 | Quick ranges | 5 minutes, 1 hour, 24 hours, 7 days, 30 days and `All` (10 years) |
-| Refresh | Every 10 s by default; pick another rate at the top right, from 5 s to 1 h |
+| Refresh | Every 5 minutes by default; pick another rate at the top right, from 1 minute to 1 hour |
 | Days and hours | Server time zone, which is UTC in Docker |
 
 The time range applies to every panel except the rail and the tips. A panel that ignores it says

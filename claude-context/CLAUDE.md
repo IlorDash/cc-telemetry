@@ -18,7 +18,7 @@ with the code (`claude-context/modules/docs-site.md`).
 1. `claude-context/context-claude.md` — hub (glossary, data flow, module map, conventions,
    ledger). Always read first.
 2. The module file of your area in `claude-context/modules/`: `stack`, `telemetry-data`,
-   `dashboard`, `setup-scripts`, `docs-site`.
+   `materialization`, `dashboard`, `setup-scripts`, `server-update`, `docs-site`.
 3. Source last.
 
 Ledger: `claude-context/pending-bugs.md` (suspected bugs and unverified behaviour).
@@ -42,10 +42,20 @@ server or connecting a PC. Never copy its content into tracked files.
 ---
 
 ## The user's tools
-Windows 10, VS Code (editing, diffs, **all git** — Source Control view or a command to paste
-into the VS Code terminal), PowerShell in the terminal. Your Bash tool is Git Bash; a PowerShell
-tool is available too. Docker runs inside WSL here (`wsl -d Ubuntu -- docker compose ...` from
-the repo root).
+VS Code everywhere (editing, diffs, **all git** — Source Control view or a command to paste into
+the VS Code terminal). The session runs on one of two kinds of machine; check which (`uname -s`,
+or the platform in your environment) before running stack commands:
+
+| | Windows PC | Linux PC (server or client) |
+| --- | --- | --- |
+| Terminal | PowerShell; your Bash tool is Git Bash, a PowerShell tool exists | bash; no PowerShell |
+| Docker | inside WSL: `wsl -d Ubuntu -- docker compose ...` | native: `docker compose ...` |
+| Python | `py -3` (`python` is the Store stub) | `python3` |
+| `.claude` | directory junction | directory symlink |
+
+The guides write stack commands in the Windows form. On Linux drop the `wsl -d Ubuntu --` prefix,
+pipe with `cat <file> |` instead of `Get-Content <file> |`, and skip PowerShell-only steps
+(`*.ps1` runs, UAC) — report them as not verified on this machine.
 
 ## Git
 - Read-only git only: `status`, `log`, `diff`, `show`, `blame`, `ls-files`, `grep`, `rev-parse`,
@@ -65,7 +75,8 @@ the repo root).
 ## Safety
 Never without the user's explicit "yes": anything that deletes data (`docker compose down -v`,
 `docker volume rm`, `wsl --unregister`, `DELETE`/`DROP` in ClickHouse — dump first with
-`linux-server-tools/backup.sh dump`); Windows system settings (network profile, firewall, services); commands
+`linux-server-tools/backup.sh dump`); system settings (Windows network profile, firewall,
+services; Linux firewall, systemd units, `/etc`); commands
 needing admin rights (hand them to the user). Never help bypass corporate controls (VPN,
 firewalls, IT policy); warn before corporate data would go to a personal server. Client setup is
 always per-user, never system-wide.
@@ -105,7 +116,7 @@ has committed the previous one.
 **Feature chain** — always sequential: developer → reviewer (BLOCKED → back to developer with the
 blocker list). **Trivial change** (comment or text, a typo, README or site-page wording, a
 constant the user named with its new value, a rename inside one function) → no reviewer; end the
-reply with the bold line **РЕВЬЮЕР НЕ ЗАПУСКАЛСЯ (ТРИВИАЛЬНАЯ ПРАВКА)**. Never trivial: SQL view logic, dashboard
+reply with the bold line **РЕВЬЮЕР НЕ ЗАПУСКАЛСЯ (ТРИВИАЛЬНАЯ ПРАВКА)**. Never trivial: SQL view logic, the MV / `events_t` schema / backfill / refresh, dashboard
 queries or variables, collector pipeline, anything in the setup scripts touching the network,
 firewall, WSL, `.env` or user settings files, or more than ~10 lines. In doubt → not trivial.
 

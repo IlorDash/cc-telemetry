@@ -77,7 +77,8 @@ The script is [client/setup-client.sh](client/setup-client.sh).
 
 On the server PC itself, use `localhost` as the address. The script changes only your own
 user's Claude Code settings and keeps every other key. Then restart running Claude Code
-sessions and make a request: within a few seconds the session appears in Grafana.
+sessions and make a request: within about 30 seconds the session reaches the server, and Grafana
+shows it on the next dashboard refresh (every 5 minutes, or at once with the refresh button).
 
 ## Next
 

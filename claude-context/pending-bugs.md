@@ -18,6 +18,11 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
   `-Distro` other than the one already kept alive, the new keepalive is not started this time
   (the Startup file is correct, so it starts after the next logon).
 
+- **?** The new `compose up -d` failure path (print views-init log, then `Fail`) never ran: the
+  `.ps1` was not executed after the change (Linux test machine only).
+- **L** Step 3 calls `wsl.exe ... docker compose up -d` / `docker compose up -d` directly,
+  duplicating the `Compose` wrapper's mode switch: a change to the wrapper must be repeated there.
+
 - **L** The final summary prints `.\setup-client.ps1` for other PCs, while in the repo the file is
   `client\setup-client.ps1` (right only for a copied file).
 
@@ -25,6 +30,15 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
 
 - **M?** Unverified on a physical Linux host: the Docker install path (`install-docker.sh` on
   Ubuntu/Debian and derivatives) and the ufw / firewalld rule paths.
+
+- **M?** `reload_changed_config` restarts only `otel-collector` and `grafana`: a pulled change to
+  `clickhouse/config.d/common.xml`, `clickhouse/users.d/common.xml` or
+  `clickhouse/limits/<CLICKHOUSE_LIMITS>/{config,users}.xml` leaves
+  `clickhouse` running on the old values (its service definition is unchanged, so `compose up -d`
+  does not recreate it). Both are single-file bind mounts: git replaces the file, the running
+  container likely keeps the old inode until a restart (unverified).
+- **?** `apply_retention` was never exercised by a real `--update` run (dump → `ttl-recent.tsv` →
+  TTL change → `finish_update` with the exact recent-row check).
 
 ## setup-client.ps1
 
@@ -45,6 +59,31 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
   A plain `setup-server.sh --update` (`compose up -d`) recreates only changed containers, so the
   collector restarts only when its service definition (image tag, environment, ports) changes,
   or when the pulled commits changed `otel-collector.yaml` (`reload_changed_config`).
+- **?** On a fresh install (no exporter `ttl` any more) the `otel.*` TTL comes only from
+  views-init (`init-views.sh`: ≤ 60 s wait for 5 `otel_metrics_*` tables, then `ALTER ... MODIFY TTL`
+  where none exists). Not run on a fresh volume, and not on 25.8 at all.
+- **?** `apply_retention` changing an existing TTL (`ttl_state` from `engine_full`, lengthen /
+  shorten, `other` left with a warning) and `check_window_days` were not run against a changed
+  `RETENTION_DAYS`; the `ttl_state` regex is fitted to the 22.3 `engine_full` form
+  (`+ toIntervalDay(<n>)`), 25.8 unverified (a different rendering would read as `other`).
+
+## ClickHouse config (`clickhouse/config.d/`, `clickhouse/users.d/`, `clickhouse/limits/`)
+
+- **M?** `background_pool_size` sits in the `default` profile (`limits/small/users.xml`). 22.3 still
+  reads it there (shows as changed in `system.settings`, observed 2026-11-17; the actual pool size
+  was not measured); in 25.8 it is a server-level setting, so in a profile it is likely ignored and
+  the 2-thread merge limit does not apply on a 25.8 server with `CLICKHOUSE_LIMITS=small` (set by
+  hand: `setup-server.sh` picks `small` only for 22.3). Unverified on 25.8.
+- **L** Stale `system.query_log*` / `system.query_views_log*` tables (e.g. `query_log_0`, left on 22.3 by
+  the old `query_log` TTL, ~78k rows observed 2026-11-17) stay on servers that had them, as the log is
+  now off. `setup-server.sh` only warns with the `DROP TABLE ... SYNC` command; dropping needs the
+  user's "yes".
+
+## AI setup (`claude-context/settings.json`)
+
+- **?** The guard-secrets hook command is `if command -v py ...; then py -3 ...; else python3 ...; fi`:
+  POSIX shell syntax, run on Linux only so far. On Windows it works only if Claude Code runs hook
+  commands under Git Bash (not cmd/PowerShell); untested there — a broken hook means no secrets guard.
 
 ## views (`clickhouse/views.sql`)
 
@@ -57,19 +96,37 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
 - **L** `cc.session_project` worktree fold is a name-prefix heuristic: it merges different
   projects sharing a prefix (`my` and `my-app`) and is not transitive (`b`, `b-c`, `b-c-d`). A
   project in an unusual layout (`/data/x/y/`) is named after its first folder (`data`).
-- **L?** Cost: every query on `cc.events` reads `otel.otel_logs` about 6 times (`events_raw` itself;
-  `session_project` over `path_roots`, which reads `events_raw` and `session_meta`; and both halves
-  of its `names` union, `path_roots` again plus `events_raw`). Deferred until an ARMv8.0 Linux
-  server gets slow.
 - **L** `cc.tips` `repeated-read` puts `cc.tool_calls.path` in the title: a file outside the
   project keeps its absolute path there.
-- **?** `cc.tips` verified only on ClickHouse 22.3 (`count()` ~0.5 s on ~4.9k events); 25.8
-  untested. It reads `otel.otel_logs` once per rule through the views — watch the cost as data grows.
+- **?** `cc.tips` rules (now in `refresh.sql`) verified only on ClickHouse 22.3; 25.8 untested.
 - **?** `cc.tips` rules `cache`, `agent-outlier`, `slow-ttft` have not fired on real data yet
-  (2026-11-19): SQL and thresholds unconfirmed.
-- **?** No `api_error` event in the live data yet (2026-11-19, Claude Code 2.1.327): its attribute
-  names, `cc.events_raw.status_code`/`error` and the Health panels 493/495 are checked only on empty
-  data; whether `api_error` carries `agent_id` / `skill.name` (used for the Actor/Skill filter) is unknown.
+  (2026-11-19, still none 2026-11-21): SQL and thresholds unconfirmed.
+- **?** `api_error` is in the live data now (12 events, all `status_code` 429, Claude Code
+  2.1.325–2.1.328, observed 2026-11-21): attribute names, `agent_id` / `skill.name` and
+  `cc.events_t.status_code` / `error` confirmed; the Health panels 493/495 were not reviewed
+  against those rows.
+
+## materialization (`clickhouse/schema.sql`, `backfill.sql`, `refresh.sql`, `cc-refresh`)
+
+- **?** Run only on ClickHouse 22.3.20.29 (2026-11-18): `schema.sql`, the backfill, `refresh.sql`
+  (`EXCHANGE TABLES`) and the new views never ran on 23.3 or 25.8.
+- **?** The day-partitioned `cc.events_t` (`PARTITION BY toDate(ts)`, TTL, `ttl_only_drop_parts`)
+  is proven only on 22.3.20.29; ClickHouse 25.8 untested.
+- **?** The `throwIf` abort path of `refresh.sql` (duplicate `session_id` → no swap, old table
+  kept, next run drops the leftover `_new`) was never triggered.
+- **?** A very large first backfill (upgrade over a big history) was not timed against the setup
+  scripts' views-init wait (90 × 2 s after `compose up -d`).
+- **?** `backup.sh restore` refilling `cc.events_t` (through `cc.events_mv`, or the next views-init
+  backfill) follows from the code but was not run.
+- **L?** A row from a client whose clock is more than 30 s ahead, arriving while a month pass
+  runs, may be inserted by both the MV and the backfill (duplicate in `cc.events_t`); rare, not
+  observed.
+- **L** A changed `clickhouse/refresh-loop.sh` is not picked up by `setup-server.sh --update`
+  (`cc-refresh`'s service definition is unchanged, `reload_changed_config` does not restart it)
+  until `cc-refresh` is restarted by hand.
+- **L** Path rules are written three times (`cc.events_mv`, `backfill.sql`, `cwd` part of
+  `cc.path_roots`) and the project rule twice (`cc.events`, `cc.tool_calls`): an edit to one copy
+  silently diverges.
 
 ## dashboards (`grafana/dashboards/*.json`)
 

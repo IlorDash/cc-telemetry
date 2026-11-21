@@ -129,7 +129,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "py -3 \"${CLAUDE_PROJECT_DIR}/.claude/hooks/guard-secrets.py\""
+            "command": "if command -v py >/dev/null 2>&1; then py -3 \"${CLAUDE_PROJECT_DIR}/.claude/hooks/guard-secrets.py\"; else python3 \"${CLAUDE_PROJECT_DIR}/.claude/hooks/guard-secrets.py\"; fi"
           }
         ]
       },

@@ -8,8 +8,8 @@ rows the dashboard reads.
 
 | Path | Role |
 | --- | --- |
-| `clickhouse/views.sql` | `CREATE DATABASE cc` + twelve `CREATE OR REPLACE VIEW` (order matters: a view must exist before one reading it) |
-| `clickhouse/init-views.sh` | waits up to 10 min for `otel.otel_logs`, then applies `views.sql` |
+| `clickhouse/views.sql` | twelve `CREATE OR REPLACE VIEW` (order matters: a view must exist before one reading it) |
+| `clickhouse/schema.sql`, `backfill.sql`, `refresh.sql`, `init-views.sh`, `refresh-loop.sh` | tables the views read and how they are filled: `modules/materialization.md` |
 | `client/user-settings.env.json`, `client/project-settings.local.env.json` | the client env keys (templates) |
 
 ## Client env → what is sent
@@ -71,8 +71,10 @@ parent `session.id`.
 | `assistant_response` | `response` (dropped by the collector), `response_length`, `model`, `request_id` |
 | `tool_result` | `tool_name`, `success`, `duration_ms`, `tool_input` (JSON: `file_path`/`notebook_path`/`path`/`pattern`/`command`), `tool_parameters` (`bash_command`: first word only, e.g. `git`; reported 2026-11-15), `tool_result_size_bytes`, `request_id`, `tool_use_id`, `agent_id` |
 | `tool_decision` | `decision`, `source`, `tool_name`, `permission_mode`, `request_id`, `tool_use_id`, `agent_id` (subagent decisions), `tool_parameters`; `source` values `config`, `hook`, `user_reject`, `user_temporary`, `request_id` always set (observed on Claude Code 2.1.327, 2026-11-19) |
-| `api_error` | `model`, `error`, `status_code`, `duration_ms`, `attempt`, `request_id`, `speed`, `query_source`, `effort` (list supplied for the redesign, 2026-11-19); one event per failed attempt, retries included. Not yet in the live data — see pending-bugs.md |
+| `api_error` | `model`, `error`, `status_code`, `duration_ms`, `attempt`, `request_id`, `client_request_id`, `speed`, `query_source`, `effort`, `agent_id`, `agent.name`, `skill.name`; one event per failed attempt, retries included (observed on Claude Code 2.1.325–2.1.328, 2026-11-16..19: 12 events, all `status_code` 429 rate limit) |
 | `compaction` | `trigger` (`auto` seen), `pre_tokens`, `post_tokens`, `duration_ms`, `success` (observed on Claude Code 2.1.327, 2026-11-19); unused by the views |
+| `permission_mode_changed` | `from_mode`, `to_mode` (observed on Claude Code 2.1.328–2.1.329, 2026-11-20); unused by the views |
+| `feedback_survey` | `survey_type`, `event_type`, `appearance_id`, `event_origin` (observed on Claude Code 2.1.325–2.1.329, 2026-11-15..20); unused by the views |
 | `at_mention` | `mention_type`, `success`; **no path**: an `@` file is inlined without a tool call, so it never feeds project inference |
 | `subagent_completed` | `agent_type`, `agent_id`, `total_tokens`, `total_tool_uses`, `duration_ms`, `model` |
 | `skill_activated` | `skill.name`, `skill.source`, `invocation_trigger` |
@@ -85,28 +87,31 @@ interactive terminal CLI value is unverified (expected `repl_main_thread`, alrea
 Resource attributes add `service.name=claude-code`, `service.version`, `os.type`, `os.version`.
 Metrics: `claude_code.{token.usage,cost.usage,lines_of_code.count,active_time.total,session.count,code_edit_tool.decision}`.
 
-## Views (`cc.*`, plain, read `otel.otel_logs` on every query)
+## Views (`cc.*`, plain views over `cc.events_t`, the refreshed tables and `cc.session_meta`)
 
 ```
-cc.events_raw ─┬─ cc.path_roots ─► cc.session_project   (+ explicit labels from events_raw)
-cc.session_meta┘ (cwd)
+cc.events_t ─┬─ cc.events_raw (39 original columns)
+             └─ cc.path_roots (path_cand) ◄─ cc.session_meta (cwd; plain view over otel_logs)
+cc.path_roots + labels ══[cc-refresh, 300 s]══► cc.session_project_t ─► cc.session_project
 cc.events_raw ─┬─ cc.events  = events_raw LEFT JOIN session_project (effective project)
                ├─ cc.agents    (agent_id → name)
                └─ cc.requests  (request_id → skill)
 cc.events ─┬─ cc.api_requests  (events + agents)
-           ├─ cc.tool_calls    (events + agents + requests)
            ├─ cc.sessions      (+ LEFT JOIN cc.session_meta)
            └─ cc.prompts
-cc.tips ◄── cc.api_requests, cc.tool_calls, cc.events, cc.events_raw   (last 7 days)
+cc.events_t + session_project + agents + requests ─► cc.tool_calls (project rule inlined)
+cc.api_requests, cc.tool_calls, cc.events, cc.events_raw ══[cc-refresh]══► cc.tips_t ─► cc.tips
 ```
-- `ServiceName` is filtered in exactly two views: `cc.events_raw` (`claude-code`) and
-  `cc.session_meta` (`cc-session-meta`); every other view reads one of them.
-- `cc.events_raw`: one row per Claude Code event; `project_label` lower-cased, `unknown` when
-  missing; attributes flattened to typed
-  columns (`toUInt64OrZero` etc.); `account_uuid` (`user.account_uuid`), `account` (display label:
-  `user.email`, else the first 8 characters of the uuid, else `''`); last four `result_bytes`
-  (`tool_result_size_bytes`), `ttft_ms`, `status_code` (`api_error`, `toUInt32OrZero`: 0 without an
-  HTTP status) and `error` (`api_error` text), passed on to `cc.events` via `e.*`.
+- `ServiceName` is filtered in two places: `cc.events_mv` / `backfill.sql` (`claude-code`, at
+  insert) and `cc.session_meta` (`cc-session-meta`); no other view reads `otel.otel_logs`.
+- `cc.events_raw`: one row per Claude Code event, the column list of `cc.events_t` (without `seq`,
+  `abs_path`, `path_cand`, `bash_cmd`); `project_label` lower-cased, `unknown` when missing;
+  attributes flattened to typed columns at insert time (`toUInt64OrZero` etc.); `account_uuid`
+  (`user.account_uuid`), `account` (display label: `user.email`, else the first 8 characters of the
+  uuid, else `''`); last four `result_bytes` (`tool_result_size_bytes`), `ttft_ms`, `status_code`
+  (`api_error`, `toUInt32OrZero`: 0 without an HTTP status) and `error` (`api_error` text), passed
+  on to `cc.events` via `e.*`. In `cc.events_t`, `account_uuid`, `status_code`, `error` are the last
+  three columns (the order of the `backfill.sql` SELECT, which inserts by position).
 - `cc.session_meta` (defined right after `events_raw`, because `path_roots` reads it): per
   `session_id` the latest value (`argMax(…, Timestamp)`) of `title`, `title_source`, `git_branch`,
   `cwd`, `host`, `cc_version`, plus `updated`; only `event.name = 'session_meta'`, non-empty id.
@@ -117,15 +122,19 @@ cc.tips ◄── cc.api_requests, cc.tool_calls, cc.events, cc.events_raw   (la
   (`users/<u>/`, `home/<u>/`, `root/`) and any run of container folders (`documents`, `projects`,
   `src`, `dev`, `work`, `repos`, `github`, `desktop`, `downloads`, `onedrive`, `onedrive - *`, ...).
   Dropped: hidden folders, temp/system/AppData/`node_modules` names, files directly in a
-  container. The regex and the `IN` stop list must stay in step.
-- `cc.session_project`: per session the `cwd` folder if any, else the most frequent `cand` (ties:
-  name order); so the effective project = label > cwd folder > path heuristic. A folder
-  `<n>-<x>` (worktree) folds into the longest known `<n>` — known = any `cand` or explicit label.
-  Limits: pending-bugs.md.
+  container. The regex and the `IN` stop list must stay in step — tool-call half precomputed in
+  `cc.events_t.path_cand`, `cwd` half computed in the view (`modules/materialization.md`).
+- `cc.session_project`: reads `cc.session_project_t` (rebuilt by `refresh.sql` every 300 s). Per
+  session the `cwd` folder if any, else the most frequent `cand` (ties: name order); so the
+  effective project = label > cwd folder > path heuristic. A folder `<n>-<x>` (worktree) folds
+  into the longest known `<n>` — known = any `cand` or explicit label. Limits: pending-bugs.md.
 - `cc.events`: `cc.events_raw` minus `project_label`, plus `project` = label if not `unknown`,
-  else `cc.session_project.project`, else `unknown` (`LEFT JOIN … ON session_id`). Computed per
-  query, so old sessions get a project too.
-- `cc.agents`, `cc.requests` read `cc.events_raw` (no project needed).
+  else `cc.session_project.project`, else `unknown` (`LEFT JOIN … ON session_id`). The inferred
+  part is as old as the last refresh: a new unlabelled session is `unknown` for ≤ 5 min; a rule
+  change reaches old sessions on the next refresh.
+- `cc.agents`, `cc.requests` read `cc.events_raw` (no project needed); `cc.agents` keeps only
+  `api_request`, `assistant_response`, `api_error`, `subagent_completed` (the events that carry a
+  name), `cc.requests` only `api_request`.
 - `cc.agents`: name = `agent_type` (at completion) → `agent.name` (first request) → `query_source`
   without `agent:<kind>:` → `agent?`.
 - `cc.api_requests.actor`: agent name if `agent_id`; `main` if `query_source` is `sdk`, `main` or
@@ -135,8 +144,9 @@ cc.tips ◄── cc.api_requests, cc.tool_calls, cc.events, cc.events_raw   (la
 - `cc.api_requests`, `cc.tool_calls`, `cc.sessions`, `cc.prompts` all carry `account` /
   `account_uuid` (the Account variable filters on `account_uuid`); `cc.sessions` / `cc.prompts` take
   them from the latest event that has an account.
-- `cc.tool_calls`: `actor` (`main` / agent), `skill` via `request_id`, `op`
-  (read/write/search/other), path normalisation: `\` → `/`, lower case, `/c/` → `c:/`; relative to
+- `cc.tool_calls`: reads `cc.events_t` (`tool_result`) directly, with the `cc.events` project rule
+  inlined (keep both in step); `actor` (`main` / agent), `skill` via `request_id`, `op`
+  (read/write/search/other), `result_bytes`, `abs_path` and `bash_cmd` from `cc.events_t`; path relative to
   the first `/<project>` in the path; worktree folders `<project>-<name>/` fold into the same
   relative path; `area` = first path segment, `claude-context` for `claude-context/` and
   `.claude/`, `external` outside the project.
@@ -151,8 +161,9 @@ cc.tips ◄── cc.api_requests, cc.tool_calls, cc.events, cc.events_raw   (la
 
 ## `cc.tips` — usage tips
 
-`UNION ALL` of rules over `now() - INTERVAL 7 DAY` (fixed; ignores the dashboard range and
-variables). Columns: `category`, `title`, `body`, `scope` (project / agent type / hook), `metric`
+A view over `cc.tips_t`; the rules are in `clickhouse/refresh.sql` (rebuilt every 300 s, so tips
+lag ≤ 5 min). `UNION ALL` of rules over `now() - INTERVAL 7 DAY` (fixed; ignores the dashboard
+range and variables). Columns: `category`, `title`, `body`, `scope` (project / agent type / hook), `metric`
 (Float64), `link` (relative, no slug, one evidence panel full-screen via `viewPanel=panel-<id>`,
 variables preset; always has a query string — the dashboards append `&` + the time range),
 `affected` (Nullable UInt64, tokens the tip is about; NULL for the time tips `denials`,
@@ -190,4 +201,5 @@ These panel ids are fixed: renumbering one breaks its tip link.
 - **No repeated-Bash rule, on purpose:** `bash_cmd` holds only the first word (`cd`, `git`), so
   counting it is noise. Do not add one while Claude Code sends only that.
 
-Apply changes: `wsl -d Ubuntu -- docker compose run --rm views-init`.
+Apply changes: views → `docker compose run --rm views-init`; tip rules (`refresh.sql`) → the next
+`cc-refresh` run picks them up (never run `refresh.sql` by hand while `cc-refresh` is up).

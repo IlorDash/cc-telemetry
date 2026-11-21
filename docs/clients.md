@@ -193,10 +193,12 @@ knows), and events produced while the server is unreachable are dropped after a 
 ## Check that events arrive
 
 1. Restart the Claude Code sessions, then make any request.
-2. Open Grafana (see [the server page](server.md)) and look at the **Overview** dashboard. Within
-   a few seconds the session appears.
+2. Open Grafana (see [the server page](server.md)) and look at the **Overview** dashboard. The
+   session reaches the server within about 30 seconds and shows on the next dashboard refresh
+   (every 5 minutes, or at once with the refresh button at the top right).
 3. The project shows in the **Project** dropdown once the session has touched a file or its
-   working directory has arrived through the hook, or at once with an explicit label.
+   working directory has arrived through the hook, or at once with an explicit label. The server
+   works out the project every 5 minutes, so until then a new session shows as `unknown`.
 
 ---
 

@@ -53,9 +53,9 @@ as it arrives, with no other filter.
 
 ## Where the data lives
 
-- **The telemetry stays on the server PC.** The collector writes every event to ClickHouse (`otel.otel_logs`
-  and the metrics tables), which keeps it in the Docker volume `clickhouse-data`. The
-  collector has no other exporter: nothing is forwarded to another server.
+- **The telemetry stays on the server PC.** The collector writes every event to ClickHouse
+  (`otel.otel_logs` and the metrics tables), which keeps it in the Docker volume
+  `clickhouse-data`. The collector has no other exporter: nothing is forwarded to another server.
 - **What Grafana contacts by itself.** The stack does not change Grafana's defaults, so Grafana
   sends anonymous usage statistics and checks grafana.com for updates, and the ClickHouse plugin
   is downloaded from grafana.com on the first start. This traffic has no prompts or events in
@@ -65,9 +65,9 @@ as it arrives, with no other filter.
   `-EnableLan`. On a Linux server all three ports are open to the LAN unless you pass
   `--local-only`. See [the server page](server.md). OTLP has no authentication and Grafana is
   plain HTTP: use LAN mode on a trusted network only.
-- **For as long as you keep it.** The stack sets no retention, see
-  [Disk use and retention](maintenance.md#disk-use-and-retention). Claude Code deletes its
-  own session files after about 30 days; the server keeps the history longer.
+- **For `RETENTION_DAYS` days.** 365 by default, 180 on a Raspberry Pi 4; older rows are
+  deleted, see [Disk use and retention](maintenance.md#disk-use-and-retention). Claude Code
+  deletes its own session files after about 30 days; the server keeps the history longer.
 - **In backups.** A dump from `linux-server-tools/backup.sh` holds all of it, prompts included,
   in `backup/`, see [Back up and restore](maintenance.md#back-up-and-restore).
 - **Shown in Grafana.** Everyone who can log in to Grafana sees the prompts, paths and e-mails

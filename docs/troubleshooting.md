@@ -100,8 +100,8 @@ Work down the list; stop at the first step that fails.
    Open the folder in Claude Code once and accept the trust dialog.
 5. On the server, read `docker compose logs otel-collector`. A ClickHouse error there means
    the events arrive but are not stored: read `docker compose logs clickhouse` too.
-6. Make a request and wait a few seconds, then reload the dashboard. The first events fill
-   **Overview**.
+6. Make a request and wait 30 seconds (the collector writes events in batches every 30 s), then
+   reload the dashboard. The first events fill **Overview**.
 
 ---
 
@@ -111,6 +111,8 @@ Work down the list; stop at the first step that fails.
 | --- | --- | --- |
 | Panels are empty | No events in the time range, or a variable filters everything out | Widen the time range; set the variables to `All`. See [Time range and refresh](dashboards.md#time-range-and-refresh) |
 | An error that the table or view `cc.events` does not exist | The `cc.*` views do not exist | `docker compose logs views-init`, then `docker compose run --rm views-init` |
+| A new session shows `project = unknown` for longer than 5 minutes, or the tips look stale | The `cc-refresh` service does not run or fails | `docker compose logs cc-refresh`: every 5 minutes it prints `refresh ok` or `refresh FAILED` with the error. `docker compose up -d cc-refresh` starts it |
+| A panel fails with a memory limit error (`MEMORY_LIMIT_EXCEEDED`) | The server runs with the limits of a small server: a query may use 1.5 GB | Narrow the time range or the variables. See [Resource limits and logs](maintenance.md#resource-limits-and-logs) |
 | A variable dropdown is empty | The variable query did not run | Dashboard settings, Variables, open the variable, **Run query**, then save the dashboard |
 | The ClickHouse plugin does not load | No internet on the first start | Restore it and run `docker compose restart grafana` |
 | **Sessions**: "No session selected" under the table | By design: the panels below the table show the selected session only | Click a session name, or pick it in the **Session** variable. See [Variables](dashboards.md#variables) |
