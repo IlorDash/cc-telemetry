@@ -5,5 +5,9 @@ settings.local.json
 *.local.json
 # Personal state of the user's own server and clients (PC names, IPs, networks).
 *.local.md
+# Drafts of the mr-description skill: working files, not part of the repo.
+merge-requests/
 # Python bytecode of the hooks and skill scripts.
 __pycache__/
+# PR descriptions drafted by the mr-description skill (the PR on GitHub keeps the text).
+pull-requests/

@@ -1,0 +1,2063 @@
+{
+  "uid": "cc-efficiency-ru",
+  "title": "Эффективность",
+  "tags": [
+    "cc",
+    "claude-code",
+    "otel"
+  ],
+  "timezone": "browser",
+  "editable": true,
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5m",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timepicker": {
+    "quick_ranges": [
+      {
+        "display": "Последние 5 минут",
+        "from": "now-5m",
+        "to": "now"
+      },
+      {
+        "display": "Последний час",
+        "from": "now-1h",
+        "to": "now"
+      },
+      {
+        "display": "Последние 24 часа",
+        "from": "now-24h",
+        "to": "now"
+      },
+      {
+        "display": "Последние 7 дней",
+        "from": "now-7d",
+        "to": "now"
+      },
+      {
+        "display": "Последние 30 дней",
+        "from": "now-30d",
+        "to": "now"
+      },
+      {
+        "display": "Всё время",
+        "from": "now-10y",
+        "to": "now"
+      }
+    ],
+    "refresh_intervals": [
+      "1m",
+      "5m",
+      "15m",
+      "1h"
+    ]
+  },
+  "links": [
+    {
+      "type": "link",
+      "title": "EN",
+      "tooltip": "Английская версия",
+      "url": "/d/cc-efficiency",
+      "keepTime": true,
+      "includeVars": true
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "account",
+        "label": "Аккаунт",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "clickhouse"
+        },
+        "query": "SELECT account_uuid, argMax(account, ts) AS name FROM cc.events WHERE account_uuid != '' GROUP BY account_uuid ORDER BY name",
+        "definition": "SELECT account_uuid, argMax(account, ts) AS name FROM cc.events WHERE account_uuid != '' GROUP BY account_uuid ORDER BY name",
+        "includeAll": true,
+        "allValue": "'__all'",
+        "multi": true,
+        "refresh": 2,
+        "sort": 0,
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": []
+      },
+      {
+        "name": "project",
+        "label": "Проект",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "clickhouse"
+        },
+        "query": "SELECT DISTINCT project FROM cc.events WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) ORDER BY project",
+        "definition": "SELECT DISTINCT project FROM cc.events WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) ORDER BY project",
+        "includeAll": true,
+        "allValue": "__all",
+        "multi": false,
+        "refresh": 2,
+        "sort": 0,
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": []
+      },
+      {
+        "name": "session",
+        "label": "Сессия",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "clickhouse"
+        },
+        "query": "SELECT session_id, if(title != '', concat(leftUTF8(title, 60), ' (', left(session_id, 8), ')'), session_id) AS name FROM cc.sessions WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
+        "definition": "SELECT session_id, if(title != '', concat(leftUTF8(title, 60), ' (', left(session_id, 8), ')'), session_id) AS name FROM cc.sessions WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
+        "includeAll": true,
+        "allValue": "__all",
+        "multi": false,
+        "refresh": 2,
+        "sort": 0,
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": []
+      },
+      {
+        "name": "actor",
+        "label": "Исполнитель",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "clickhouse"
+        },
+        "query": "SELECT DISTINCT actor FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') ORDER BY actor",
+        "definition": "SELECT DISTINCT actor FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') ORDER BY actor",
+        "includeAll": true,
+        "allValue": "__all",
+        "multi": false,
+        "refresh": 2,
+        "sort": 0,
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": []
+      },
+      {
+        "name": "skill",
+        "label": "Навык",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "clickhouse"
+        },
+        "query": "SELECT DISTINCT skill FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND skill != '' ORDER BY skill",
+        "definition": "SELECT DISTINCT skill FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND skill != '' ORDER BY skill",
+        "includeAll": true,
+        "allValue": "__all",
+        "multi": false,
+        "refresh": 2,
+        "sort": 0,
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": []
+      }
+    ]
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 330,
+      "type": "text",
+      "title": "Дашборды",
+      "description": "Навигация. Ссылки сохраняют период и переменные.",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 3,
+        "h": 12
+      },
+      "transparent": false,
+      "options": {
+        "mode": "html",
+        "content": "<a href=\"/d/cc-usage-ru?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Обзор</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">итоги и статус</span></a><a href=\"/d/cc-sessions-ru?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Сессии</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">список · таймлайн</span></a><a href=\"/d/cc-prompts-ru?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Промпты</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">дорогие ходы</span></a><a href=\"/d/cc-efficiency-ru?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid #F46800;background:#22252b\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Эффективность</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">советы и разбор затрат</span></a><a href=\"/d/cc-agents-ru?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Агенты и навыки</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">субагенты, навыки</span></a><a href=\"/d/cc-tools-ru?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Инструменты и файлы</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">вызовы, файлы, чтения</span></a><a href=\"/d/cc-health-ru?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Состояние</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">задержки, хуки</span></a>"
+      }
+    },
+    {
+      "id": 331,
+      "type": "bargauge",
+      "title": "Расход · 5 ч",
+      "description": "Стоимость (cost_usd) по аккаунтам Claude за последние 5 часов. Полоса = эта стоимость в % от пика аккаунта: его максимума за скользящие 5 часов за последние 30 дней (шаг 10 минут). Зелёный до 60 %, жёлтый от 60 %, красный от 80 %. Окна фиксированы: период дашборда и переменные не действуют. Аккаунты без затрат за 7 дней не показаны.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 3,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT\n    concat(if(t.label = '', '(нет аккаунта)', t.label), '  ·  $', toString(round(t.h5, 2))) AS name,\n    round(100 * t.h5 / greatest(p.peak, t.h5, 0.000001)) AS pct\nFROM\n(\n    SELECT account_uuid,\n           argMax(account, ts) AS label,\n           sumIf(cost_usd, ts >= now() - INTERVAL 5 HOUR) AS h5,\n           sumIf(cost_usd, ts >= now() - INTERVAL 7 DAY) AS d7\n    FROM cc.api_requests\n    WHERE ts >= now() - INTERVAL 30 DAY\n    GROUP BY account_uuid\n) AS t\nLEFT JOIN\n(\n    SELECT account_uuid, max(w) AS peak\n    FROM\n    (\n        SELECT account_uuid,\n               sum(c) OVER (PARTITION BY account_uuid ORDER BY b RANGE BETWEEN 17999 PRECEDING AND CURRENT ROW) AS w\n        FROM\n        (\n            SELECT account_uuid, toUInt32(toStartOfInterval(ts, INTERVAL 10 MINUTE)) AS b, sum(cost_usd) AS c\n            FROM cc.api_requests\n            WHERE ts >= now() - INTERVAL 30 DAY\n            GROUP BY account_uuid, b\n        )\n    )\n    GROUP BY account_uuid\n) AS p ON p.account_uuid = t.account_uuid\nWHERE t.d7 > 0\nORDER BY t.h5 DESC, t.d7 DESC"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": true,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "valueMode": "color",
+        "namePlacement": "top",
+        "showUnfilled": true,
+        "sizing": "manual",
+        "minVizHeight": 36,
+        "maxVizHeight": 36,
+        "text": {
+          "titleSize": 15,
+          "valueSize": 15
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#73BF69",
+                "value": null
+              },
+              {
+                "color": "#FADE2A",
+                "value": 60
+              },
+              {
+                "color": "#F2495C",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 333,
+      "type": "stat",
+      "title": "Советы · 7 д",
+      "description": "Число советов (view cc.tips, последние 7 дней). Клик по значению открывает раздел «Советы» на дашборде «Эффективность». Период дашборда и переменные не действуют.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 3,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT count() AS tips\nFROM cc.tips"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/.*/",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value_and_name",
+        "text": {
+          "titleSize": 30,
+          "valueSize": 30
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "0"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "tips"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Советы"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 1
+                    },
+                    {
+                      "color": "orange",
+                      "value": 5
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Открыть все советы",
+                    "url": "/d/cc-efficiency-ru?${__url_time_range}",
+                    "oneClick": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 332,
+      "type": "stat",
+      "title": "",
+      "description": "Самая частая категория советов (view cc.tips, последние 7 дней), в скобках число (при равенстве по алфавиту). Клик по значению открывает раздел «Советы» на дашборде «Эффективность». Период дашборда и переменные не действуют.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 19,
+        "w": 3,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT if(tips = 0, 'нет', concat(multiIf(top = 'cache', 'Пересборка кэша', top = 'repeated-read', 'Повтор чтений', top = 'big-results', 'Крупные выводы', top = 'short-opus', 'Opus на мелочи', top = 'agent-outlier', 'Дорогой агент', top = 'denials', 'Отклонения', top = 'slow-hook', 'Медленные хуки', top = 'slow-ttft', 'Долгий TTFT', top), ' (', toString(n), ')')) AS most_frequent\nFROM\n(\n    SELECT sum(c) AS tips,\n           argMin(category, (-toInt64(c), category)) AS top,\n           max(c) AS n\n    FROM (SELECT category, count() AS c FROM cc.tips GROUP BY category)\n)"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/.*/",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value_and_name",
+        "text": {
+          "titleSize": 20,
+          "valueSize": 20
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "нет"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "most_frequent"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Чаще всего"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Открыть все советы",
+                    "url": "/d/cc-efficiency-ru?${__url_time_range}",
+                    "oneClick": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 412,
+      "type": "text",
+      "title": "Советы · последние 7 дней, период и переменные не действуют",
+      "description": "Советы по использованию из view cc.tips. Окно фиксировано 7 дней: период дашборда и переменные не действуют. Разделы стоимости и кэша ниже следуют периоду и переменным.",
+      "transparent": true,
+      "gridPos": {
+        "x": 3,
+        "y": 0,
+        "w": 21,
+        "h": 1
+      },
+      "options": {
+        "mode": "html",
+        "content": ""
+      }
+    },
+    {
+      "id": 220,
+      "type": "stat",
+      "title": "Советы · 7 д",
+      "description": "Число советов в cc.tips (за последние 7 дней), затем сколько из них про токены (affected не пусто) и сколько про время (denials, slow hooks, slow first token). Окно фиксировано 7 дней: период дашборда и переменные не действуют.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "timeFrom": "7d",
+      "hideTimeOverride": true,
+      "gridPos": {
+        "x": 3,
+        "y": 1,
+        "w": 3,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT count() AS tips, concat(toString(countIf(affected IS NOT NULL)), ' токенных · ', toString(countIf(affected IS NULL)), ' временных') AS name\nFROM cc.tips"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "orientation": "vertical",
+        "justifyMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "text": {
+          "titleSize": 15,
+          "valueSize": 56
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#FF9830"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 227,
+      "type": "stat",
+      "title": "Затронуто · 7 д",
+      "description": "токены, измерено / не оценка экономии. Сумма cc.tips.affected за последние 7 дней (размеры результатов = байты / 4, то есть примерно столько токенов). Окно фиксировано 7 дней: период дашборда и переменные не действуют.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "timeFrom": "7d",
+      "hideTimeOverride": true,
+      "gridPos": {
+        "x": 6,
+        "y": 1,
+        "w": 4,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT ifNull(sum(affected), 0) AS affected, 'токены · не оценка экономии' AS name\nFROM cc.tips"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "orientation": "vertical",
+        "justifyMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "text": {
+          "titleSize": 15,
+          "valueSize": 56
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 1,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#ccccdc"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 221,
+      "type": "bargauge",
+      "title": "Затронутые токены по категориям",
+      "description": "Сумма cc.tips.affected по категориям, крупные сверху; число советов следует за значением (примерно столько токенов: размеры результатов = байты / 4). Окно фиксировано 7 дней: период и переменные не действуют. У советов про время нет affected, их здесь нет.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "timeFrom": "7d",
+      "transformations": [
+        {
+          "id": "rowsToFields",
+          "options": {
+            "mappings": [
+              {
+                "fieldName": "name",
+                "handlerKey": "field.name"
+              },
+              {
+                "fieldName": "value",
+                "handlerKey": "field.value"
+              },
+              {
+                "fieldName": "max",
+                "handlerKey": "max"
+              },
+              {
+                "fieldName": "unit",
+                "handlerKey": "unit"
+              }
+            ]
+          }
+        }
+      ],
+      "gridPos": {
+        "x": 10,
+        "y": 1,
+        "w": 14,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT t.category AS name,\n    t.v / t.s AS value,\n    m.mx / t.s AS max,\n    concat('suffix:', multiIf(t.s = 1000000, ' млн', t.s = 1000, ' тыс', ''), ' · советов: ', toString(t.n)) AS unit\nFROM (\n    SELECT category, count() AS n, sum(affected) AS v,\n        multiIf(v >= 999950, 1000000, v >= 999.95, 1000, 1) AS s\n    FROM cc.tips\n    WHERE affected IS NOT NULL\n    GROUP BY category\n) AS t\nCROSS JOIN (\n    SELECT max(v) AS mx\n    FROM (SELECT sum(affected) AS v FROM cc.tips WHERE affected IS NOT NULL GROUP BY category)\n) AS m\nORDER BY t.v DESC, t.category"
+        }
+      ],
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "valueMode": "text",
+        "namePlacement": "top",
+        "sizing": "manual",
+        "maxVizHeight": 34,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "showUnfilled": true,
+        "text": {
+          "titleSize": 15,
+          "valueSize": 14
+        },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "decimals": 1,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#5794F2"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "cache"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5794F2"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "repeated-read"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#B877D9"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "big-results"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#FF9830"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "short-opus"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#FADE2A"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "agent-outlier"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2DBFB1"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 222,
+      "type": "table",
+      "title": "Советы про токены · клик по заголовку открывает данные",
+      "description": "Советы из cc.tips про токены (affected не пусто), по affected, крупные сверху. Окно фиксировано 7 дней: период дашборда и переменные не действуют. Ссылка в заголовке открывает одну панель с данными на весь экран на связанном дашборде, с выбранными проектом / сессией / исполнителем и текущим периодом. affected = примерно столько токенов (read results и big results: байты результата / 4; cache: токены cache-creation). cost_usd = стоимость запросов, о которых совет; пусто, где её нельзя измерить. Как составляются советы: текстовая панель внизу.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "timeFrom": "7d",
+      "gridPos": {
+        "x": 3,
+        "y": 9,
+        "w": 21,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT category, title, body, scope, metric, affected, cost_usd,\n       concat(replaceRegexpOne(link, '^/d/([a-z-]+)', '/d/\\\\1-ru'), if(position(link, '?') > 0, '&', '?'),\n              if(startsWith(link, '/d/cc-sessions'), 'var-project=%24__all&', '')) AS open\nFROM cc.tips\nWHERE affected IS NOT NULL\nORDER BY affected DESC, category, title"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": [
+          {
+            "displayName": "≈ токенов",
+            "desc": true
+          }
+        ]
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": false,
+            "minWidth": 50
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "category"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Категория"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "custom.width",
+                "value": 120
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5794F2"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "cache": {
+                        "color": "#5794F2",
+                        "index": 0
+                      },
+                      "repeated-read": {
+                        "color": "#B877D9",
+                        "index": 1
+                      },
+                      "big-results": {
+                        "color": "#FF9830",
+                        "index": 2
+                      },
+                      "short-opus": {
+                        "color": "#FADE2A",
+                        "index": 3
+                      },
+                      "agent-outlier": {
+                        "color": "#2DBFB1",
+                        "index": 4
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "title"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Заголовок"
+              },
+              {
+                "id": "custom.width",
+                "value": 360
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Открыть связанный дашборд",
+                    "url": "${__data.fields.open}${__url_time_range}"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "body"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Текст"
+              },
+              {
+                "id": "custom.minWidth",
+                "value": 300
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#8e8e9e"
+                }
+              },
+              {
+                "id": "custom.inspect",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "scope"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Объект"
+              },
+              {
+                "id": "custom.width",
+                "value": 160
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "metric"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Метрика"
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#8e8e9e"
+                }
+              },
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "affected"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "≈ токенов"
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5794F2"
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "gauge",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "custom.width",
+                "value": 200
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cost_usd"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              },
+              {
+                "id": "noValue",
+                "value": "—"
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#73BF69"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null",
+                      "result": {
+                        "text": "—",
+                        "color": "#8e8e9e",
+                        "index": 0
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "open"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 228,
+      "type": "table",
+      "title": "Советы про время и помехи · клик по заголовку открывает данные",
+      "description": "Не про токены, поэтому не ранжируются по affected. Советы из cc.tips без значения affected (denials, slow hooks, slow first token). Окно фиксировано 7 дней: период дашборда и переменные не действуют. Ссылка в заголовке открывает одну панель с данными на весь экран на связанном дашборде, с выбранными проектом / сессией / исполнителем и текущим периодом. metric = число за советом (количество или средние мс).",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "timeFrom": "7d",
+      "gridPos": {
+        "x": 3,
+        "y": 19,
+        "w": 21,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT category, title, body, scope, metric,\n       concat(replaceRegexpOne(link, '^/d/([a-z-]+)', '/d/\\\\1-ru'), if(position(link, '?') > 0, '&', '?'),\n              if(startsWith(link, '/d/cc-sessions'), 'var-project=%24__all&', '')) AS open\nFROM cc.tips\nWHERE affected IS NULL\nORDER BY category, metric DESC, title"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": false,
+            "minWidth": 50
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "category"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Категория"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "custom.width",
+                "value": 120
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#C4162A"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "denials": {
+                        "color": "#C4162A",
+                        "index": 0
+                      },
+                      "slow-hook": {
+                        "color": "#73BF69",
+                        "index": 1
+                      },
+                      "slow-ttft": {
+                        "color": "#8AB8FF",
+                        "index": 2
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "title"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Заголовок"
+              },
+              {
+                "id": "custom.width",
+                "value": 360
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Открыть связанный дашборд",
+                    "url": "${__data.fields.open}${__url_time_range}"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "body"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Текст"
+              },
+              {
+                "id": "custom.minWidth",
+                "value": 300
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#8e8e9e"
+                }
+              },
+              {
+                "id": "custom.inspect",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "scope"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Объект"
+              },
+              {
+                "id": "custom.width",
+                "value": 160
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "metric"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Метрика"
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#8e8e9e"
+                }
+              },
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "open"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 411,
+      "type": "text",
+      "title": "Куда уходит стоимость · следует периоду и переменным",
+      "description": "sum(cost_usd) по фазе работы хода. Действуют период и все переменные.",
+      "transparent": true,
+      "gridPos": {
+        "x": 3,
+        "y": 26,
+        "w": 21,
+        "h": 1
+      },
+      "options": {
+        "mode": "html",
+        "content": ""
+      }
+    },
+    {
+      "id": 223,
+      "type": "timeseries",
+      "title": "cost_usd по дням и фазам",
+      "description": "cost_usd каждого запроса к модели по фазе ответа. Фаза определяется инструментами, вызванными в том же ответе (события tool_result с тем же request_id, что у api_request): Правка = любой Edit / Write / MultiEdit / NotebookEdit; Делегирование = Task / Agent (запуск субагента) / SendMessage / SubagentHandback / TaskStop (управление субагентом); Запуск = Bash (без правок и делегирования); Изучение = только Read / Grep / Glob / LS; Диалог = без результата инструмента (простой ответ; также вызов, чей результат не записан); Прочее = любая другая смесь (MCP, web, Skill, ...). Ответ с инструментами нескольких видов берёт первую подходящую фазу в порядке Правка, Делегирование, Запуск, Изучение, Прочее. Дни по времени сервера (UTC).",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 3,
+        "y": 27,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "queryType": "timeseries",
+          "rawSql": "SELECT time,\n       sumIf(c, ph = 'Explore') AS Explore,\n       sumIf(c, ph = 'Edit') AS Edit,\n       sumIf(c, ph = 'Run') AS Run,\n       sumIf(c, ph = 'Delegate') AS Delegate,\n       sumIf(c, ph = 'Talk') AS Talk,\n       sumIf(c, ph = 'Other') AS Other\nFROM\n(\nSELECT toStartOfDay(a.ts) AS time, if(t.tool_phase = '', 'Talk', t.tool_phase) AS ph, a.cost_usd AS c\nFROM cc.api_requests AS a\nLEFT JOIN (SELECT request_id AS rid, multiIf(countIf(tool_name IN ('Edit', 'Write', 'MultiEdit', 'NotebookEdit')) > 0, 'Edit', countIf(tool_name IN ('Task', 'Agent', 'SendMessage', 'SubagentHandback', 'TaskStop')) > 0, 'Delegate', countIf(tool_name = 'Bash') > 0, 'Run', countIf(tool_name NOT IN ('Read', 'Grep', 'Glob', 'LS')) = 0, 'Explore', 'Other') AS tool_phase FROM cc.events WHERE event = 'tool_result' AND request_id != '' GROUP BY request_id) AS t ON t.rid = a.request_id\nWHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\n)\nGROUP BY time ORDER BY time"
+        }
+      ],
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "custom": {
+            "drawStyle": "bars",
+            "stacking": {
+              "mode": "normal"
+            },
+            "fillOpacity": 100,
+            "gradientMode": "none"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Explore"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Изучение"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5794F2"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Edit"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Правка"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#B877D9"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Run"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Запуск"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#FF9830"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Delegate"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Делегирование"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2DBFB1"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Talk"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Диалог"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#8e8e9e"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Other"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Прочее"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#D8D9DA"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 224,
+      "type": "table",
+      "title": "Итоги по фазам",
+      "description": "Те же фазы, что на графике слева (см. его описание). Доля = часть cost_usd фазы за период; за ход = cost_usd на запрос к модели этой фазы. Действуют период и все переменные.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 15,
+        "y": 27,
+        "w": 9,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT ph AS phase, 100 * cost / greatest(total, 0.000001) AS share, cost AS cost_usd, cost / turns AS per_turn\nFROM\n(\nSELECT ph, cost, turns, sum(cost) OVER () AS total\nFROM\n(\n  SELECT if(t.tool_phase = '', 'Talk', t.tool_phase) AS ph, sum(a.cost_usd) AS cost, count() AS turns\n  FROM cc.api_requests AS a\n  LEFT JOIN (SELECT request_id AS rid, multiIf(countIf(tool_name IN ('Edit', 'Write', 'MultiEdit', 'NotebookEdit')) > 0, 'Edit', countIf(tool_name IN ('Task', 'Agent', 'SendMessage', 'SubagentHandback', 'TaskStop')) > 0, 'Delegate', countIf(tool_name = 'Bash') > 0, 'Run', countIf(tool_name NOT IN ('Read', 'Grep', 'Glob', 'LS')) = 0, 'Explore', 'Other') AS tool_phase FROM cc.events WHERE event = 'tool_result' AND request_id != '' GROUP BY request_id) AS t ON t.rid = a.request_id\n  WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\n  GROUP BY ph\n)\n)\nORDER BY cost DESC"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": false,
+            "minWidth": 50
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "phase"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Фаза"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "custom.width",
+                "value": 130
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#8e8e9e"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "Explore": {
+                        "text": "Изучение",
+                        "color": "#5794F2",
+                        "index": 0
+                      },
+                      "Edit": {
+                        "text": "Правка",
+                        "color": "#B877D9",
+                        "index": 1
+                      },
+                      "Run": {
+                        "text": "Запуск",
+                        "color": "#FF9830",
+                        "index": 2
+                      },
+                      "Delegate": {
+                        "text": "Делегирование",
+                        "color": "#2DBFB1",
+                        "index": 3
+                      },
+                      "Talk": {
+                        "text": "Диалог",
+                        "color": "#8e8e9e",
+                        "index": 4
+                      },
+                      "Other": {
+                        "text": "Прочее",
+                        "color": "#D8D9DA",
+                        "index": 5
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "share"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Доля"
+              },
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 100
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5794F2"
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "gauge",
+                  "mode": "gradient"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cost_usd"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "per_turn"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "за ход"
+              },
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 3
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#8e8e9e"
+                }
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 413,
+      "type": "text",
+      "title": "Кэш · следует периоду и переменным",
+      "description": "Паузы между запросами и хит кэша. Действуют период и все переменные.",
+      "transparent": true,
+      "gridPos": {
+        "x": 3,
+        "y": 36,
+        "w": 21,
+        "h": 1
+      },
+      "options": {
+        "mode": "html",
+        "content": ""
+      }
+    },
+    {
+      "id": 225,
+      "type": "barchart",
+      "title": "Паузы между запросами",
+      "description": "Пауза между соседними запросами к модели сессии (запросы, прошедшие переменные и период, все исполнители вместе), на каждый запрос. После 5 минут жизни кэша промпта (TTL) следующий запрос пишет кэш заново вместо чтения: такие паузы красные (зелёные: в пределах 5 минут). Паузы считаются между соседними запросами сессии, включая субагентов (для одного основного диалога выберите Исполнитель = main); у первого запроса в периоде нет предшественника, он не считается. Действуют период и все переменные.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 3,
+        "y": 37,
+        "w": 9,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT multiIf(gap < 60, '<1м', gap < 300, '1–5м', gap < 900, '5–15м', gap < 3600, '15–60м', '>1ч') AS bucket,\n       count() AS requests,\n       max(gap >= 300) AS over_ttl\nFROM\n(\n  SELECT cur - prev AS gap\n  FROM\n  (\n    SELECT toUnixTimestamp(ts) AS cur,\n           lagInFrame(toUnixTimestamp(ts), 1, 0) OVER (PARTITION BY session_id ORDER BY ts ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS prev\n    FROM cc.api_requests\n    WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\n  )\n  WHERE prev > 0\n)\nGROUP BY bucket\nORDER BY min(gap)"
+        }
+      ],
+      "options": {
+        "orientation": "vertical",
+        "xField": "bucket",
+        "showValue": "always",
+        "stacking": "none",
+        "colorByField": "over_ttl",
+        "legend": {
+          "showLegend": false,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "barWidth": 0.8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "custom": {
+            "fillOpacity": 100,
+            "gradientMode": "none"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byType",
+              "options": "number"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "hidden"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "requests"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#73BF69"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "over_ttl"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "#73BF69",
+                      "value": null
+                    },
+                    {
+                      "color": "#F2495C",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": true,
+                  "viz": true
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 226,
+      "type": "table",
+      "title": "Хит кэша по проектам",
+      "description": "По эффективному проекту: запросы к модели, хит кэша = cache read / (cache read + input + cache creation) токенов, токены cache creation (во что обходится низкий хит), cost_usd. Цвета хита: от 90 % зелёный, от 75 % жёлтый, ниже красный. Цель совета cache. Действуют период и все переменные.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 37,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT project, count() AS requests,\n       100 * sum(cache_read_tokens) / greatest(sum(cache_read_tokens + input_tokens + cache_creation_tokens), 1) AS hit_rate,\n       sum(cache_creation_tokens) AS cache_create, sum(cost_usd) AS cost_usd\nFROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nGROUP BY project ORDER BY cache_create DESC LIMIT 100"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": false,
+            "minWidth": 50
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "project"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Проект"
+              },
+              {
+                "id": "custom.minWidth",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "requests"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Запросы"
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "hit_rate"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Доля хитов"
+              },
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.width",
+                "value": 120
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "#F2495C",
+                      "value": null
+                    },
+                    {
+                      "color": "#FADE2A",
+                      "value": 75
+                    },
+                    {
+                      "color": "#73BF69",
+                      "value": 90
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cache_create"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Cache create"
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5794F2"
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "gauge",
+                  "mode": "gradient"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cost_usd"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.width",
+                "value": 85
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 204,
+      "type": "text",
+      "title": "Как составляются советы",
+      "description": "",
+      "gridPos": {
+        "x": 3,
+        "y": 44,
+        "w": 21,
+        "h": 18
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "| Категория | Срабатывает (последние 7 дней) | Что смотреть / делать | Ссылка открывает |\n| --- | --- | --- | --- |\n| cache | по проекту: не менее 20 запросов и хит кэша ниже 40 % | держите префикс промпта (CLAUDE.md, инструменты) стабильным; реже /clear и смена модели | Эффективность: Хит кэша по проектам |\n| repeated-read | по проекту и файлу: прочитан более 10 раз | храните ключевые факты в CLAUDE.md или заметке, а не перечитывайте | Инструменты и файлы: Файлы, перечитанные в сессии |\n| big-results | по проекту: не менее 5 результатов инструментов больше 200 КБ | сузьте поиск или ограничьте диапазон чтения | Инструменты и файлы: Крупнейшие результаты инструментов |\n| short-opus | по проекту: не менее 20 запросов Opus короче 500 output токенов, и это не менее половины всех запросов Opus | такие ходы может выполнить модель поменьше; показанная стоимость это верхняя граница экономии | Промпты: Самые дорогие промпты |\n| agent-outlier | по типу субагента: не менее 3 запусков, крупнейший больше 6 средних и больше 50k токенов | проверьте, что делал этот запуск | Сессии: Таймлайн (сессия и исполнитель выбраны) |\n| denials | по проекту и инструменту: не менее 5 отклонённых разрешений | если правило задумано, игнорируйте; иначе пересмотрите правила разрешений | Инструменты и файлы: Отклонённые вызовы |\n| slow-hook | по хуку: не менее 10 запусков и среднее больше 500 мс | хуки выполняются синхронно и задерживают каждый подходящий вызов инструмента | Состояние: Время хуков |\n| slow-ttft | по проекту и модели: не менее 10 запросов и среднее время до первого токена больше 3 с | длинные контексты или занятый провайдер | Состояние: Время до первого токена по дням |"
+      }
+    }
+  ]
+}

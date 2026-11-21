@@ -10,9 +10,9 @@
   "editable": true,
   "schemaVersion": 39,
   "version": 1,
-  "refresh": "10s",
+  "refresh": "5m",
   "time": {
-    "from": "now-7d",
+    "from": "now-24h",
     "to": "now"
   },
   "timepicker": {
@@ -49,9 +49,6 @@
       }
     ],
     "refresh_intervals": [
-      "5s",
-      "10s",
-      "30s",
       "1m",
       "5m",
       "15m",
@@ -60,22 +57,42 @@
   },
   "links": [
     {
-      "type": "dashboards",
-      "title": "Dashboards",
-      "tags": [
-        "cc"
-      ],
-      "asDropdown": false,
-      "icon": "external link",
-      "includeVars": true,
+      "type": "link",
+      "title": "RU",
+      "tooltip": "Russian version",
+      "url": "/d/cc-agents-ru",
       "keepTime": true,
-      "targetBlank": false,
-      "tooltip": "",
-      "url": ""
+      "includeVars": true
     }
   ],
   "templating": {
     "list": [
+      {
+        "name": "account",
+        "label": "Account",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "clickhouse"
+        },
+        "query": "SELECT account_uuid, argMax(account, ts) AS name FROM cc.events WHERE account_uuid != '' GROUP BY account_uuid ORDER BY name",
+        "definition": "SELECT account_uuid, argMax(account, ts) AS name FROM cc.events WHERE account_uuid != '' GROUP BY account_uuid ORDER BY name",
+        "includeAll": true,
+        "allValue": "'__all'",
+        "multi": true,
+        "refresh": 2,
+        "sort": 0,
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": []
+      },
       {
         "name": "project",
         "label": "Project",
@@ -84,8 +101,8 @@
           "type": "grafana-clickhouse-datasource",
           "uid": "clickhouse"
         },
-        "query": "SELECT DISTINCT project FROM cc.events ORDER BY project",
-        "definition": "SELECT DISTINCT project FROM cc.events ORDER BY project",
+        "query": "SELECT DISTINCT project FROM cc.events WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) ORDER BY project",
+        "definition": "SELECT DISTINCT project FROM cc.events WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) ORDER BY project",
         "includeAll": true,
         "allValue": "__all",
         "multi": false,
@@ -106,8 +123,8 @@
           "type": "grafana-clickhouse-datasource",
           "uid": "clickhouse"
         },
-        "query": "SELECT session_id, if(title != '', concat(leftUTF8(title, 60), ' (', left(session_id, 8), ')'), session_id) AS name FROM cc.sessions WHERE ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
-        "definition": "SELECT session_id, if(title != '', concat(leftUTF8(title, 60), ' (', left(session_id, 8), ')'), session_id) AS name FROM cc.sessions WHERE ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
+        "query": "SELECT session_id, if(title != '', concat(leftUTF8(title, 60), ' (', left(session_id, 8), ')'), session_id) AS name FROM cc.sessions WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
+        "definition": "SELECT session_id, if(title != '', concat(leftUTF8(title, 60), ' (', left(session_id, 8), ')'), session_id) AS name FROM cc.sessions WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND requests > 0 ORDER BY started DESC LIMIT 300",
         "includeAll": true,
         "allValue": "__all",
         "multi": false,
@@ -128,8 +145,8 @@
           "type": "grafana-clickhouse-datasource",
           "uid": "clickhouse"
         },
-        "query": "SELECT DISTINCT actor FROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') ORDER BY actor",
-        "definition": "SELECT DISTINCT actor FROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') ORDER BY actor",
+        "query": "SELECT DISTINCT actor FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') ORDER BY actor",
+        "definition": "SELECT DISTINCT actor FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') ORDER BY actor",
         "includeAll": true,
         "allValue": "__all",
         "multi": false,
@@ -150,8 +167,8 @@
           "type": "grafana-clickhouse-datasource",
           "uid": "clickhouse"
         },
-        "query": "SELECT DISTINCT skill FROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND skill != '' ORDER BY skill",
-        "definition": "SELECT DISTINCT skill FROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND skill != '' ORDER BY skill",
+        "query": "SELECT DISTINCT skill FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND skill != '' ORDER BY skill",
+        "definition": "SELECT DISTINCT skill FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND skill != '' ORDER BY skill",
         "includeAll": true,
         "allValue": "__all",
         "multi": false,
@@ -171,19 +188,569 @@
   },
   "panels": [
     {
+      "id": 340,
+      "type": "text",
+      "title": "Dashboards",
+      "description": "Navigation. Links keep the time range and the variables.",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 3,
+        "h": 12
+      },
+      "transparent": false,
+      "options": {
+        "mode": "html",
+        "content": "<a href=\"/d/cc-usage?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Overview</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">totals and status</span></a><a href=\"/d/cc-sessions?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Sessions</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">list · timeline</span></a><a href=\"/d/cc-prompts?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Prompts</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">costliest turns</span></a><a href=\"/d/cc-efficiency?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Efficiency</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">tips and cost breakdown</span></a><a href=\"/d/cc-agents?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid #F46800;background:#22252b\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Agents &amp; skills</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">subagents, skills</span></a><a href=\"/d/cc-tools?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Tools &amp; files</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">calls, files, reads</span></a><a href=\"/d/cc-health?${__url_time_range}&${__all_variables}\" style=\"display:block;padding:2px 8px;margin:0 0 1px 0;text-decoration:none;line-height:1.25;border-left:3px solid transparent;background:transparent\"><span style=\"display:block;color:#ccccdc;font-size:15px;font-weight:500\">Health</span><span style=\"display:block;color:#8e8e9e;font-size:13px\">latency, hooks</span></a>"
+      }
+    },
+    {
+      "id": 341,
+      "type": "bargauge",
+      "title": "Usage · last 5 h",
+      "description": "Cost (cost_usd) per Claude account over the last 5 hours. Bar = that cost as % of the account's peak: its highest rolling 5-hour cost over the last 30 days (10-minute steps). Green below 60 %, yellow from 60 %, red from 80 %. Fixed windows: ignores the dashboard time range and the variables. Accounts with no cost in 7 days are not listed.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 3,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT\n    concat(if(t.label = '', '(no account)', t.label), '  ·  $', toString(round(t.h5, 2))) AS name,\n    round(100 * t.h5 / greatest(p.peak, t.h5, 0.000001)) AS pct\nFROM\n(\n    SELECT account_uuid,\n           argMax(account, ts) AS label,\n           sumIf(cost_usd, ts >= now() - INTERVAL 5 HOUR) AS h5,\n           sumIf(cost_usd, ts >= now() - INTERVAL 7 DAY) AS d7\n    FROM cc.api_requests\n    WHERE ts >= now() - INTERVAL 30 DAY\n    GROUP BY account_uuid\n) AS t\nLEFT JOIN\n(\n    SELECT account_uuid, max(w) AS peak\n    FROM\n    (\n        SELECT account_uuid,\n               sum(c) OVER (PARTITION BY account_uuid ORDER BY b RANGE BETWEEN 17999 PRECEDING AND CURRENT ROW) AS w\n        FROM\n        (\n            SELECT account_uuid, toUInt32(toStartOfInterval(ts, INTERVAL 10 MINUTE)) AS b, sum(cost_usd) AS c\n            FROM cc.api_requests\n            WHERE ts >= now() - INTERVAL 30 DAY\n            GROUP BY account_uuid, b\n        )\n    )\n    GROUP BY account_uuid\n) AS p ON p.account_uuid = t.account_uuid\nWHERE t.d7 > 0\nORDER BY t.h5 DESC, t.d7 DESC"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": true,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "valueMode": "color",
+        "namePlacement": "top",
+        "showUnfilled": true,
+        "sizing": "manual",
+        "minVizHeight": 36,
+        "maxVizHeight": 36,
+        "text": {
+          "titleSize": 15,
+          "valueSize": 15
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#73BF69",
+                "value": null
+              },
+              {
+                "color": "#FADE2A",
+                "value": 60
+              },
+              {
+                "color": "#F2495C",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 343,
+      "type": "stat",
+      "title": "Tips · 7 d",
+      "description": "Number of tips (view cc.tips, last 7 days). Click the value to open the Tips section of the Efficiency dashboard. Ignores the dashboard time range and the variables.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 3,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT count() AS tips\nFROM cc.tips"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/.*/",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value_and_name",
+        "text": {
+          "titleSize": 30,
+          "valueSize": 30
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "0"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "tips"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Tips"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 1
+                    },
+                    {
+                      "color": "orange",
+                      "value": 5
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open all tips",
+                    "url": "/d/cc-efficiency?${__url_time_range}",
+                    "oneClick": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 342,
+      "type": "stat",
+      "title": "",
+      "description": "The most frequent tip category (view cc.tips, last 7 days) with its count in brackets (ties: alphabetical order). Click the value to open the Tips section of the Efficiency dashboard. Ignores the dashboard time range and the variables.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 19,
+        "w": 3,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT if(tips = 0, 'none', concat(multiIf(top = 'cache', 'Cache rebuilds', top = 'repeated-read', 'Repeated reads', top = 'big-results', 'Big tool results', top = 'short-opus', 'Short Opus answers', top = 'agent-outlier', 'Costly agent run', top = 'denials', 'Denied tool calls', top = 'slow-hook', 'Slow hooks', top = 'slow-ttft', 'Slow first token', top), ' (', toString(n), ')')) AS most_frequent\nFROM\n(\n    SELECT sum(c) AS tips,\n           argMin(category, (-toInt64(c), category)) AS top,\n           max(c) AS n\n    FROM (SELECT category, count() AS c FROM cc.tips GROUP BY category)\n)"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/.*/",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value_and_name",
+        "text": {
+          "titleSize": 20,
+          "valueSize": 20
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "none"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "most_frequent"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Most frequent"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open all tips",
+                    "url": "/d/cc-efficiency?${__url_time_range}",
+                    "oneClick": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 470,
+      "type": "text",
+      "title": "Actor = main agent or a subagent type. Skill cost = cost_usd of the turns after the skill was invoked.",
+      "description": "Every panel follows the time range and the Account, Project, Session, Actor and Skill variables. The rail on the left ignores them.",
+      "transparent": true,
+      "gridPos": {
+        "x": 3,
+        "y": 0,
+        "w": 21,
+        "h": 1
+      },
+      "options": {
+        "mode": "html",
+        "content": ""
+      }
+    },
+    {
+      "id": 471,
+      "type": "stat",
+      "title": "Subagent share",
+      "description": "Share of cost_usd spent by subagents: sum of cost_usd of the model requests with an agent_id divided by the cost_usd of all requests (main session and auxiliary requests included). cost_usd is computed by Claude Code from API prices: on a subscription it is not a bill.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 3,
+        "y": 1,
+        "w": 5,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT 100 * sumIf(cost_usd, agent_id != '') / greatest(sum(cost_usd), 0.000001) AS share, 'of cost_usd' AS name\nFROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "orientation": "vertical",
+        "justifyMode": "auto",
+        "wideLayout": false,
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "text": {
+          "titleSize": 13,
+          "valueSize": 42
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 0,
+          "noValue": "0",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#FF9830"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 472,
+      "type": "stat",
+      "title": "Subagent runs",
+      "description": "Completed subagent runs (subagent_completed events) and the number of agent types among them. The Actor variable matches the agent type; the Skill variable keeps the runs whose model requests carried that skill.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 1,
+        "w": 5,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT count() AS runs, concat(toString(uniqExact(agent_type)), if(uniqExact(agent_type) = 1, ' type', ' types')) AS name\nFROM cc.events WHERE event = 'subagent_completed' AND agent_type != '' AND ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR agent_type = '${actor}') AND ('${skill}' = '__all' OR agent_id IN (SELECT agent_id FROM cc.events_raw WHERE '${skill}' != '__all' AND skill_name = '${skill}' AND agent_id != '')) AND $__timeFilter(ts)"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "orientation": "vertical",
+        "justifyMode": "auto",
+        "wideLayout": false,
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "text": {
+          "titleSize": 13,
+          "valueSize": 42
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "locale",
+          "decimals": 0,
+          "noValue": "0",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#ccccdc"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 473,
+      "type": "stat",
+      "title": "Skills used",
+      "description": "Distinct skills activated (skill_activated events) and the number of activations. Claude Code reports skill activations of the main session only, so with an agent selected as Actor this shows 0.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 13,
+        "y": 1,
+        "w": 5,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT uniqExact(skill_name) AS skills, concat(toString(count()), if(count() = 1, ' invocation', ' invocations')) AS name\nFROM cc.events WHERE event = 'skill_activated' AND skill_name != '' AND ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR (agent_id = '' AND '${actor}' = 'main')) AND ('${skill}' = '__all' OR skill_name = '${skill}') AND $__timeFilter(ts)"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "orientation": "vertical",
+        "justifyMode": "auto",
+        "wideLayout": false,
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "text": {
+          "titleSize": 13,
+          "valueSize": 42
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "locale",
+          "decimals": 0,
+          "noValue": "0",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#ccccdc"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 474,
+      "type": "stat",
+      "title": "Outlier runs",
+      "description": "Subagent runs whose tokens (total_tokens of subagent_completed) are above 6 times the mean of their agent type and above 50k: the rule of the agent-outlier tip, but over the time range and the variables instead of the last 7 days. Green with none, yellow with one or more.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 1,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT countIf(agent_total_tokens > 6 * mean_tokens AND agent_total_tokens > 50000) AS outliers, '> 6× type mean and > 50k tokens' AS name\nFROM\n(\n    SELECT agent_total_tokens, avg(agent_total_tokens) OVER (PARTITION BY agent_type) AS mean_tokens\n    FROM cc.events WHERE event = 'subagent_completed' AND agent_type != '' AND ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR agent_type = '${actor}') AND ('${skill}' = '__all' OR agent_id IN (SELECT agent_id FROM cc.events_raw WHERE '${skill}' != '__all' AND skill_name = '${skill}' AND agent_id != '')) AND $__timeFilter(ts)\n)"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "orientation": "vertical",
+        "justifyMode": "auto",
+        "wideLayout": false,
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "text": {
+          "titleSize": 13,
+          "valueSize": 42
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "locale",
+          "decimals": 0,
+          "noValue": "0",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#73BF69",
+                "value": null
+              },
+              {
+                "color": "#FADE2A",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
       "id": 13,
       "type": "table",
-      "title": "Agents (click to filter)",
-      "description": "",
+      "title": "Subagent types · click a type to filter by it",
+      "description": "Completed subagent runs per agent type: runs, mean and maximum tokens of one run (total_tokens of subagent_completed), Max/mean (above 4 yellow, above 6 red; the agent-outlier tip also needs a run above 50k tokens) and cost_usd of the type's model requests. Sorted by cost_usd. A click filters the dashboard by that type (Actor variable).",
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "clickhouse"
       },
       "gridPos": {
-        "x": 0,
-        "y": 0,
-        "w": 12,
-        "h": 9
+        "x": 3,
+        "y": 5,
+        "w": 13,
+        "h": 8
       },
       "targets": [
         {
@@ -195,34 +762,236 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT t.actor AS agent, t.runs, t.tokens, t.cost_usd, ifNull(c.tool_calls, 0) AS tool_calls\nFROM\n(\n    SELECT actor, uniqExact(agent_id) AS runs, sum(total_tokens) AS tokens, round(sum(cost_usd), 3) AS cost_usd\n    FROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts) AND agent_id != ''\n    GROUP BY actor\n) AS t\nLEFT JOIN\n(\n    SELECT actor, count() AS tool_calls FROM cc.tool_calls WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts) AND agent_id != '' GROUP BY actor\n) AS c USING (actor)\nORDER BY tokens DESC"
+          "rawSql": "SELECT t.agent_type AS type, t.runs AS runs, t.mean_tokens AS mean_tokens, t.max_tokens AS max_tokens,\n       t.max_tokens / greatest(t.mean_tokens, 1) AS ratio, ifNull(c.cost, 0) AS cost_usd\nFROM\n(\n    SELECT agent_type, count() AS runs, avg(agent_total_tokens) AS mean_tokens, max(agent_total_tokens) AS max_tokens\n    FROM cc.events WHERE event = 'subagent_completed' AND agent_type != '' AND ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR agent_type = '${actor}') AND ('${skill}' = '__all' OR agent_id IN (SELECT agent_id FROM cc.events_raw WHERE '${skill}' != '__all' AND skill_name = '${skill}' AND agent_id != '')) AND $__timeFilter(ts)\n    GROUP BY agent_type\n) AS t\nLEFT JOIN\n(\n    SELECT actor, sum(cost_usd) AS cost\n    FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts) AND agent_id != ''\n    GROUP BY actor\n) AS c ON c.actor = t.agent_type\nORDER BY cost_usd DESC, runs DESC"
         }
       ],
       "options": {
         "showHeader": true,
-        "cellHeight": "sm"
+        "cellHeight": "sm",
+        "sortBy": [
+          {
+            "displayName": "cost_usd",
+            "desc": true
+          }
+        ]
       },
       "fieldConfig": {
         "defaults": {
           "custom": {
-            "filterable": true
+            "align": "auto",
+            "filterable": false,
+            "minWidth": 50
           }
         },
         "overrides": [
           {
             "matcher": {
               "id": "byName",
-              "options": "agent"
+              "options": "type"
             },
             "properties": [
+              {
+                "id": "displayName",
+                "value": "Type"
+              },
+              {
+                "id": "custom.minWidth",
+                "value": 120
+              },
               {
                 "id": "links",
                 "value": [
                   {
-                    "title": "Filter by this agent",
-                    "url": "/d/cc-agents?var-project=${project}&var-session=${session}&var-actor=${__value.raw}&var-skill=${skill}&${__url_time_range}"
+                    "title": "Filter by this agent type",
+                    "url": "/d/cc-agents?${account:queryparam}&${project:queryparam}&${session:queryparam}&var-actor=${__value.raw:percentencode}&${skill:queryparam}&${__url_time_range}"
                   }
                 ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "runs"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Runs"
+              },
+              {
+                "id": "unit",
+                "value": "locale"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.width",
+                "value": 70
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mean_tokens"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Mean tok"
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "max_tokens"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Max tok"
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ratio"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Max/mean"
+              },
+              {
+                "id": "unit",
+                "value": "suffix:×"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "#ccccdc",
+                      "value": null
+                    },
+                    {
+                      "color": "#FADE2A",
+                      "value": 4
+                    },
+                    {
+                      "color": "#F2495C",
+                      "value": 6
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cost_usd"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "cost_usd"
+              },
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              },
+              {
+                "id": "fieldMinMax",
+                "value": true
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5794F2"
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "gauge",
+                  "mode": "gradient"
+                }
               }
             ]
           }
@@ -230,19 +999,19 @@
       }
     },
     {
-      "id": 14,
-      "type": "table",
-      "title": "Skills (click to filter)",
-      "description": "",
+      "id": 475,
+      "type": "timeseries",
+      "title": "cost_usd per day by actor",
+      "description": "cost_usd of the model requests per day: subagents (requests with an agent_id) and main (the main session and auxiliary requests). Days are in server time (UTC).",
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "clickhouse"
       },
       "gridPos": {
-        "x": 12,
-        "y": 0,
-        "w": 12,
-        "h": 9
+        "x": 16,
+        "y": 5,
+        "w": 8,
+        "h": 8
       },
       "targets": [
         {
@@ -252,92 +1021,33 @@
             "uid": "clickhouse"
           },
           "editorType": "sql",
-          "format": 1,
-          "queryType": "table",
-          "rawSql": "SELECT s.skill AS skill, s.launches, ifNull(t.tokens, 0) AS tokens, ifNull(t.cost_usd, 0) AS cost_usd,\n       ifNull(c.tool_calls, 0) AS tool_calls, s.triggers\nFROM\n(\n    SELECT skill_name AS skill, count() AS launches,\n           arrayStringConcat(groupUniqArray(skill_trigger), ', ') AS triggers\n    FROM cc.events WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND $__timeFilter(ts) AND event = 'skill_activated'\n    GROUP BY skill\n) AS s\nLEFT JOIN\n(\n    SELECT skill, sum(total_tokens) AS tokens, round(sum(cost_usd), 3) AS cost_usd\n    FROM cc.api_requests WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND $__timeFilter(ts) AND skill != '' GROUP BY skill\n) AS t ON s.skill = t.skill\nLEFT JOIN\n(\n    SELECT skill, count() AS tool_calls\n    FROM cc.tool_calls WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND $__timeFilter(ts) AND skill != '' GROUP BY skill\n) AS c ON s.skill = c.skill\nORDER BY launches DESC"
+          "format": 0,
+          "queryType": "timeseries",
+          "rawSql": "SELECT toStartOfDay(ts) AS time, sumIf(cost_usd, agent_id = '') AS main, sumIf(cost_usd, agent_id != '') AS subagents\nFROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nGROUP BY time ORDER BY time"
         }
       ],
       "options": {
-        "showHeader": true,
-        "cellHeight": "sm"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "filterable": true
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "skill"
-            },
-            "properties": [
-              {
-                "id": "links",
-                "value": [
-                  {
-                    "title": "Filter by this skill",
-                    "url": "/d/cc-agents?var-project=${project}&var-session=${session}&var-actor=${actor}&var-skill=${__value.raw}&${__url_time_range}"
-                  }
-                ]
-              }
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "id": 120,
-      "type": "barchart",
-      "title": "Main vs subagents by tool",
-      "description": "Top 15 tools by calls: calls made by the main session vs by subagents (agent_id set).",
-      "datasource": {
-        "type": "grafana-clickhouse-datasource",
-        "uid": "clickhouse"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 9,
-        "w": 12,
-        "h": 10
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "grafana-clickhouse-datasource",
-            "uid": "clickhouse"
-          },
-          "editorType": "sql",
-          "format": 1,
-          "queryType": "table",
-          "rawSql": "SELECT tool_name AS tool, countIf(agent_id = '') AS main, countIf(agent_id != '') AS subagent\nFROM cc.tool_calls WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nGROUP BY tool_name\nORDER BY count() DESC\nLIMIT 15"
-        }
-      ],
-      "options": {
-        "orientation": "horizontal",
-        "stacking": "normal",
-        "xField": "tool",
         "legend": {
+          "showLegend": true,
           "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
+          "placement": "bottom"
         },
         "tooltip": {
           "mode": "multi",
-          "sort": "desc"
-        },
-        "showValue": "auto",
-        "xTickLabelMaxLength": 24
+          "sort": "none"
+        }
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
+          "unit": "currencyUSD",
           "custom": {
-            "fillOpacity": 80,
-            "lineWidth": 1
+            "drawStyle": "bars",
+            "stacking": {
+              "mode": "normal"
+            },
+            "fillOpacity": 100,
+            "lineWidth": 1,
+            "gradientMode": "none"
           }
         },
         "overrides": [
@@ -351,7 +1061,7 @@
                 "id": "color",
                 "value": {
                   "mode": "fixed",
-                  "fixedColor": "blue"
+                  "fixedColor": "#5794F2"
                 }
               }
             ]
@@ -359,14 +1069,14 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "subagent"
+              "options": "subagents"
             },
             "properties": [
               {
                 "id": "color",
                 "value": {
                   "mode": "fixed",
-                  "fixedColor": "orange"
+                  "fixedColor": "#FF9830"
                 }
               }
             ]
@@ -375,19 +1085,19 @@
       }
     },
     {
-      "id": 121,
+      "id": 14,
       "type": "table",
-      "title": "Subagent outliers (max vs mean tokens)",
-      "description": "Completed subagent runs per agent type: tokens of one run (total_tokens of subagent_completed). x mean = max / mean; 6 and above is highlighted (the cc.tips agent-outlier rule also needs max above 50k). Ignores the skill variable; the actor variable matches the agent type.",
+      "title": "Skills · click a skill to filter by it",
+      "description": "Per skill: activations (skill_activated events), sessions and projects they happened in, and cost_usd of the model requests that carried the skill (the turns after it was invoked, until the end of the prompt). Sorted by cost_usd. A click filters the dashboard by that skill (Skill variable).",
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "clickhouse"
       },
       "gridPos": {
-        "x": 12,
-        "y": 9,
-        "w": 12,
-        "h": 10
+        "x": 3,
+        "y": 13,
+        "w": 13,
+        "h": 8
       },
       "targets": [
         {
@@ -399,47 +1109,392 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT agent_type, count() AS runs, round(avg(agent_total_tokens)) AS mean_tokens, max(agent_total_tokens) AS max_tokens, round(max(agent_total_tokens) / avg(agent_total_tokens), 1) AS x_mean, sum(agent_total_tokens) AS total_tokens\nFROM cc.events WHERE ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR agent_type = '${actor}') AND $__timeFilter(ts) AND event = 'subagent_completed' AND agent_type != ''\nGROUP BY agent_type\nORDER BY max_tokens DESC"
+          "rawSql": "SELECT s.skill AS skill, s.uses AS uses, s.sessions AS sessions, s.projects AS projects, ifNull(t.cost, 0) AS cost_usd\nFROM\n(\n    SELECT skill_name AS skill, count() AS uses, uniqExact(session_id) AS sessions, uniqExact(project) AS projects\n    FROM cc.events WHERE event = 'skill_activated' AND skill_name != '' AND ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR (agent_id = '' AND '${actor}' = 'main')) AND ('${skill}' = '__all' OR skill_name = '${skill}') AND $__timeFilter(ts)\n    GROUP BY skill\n) AS s\nLEFT JOIN\n(\n    SELECT skill, sum(cost_usd) AS cost\n    FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts) AND skill != ''\n    GROUP BY skill\n) AS t ON t.skill = s.skill\nORDER BY cost_usd DESC, uses DESC LIMIT 50"
         }
       ],
       "options": {
         "showHeader": true,
-        "cellHeight": "sm"
+        "cellHeight": "sm",
+        "sortBy": [
+          {
+            "displayName": "cost_usd",
+            "desc": true
+          }
+        ]
       },
       "fieldConfig": {
         "defaults": {
           "custom": {
-            "filterable": true
+            "align": "auto",
+            "filterable": false,
+            "minWidth": 50
           }
         },
         "overrides": [
           {
             "matcher": {
               "id": "byName",
-              "options": "x_mean"
+              "options": "skill"
             },
             "properties": [
               {
-                "id": "custom.cellOptions",
+                "id": "displayName",
+                "value": "Skill"
+              },
+              {
+                "id": "custom.minWidth",
+                "value": 140
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Filter by this skill",
+                    "url": "/d/cc-agents?${account:queryparam}&${project:queryparam}&${session:queryparam}&${actor:queryparam}&var-skill=${__value.raw:percentencode}&${__url_time_range}"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "uses"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Uses"
+              },
+              {
+                "id": "unit",
+                "value": "locale"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.width",
+                "value": 70
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "sessions"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Sessions"
+              },
+              {
+                "id": "unit",
+                "value": "locale"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "projects"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Projects"
+              },
+              {
+                "id": "unit",
+                "value": "locale"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cost_usd"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "cost_usd"
+              },
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              },
+              {
+                "id": "fieldMinMax",
+                "value": true
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "color",
                 "value": {
-                  "type": "color-background"
+                  "mode": "fixed",
+                  "fixedColor": "#5794F2"
                 }
               },
               {
-                "id": "thresholds",
+                "id": "custom.cellOptions",
                 "value": {
-                  "mode": "absolute",
-                  "steps": [
-                    {
-                      "color": "transparent",
-                      "value": null
-                    },
-                    {
-                      "color": "red",
-                      "value": 6
-                    }
-                  ]
+                  "type": "gauge",
+                  "mode": "gradient"
                 }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 476,
+      "type": "table",
+      "title": "Biggest subagent runs · click a session to open it",
+      "description": "The 5 completed subagent runs with the most tokens (total_tokens of subagent_completed) in the time range; cost_usd = the model requests of that run. Outlier (red) marks a run above 6 times the mean of its type and above 50k tokens, the Outlier runs rule. A click opens the run's session on Sessions and zooms the time range to it (3 % padding, at least 5 seconds).",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 13,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT r.session_id AS sid,\n       if(w.t1 = 0, r.ms, w.t0) - greatest(intDiv(3 * (if(w.t1 = 0, r.ms, w.t1) - if(w.t1 = 0, r.ms, w.t0)), 100), 5000) AS from_ms,\n       if(w.t1 = 0, r.ms, w.t1) + greatest(intDiv(3 * (if(w.t1 = 0, r.ms, w.t1) - if(w.t1 = 0, r.ms, w.t0)), 100), 5000) AS to_ms,\n       left(r.session_id, 8) AS session, r.agent_type AS type, r.agent_total_tokens AS tokens,\n       if(r.agent_total_tokens > 6 * r.mean_tokens AND r.agent_total_tokens > 50000, concat(toString(round(r.agent_total_tokens / r.mean_tokens, 1)), '× mean'), '') AS outlier,\n       ifNull(c.cost, 0) AS cost_usd\nFROM\n(\n    SELECT session_id, agent_id, agent_type, agent_total_tokens, toUnixTimestamp64Milli(ts) AS ms,\n           avg(agent_total_tokens) OVER (PARTITION BY agent_type) AS mean_tokens\n    FROM cc.events WHERE event = 'subagent_completed' AND agent_type != '' AND ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR agent_type = '${actor}') AND ('${skill}' = '__all' OR agent_id IN (SELECT agent_id FROM cc.events_raw WHERE '${skill}' != '__all' AND skill_name = '${skill}' AND agent_id != '')) AND $__timeFilter(ts)\n    ORDER BY agent_total_tokens DESC LIMIT 5\n) AS r\nLEFT JOIN\n(\n    SELECT agent_id, sum(cost_usd) AS cost\n    FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND $__timeFilter(ts) AND agent_id != ''\n    GROUP BY agent_id\n) AS c ON c.agent_id = r.agent_id\nLEFT JOIN\n(\n    SELECT session_id, min(a_s) AS t0, max(a_e) AS t1\n    FROM\n    (\n        SELECT session_id, toUnixTimestamp64Milli(ts) - if(event = 'user_prompt', toInt64(0), toInt64(duration_ms)) AS a_s, toUnixTimestamp64Milli(ts) AS a_e\n        FROM cc.events_raw\n        WHERE event IN ('user_prompt', 'api_request', 'tool_result')\n          AND session_id IN (SELECT session_id FROM cc.events_raw WHERE event = 'subagent_completed' AND $__timeFilter(ts))\n    )\n    GROUP BY session_id\n) AS w ON w.session_id = r.session_id\nORDER BY r.agent_total_tokens DESC"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": [
+          {
+            "displayName": "Tokens",
+            "desc": true
+          }
+        ]
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": false,
+            "minWidth": 50
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "sid"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "from_ms"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "to_ms"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "session"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Session"
+              },
+              {
+                "id": "custom.width",
+                "value": 100
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open session",
+                    "url": "/d/cc-sessions?from=${__data.fields.from_ms:raw}&to=${__data.fields.to_ms:raw}&${account:queryparam}&${project:queryparam}&var-session=${__data.fields.sid:percentencode}&var-actor=$__all&var-skill=$__all"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "type"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Type"
+              },
+              {
+                "id": "custom.minWidth",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "tokens"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Tokens"
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "outlier"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Outlier"
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.width",
+                "value": 100
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#F2495C"
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cost_usd"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "cost_usd"
+              },
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.width",
+                "value": 90
               }
             ]
           }

@@ -1,0 +1,14 @@
+<!-- Limits of a small server (CLICKHOUSE_LIMITS=small; setup-server.sh sets it together with CLICKHOUSE_CPUS=2
+     for ClickHouse 22.3, the Raspberry Pi 4: 4 cores, 8 GB shared with other services).
+     Pairs with clickhouse/limits/small/users.xml. -->
+<clickhouse>
+  <max_server_memory_usage>3000000000</max_server_memory_usage>
+  <mark_cache_size>268435456</mark_cache_size>
+  <uncompressed_cache_size>0</uncompressed_cache_size>
+  <max_concurrent_queries>8</max_concurrent_queries>
+  <merge_tree>
+    <!-- Defaults (8 and 20) exceed the 2 x 2 merge slots, which would pin merges to the 1 MiB minimum size. -->
+    <number_of_free_entries_in_pool_to_lower_max_size_of_merge>2</number_of_free_entries_in_pool_to_lower_max_size_of_merge>
+    <number_of_free_entries_in_pool_to_execute_mutation>2</number_of_free_entries_in_pool_to_execute_mutation>
+  </merge_tree>
+</clickhouse>

@@ -3,12 +3,13 @@
   Sets up the cc-telemetry server on this PC.
 
 .DESCRIPTION
-  1. Finds Docker: Docker Desktop, or Docker Engine inside WSL2 (installs it there if missing).
+  1. Finds Docker Engine inside WSL2 (installs it there if missing). Docker Desktop is not supported
+     (known issue): if its WSL integration answers in the distro, the script stops.
   2. Creates .env with random passwords (an existing .env is kept).
   3. Starts the stack and waits until the cc.* views are created.
   4. Checks Grafana (:3000) and the OTLP ports (:4317 gRPC, :4318 HTTP).
-  5. WSL only: keeps WSL running and adds that to autostart (Startup folder, no admin rights).
-  6. With -EnableLan: firewall rules for 4317 and 4318 and, for WSL, port forwards from the LAN address.
+  5. Keeps WSL running and adds that to autostart (Startup folder, no admin rights).
+  6. With -EnableLan: firewall rules for 4317 and 4318 and port forwards from the LAN address to WSL.
      This step needs admin rights; the script asks for them through UAC.
   Safe to re-run: every step checks what is already done.
 
@@ -18,7 +19,7 @@
   powershell -ExecutionPolicy Bypass -File .\setup-server.ps1 -EnableLan
 #>
 param(
-  [ValidateSet('auto', 'desktop', 'wsl')][string]$Mode = 'auto',
+  [string]$Mode = 'auto',   # 'auto' and 'wsl' are the same: Docker Engine in WSL2 (Docker Desktop is not supported)
   [string]$Distro = 'Ubuntu',
   [switch]$EnableLan,
   [string]$LanIp,
@@ -59,12 +60,6 @@ function Get-LanIp {
   return $null
 }
 
-function Test-DesktopDocker {
-  if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { return $false }
-  docker info --format '{{.ServerVersion}}' *> $null
-  return ($LASTEXITCODE -eq 0)
-}
-
 function Test-DistroExists {
   $names = (wsl.exe -l -q 2>$null) | ForEach-Object { ($_ -replace "`0", '').Trim() }
   return ($names -contains $Distro)
@@ -75,9 +70,19 @@ function Test-WslDocker {
   return ($LASTEXITCODE -eq 0)
 }
 
+# Docker Desktop's WSL integration makes `docker` in the distro talk to Docker Desktop itself.
+# Same detection as warn_docker_desktop in setup-server.sh. Stops the script: Docker Desktop is not supported.
+function Assert-NotDockerDesktop {
+  $platform = (wsl.exe -d $Distro -- docker version --format '{{.Server.Platform.Name}}' 2>$null | Out-String).Trim()
+  if ($platform -like '*Docker Desktop*') {
+    Fail ("The docker in WSL '$Distro' is Docker Desktop (its WSL integration is on). Docker Desktop is not supported (known issue); " +
+          "this stack needs Docker Engine inside WSL2. Turn the integration off: Docker Desktop > Settings > Resources > WSL integration, " +
+          "switch off '$Distro'. Then in WSL run:  sudo systemctl restart docker.socket docker  and run this script again.")
+  }
+}
+
 function Compose {
-  if ($script:Mode -eq 'wsl') { & wsl.exe -d $Distro --cd $root -- docker compose @args }
-  else { & docker compose @args }
+  & wsl.exe -d $Distro --cd $root -- docker compose @args
   if ($LASTEXITCODE -ne 0) { Fail "docker compose $args failed (exit $LASTEXITCODE)" }
 }
 
@@ -105,24 +110,28 @@ function Enable-Lan {
     Warn "  Set-NetConnectionProfile -InterfaceAlias '$alias' -NetworkCategory Private"
   } else { Ok "network '$alias' profile: $netProfile" }
 
-  if ($script:Mode -eq 'wsl') {
-    foreach ($port in $otlpPorts) {
-      $existing = @(netsh interface portproxy show v4tov4 | Select-String "^\s*(\S+)\s+$port\s" | ForEach-Object { $_.Matches[0].Groups[1].Value })
-      foreach ($old in $existing) {
-        if ($old -ne $ip) { netsh interface portproxy delete v4tov4 listenaddress=$old listenport=$port | Out-Null; Ok "removed old port forward ${old}:$port" }
-      }
-      if ($existing -contains $ip) { Ok "port forward ${ip}:$port -> 127.0.0.1:$port already exists" }
-      else {
-        netsh interface portproxy add v4tov4 listenaddress=$ip listenport=$port connectaddress=127.0.0.1 connectport=$port | Out-Null
-        if ($LASTEXITCODE -ne 0) { Fail "netsh portproxy add failed (exit $LASTEXITCODE)" }
-        Ok "port forward ${ip}:$port -> 127.0.0.1:$port added"
-      }
+  foreach ($port in $otlpPorts) {
+    $existing = @(netsh interface portproxy show v4tov4 | Select-String "^\s*(\S+)\s+$port\s" | ForEach-Object { $_.Matches[0].Groups[1].Value })
+    foreach ($old in $existing) {
+      if ($old -ne $ip) { netsh interface portproxy delete v4tov4 listenaddress=$old listenport=$port | Out-Null; Ok "removed old port forward ${old}:$port" }
+    }
+    if ($existing -contains $ip) { Ok "port forward ${ip}:$port -> 127.0.0.1:$port already exists" }
+    else {
+      netsh interface portproxy add v4tov4 listenaddress=$ip listenport=$port connectaddress=127.0.0.1 connectport=$port | Out-Null
+      if ($LASTEXITCODE -ne 0) { Fail "netsh portproxy add failed (exit $LASTEXITCODE)" }
+      Ok "port forward ${ip}:$port -> 127.0.0.1:$port added"
     }
   }
   foreach ($port in $otlpPorts) {
     if (Test-Port $ip $port) { Ok "${ip}:$port is reachable" } else { Warn "${ip}:$port is not reachable yet" }
   }
 }
+
+if ($Mode -eq 'desktop') {
+  Fail 'Docker Desktop is not supported (known issue). Use Docker Engine inside WSL2: run the script without -Mode (or with -Mode wsl).'
+}
+if ($Mode -notin 'auto', 'wsl') { Fail "Unknown -Mode '$Mode'. Use auto or wsl." }
+$Mode = 'wsl'
 
 # ---------------------------------------------------------------- elevated pass
 if ($LanOnly) {
@@ -133,37 +142,30 @@ if ($LanOnly) {
 
 # ---------------------------------------------------------------- 1. Docker
 Step 'Docker'
-if ($Mode -eq 'auto') {
-  if (Test-DesktopDocker) { $Mode = 'desktop' }
-  elseif (Test-DistroExists) { $Mode = 'wsl' }
-  else {
-    Fail ("No Docker found. Install Docker Desktop (Windows 10 22H2+ / Windows 11), or on older Windows install WSL2 " +
-          "with Ubuntu (admin: wsl --install -d Ubuntu), reboot, and run this script again.")
-  }
+if (-not (Test-DistroExists)) {
+  Fail ("WSL distro '$Distro' not found (wsl -l -v). Use -Distro <name>. Without WSL2: admin: wsl --install -d Ubuntu, " +
+        "reboot, and run this script again.")
 }
-if ($Mode -eq 'desktop') {
-  if (-not (Test-DesktopDocker)) { Fail 'Docker Desktop is not running. Start it and run this script again.' }
-  Ok ("Docker Desktop, engine " + (docker info --format '{{.ServerVersion}}'))
-} else {
-  if (-not (Test-DistroExists)) { Fail "WSL distro '$Distro' not found (wsl -l -v). Use -Distro <name>." }
-  if (-not (Test-WslDocker)) {
-    $pid1 = (wsl.exe -d $Distro -- ps -p 1 -o comm= | Out-String).Trim()
-    if ($pid1 -ne 'systemd') {
-      Fail ("systemd is off in WSL '$Distro'. Add to /etc/wsl.conf:  [boot]  systemd=true  " +
-            "then run 'wsl --terminate $Distro' and this script again.")
-    }
-    if (-not $Yes) {
-      $answer = Read-Host "Docker is not installed in WSL '$Distro'. Install Docker Engine there now? [Y/n]"
-      if ($answer -match '^[Nn]') { Fail 'Docker is required.' }
-    }
-    $linuxUser = (wsl.exe -d $Distro -- whoami | Out-String).Trim()
-    & wsl.exe -d $Distro -u root --cd $root -- bash linux-server-tools/install-docker.sh $linuxUser
-    if ($LASTEXITCODE -ne 0) { Fail 'Docker installation in WSL failed, see the output above.' }
-    wsl.exe --terminate $Distro | Out-Null   # applies the docker group
-    if (-not (Test-WslDocker)) { Fail 'Docker was installed but does not answer. Run: wsl -d <distro> -- docker info' }
+# Docker answering in the distro may be Docker Desktop (WSL integration): stop before anything is installed or changed.
+if (Test-WslDocker) { Assert-NotDockerDesktop }
+else {
+  $pid1 = (wsl.exe -d $Distro -- ps -p 1 -o comm= | Out-String).Trim()
+  if ($pid1 -ne 'systemd') {
+    Fail ("systemd is off in WSL '$Distro'. Add to /etc/wsl.conf:  [boot]  systemd=true  " +
+          "then run 'wsl --terminate $Distro' and this script again.")
   }
-  Ok ("Docker Engine in WSL '$Distro', version " + (wsl.exe -d $Distro -- docker info --format '{{.ServerVersion}}' | Out-String).Trim())
+  if (-not $Yes) {
+    $answer = Read-Host "Docker is not installed in WSL '$Distro'. Install Docker Engine there now? [Y/n]"
+    if ($answer -match '^[Nn]') { Fail 'Docker is required.' }
+  }
+  $linuxUser = (wsl.exe -d $Distro -- whoami | Out-String).Trim()
+  & wsl.exe -d $Distro -u root --cd $root -- bash linux-server-tools/install-docker.sh $linuxUser
+  if ($LASTEXITCODE -ne 0) { Fail 'Docker installation in WSL failed, see the output above.' }
+  wsl.exe --terminate $Distro | Out-Null   # applies the docker group
+  if (-not (Test-WslDocker)) { Fail 'Docker was installed but does not answer. Run: wsl -d <distro> -- docker info' }
+  Assert-NotDockerDesktop   # the new docker may still be answered by Docker Desktop (integration on)
 }
+Ok ("Docker Engine in WSL '$Distro', version " + (wsl.exe -d $Distro -- docker info --format '{{.ServerVersion}}' | Out-String).Trim())
 
 # ---------------------------------------------------------------- 2. .env
 Step '.env'
@@ -178,7 +180,12 @@ else {
 
 # ---------------------------------------------------------------- 3. stack
 Step 'Stack'
-Compose up -d
+# Not through Compose: it fails at once, and a failed views-init (cc-refresh waits for it) must show its log first.
+& wsl.exe -d $Distro --cd $root -- docker compose up -d
+if ($LASTEXITCODE -ne 0) {
+  Compose logs --tail 50 views-init
+  Fail 'docker compose up failed (cc-refresh waits for views-init: its log is above), see the output above.'
+}
 $state = $null
 for ($i = 0; $i -lt 90; $i++) {
   $state = (Compose ps -a views-init --format '{{.State}} {{.ExitCode}}' | Out-String).Trim()
@@ -187,6 +194,40 @@ for ($i = 0; $i -lt 90; $i++) {
 }
 if ($state -eq 'exited 0') { Ok 'cc.* views are ready' }
 else { Compose logs views-init; Fail "views-init did not finish cleanly ($state)" }
+
+# `compose up -d` recreates only containers whose service definition changed, so a changed bind-mounted config
+# file (a git pull before this run) stays unloaded. Restart a service when one of its config files is newer than
+# the running container (stateless). A container just created by `compose up -d` is newer than its files. A file
+# only touched, with no content change, costs one restart of a few seconds: accepted. grafana/dashboards is
+# re-read by Grafana itself; clickhouse/ is read by views-init on every run.
+Step 'Reload changed configuration'
+$restarted = $false
+$configFiles = [ordered]@{
+  'otel-collector' = @(Join-Path $root 'otel-collector.yaml')
+  'grafana'        = @(Get-ChildItem -Path (Join-Path $root 'grafana\provisioning') -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
+}
+foreach ($svc in $configFiles.Keys) {
+  $cid = (Compose ps -q $svc | Out-String).Trim()
+  if (-not $cid) { continue }
+  $info = (& wsl.exe -d $Distro -- docker inspect -f '{{.State.Running}} {{.State.StartedAt}}' $cid | Out-String).Trim()
+  if ($LASTEXITCODE -ne 0 -or $info -notlike 'true *') { continue }   # not running: nothing to restart
+  $started = [DateTimeOffset]::MinValue
+  $newest = $null
+  foreach ($f in $configFiles[$svc]) {
+    $t = (Get-Item -LiteralPath $f -ErrorAction SilentlyContinue).LastWriteTimeUtc
+    if ($t -and (-not $newest -or $t -gt $newest)) { $newest = $t }
+  }
+  if (-not [DateTimeOffset]::TryParse($info.Substring(5), [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::AssumeUniversal, [ref]$started) -or -not $newest) {
+    Warn "could not compare the config of $svc with the running container: restart it yourself if its config changed (docker compose restart $svc)"
+    continue
+  }
+  if ([DateTimeOffset]$newest -gt $started.AddSeconds(1)) {
+    Compose restart $svc
+    Ok "$svc restarted (its config is newer than the running container)"
+    $restarted = $true
+  }
+}
+if (-not $restarted) { Ok 'collector and Grafana provisioning config is not newer than the containers: nothing to restart' }
 
 # ---------------------------------------------------------------- 4. checks
 Step 'Checks'
@@ -200,18 +241,16 @@ foreach ($port in $otlpPorts) {
 }
 
 # ---------------------------------------------------------------- 5. WSL autostart
-if ($Mode -eq 'wsl') {
-  Step 'Keep WSL running'
-  $vbs = @"
+Step 'Keep WSL running'
+$vbs = @"
 ' cc-telemetry: keeps WSL '$Distro' (and Docker inside it) running. Created by setup-server.ps1.
 CreateObject("WScript.Shell").Run "wsl.exe -d $Distro --exec /bin/sleep infinity", 0, False
 "@
-  $startupFile = Join-Path ([Environment]::GetFolderPath('Startup')) 'cc-telemetry-keepalive.vbs'
-  [IO.File]::WriteAllText($startupFile, $vbs, [Text.Encoding]::ASCII)
-  Ok "autostart: $startupFile"
-  $running = Get-CimInstance Win32_Process -Filter "Name='wsl.exe'" | Where-Object { $_.CommandLine -like '*sleep infinity*' }
-  if ($running) { Ok 'keepalive already running' } else { Start-Process wscript.exe -ArgumentList "`"$startupFile`""; Ok 'keepalive started' }
-}
+$startupFile = Join-Path ([Environment]::GetFolderPath('Startup')) 'cc-telemetry-keepalive.vbs'
+[IO.File]::WriteAllText($startupFile, $vbs, [Text.Encoding]::ASCII)
+Ok "autostart: $startupFile"
+$running = Get-CimInstance Win32_Process -Filter "Name='wsl.exe'" | Where-Object { $_.CommandLine -like '*sleep infinity*' }
+if ($running) { Ok 'keepalive already running' } else { Start-Process wscript.exe -ArgumentList "`"$startupFile`""; Ok 'keepalive started' }
 
 # ---------------------------------------------------------------- 6. LAN
 if ($EnableLan) {
@@ -220,7 +259,7 @@ if ($EnableLan) {
     Step 'LAN access: asking for admin rights (UAC)'
     $log = Join-Path $env:TEMP 'cc-telemetry-lan.log'
     Remove-Item $log -ErrorAction SilentlyContinue
-    $argList = "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" -LanOnly -Mode $Mode -Distro $Distro"
+    $argList = "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" -LanOnly -Mode wsl -Distro $Distro"
     if ($LanIp) { $argList += " -LanIp $LanIp" }
     try { Start-Process powershell.exe -Verb RunAs -ArgumentList $argList -Wait -WindowStyle Hidden -ErrorAction Stop }
     catch { Fail 'admin rights were not granted; LAN access is not configured' }

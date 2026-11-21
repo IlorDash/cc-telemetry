@@ -7,16 +7,18 @@
 
 cc-telemetry is a local usage-statistics stack for Claude Code: clients export OpenTelemetry
 events (OTLP gRPC :4317) to a server PC running OTel Collector → ClickHouse → Grafana in Docker
-(Windows: Docker Desktop or Docker Engine inside WSL2; Linux: native Docker Engine). Setup scripts
+(Windows: Docker Engine inside WSL2; Linux: native Docker Engine). Setup scripts
 for each OS: server `setup-server.ps1` / `setup-server.sh` (also `--update` on Linux), client
 `client/setup-client.ps1` / `client/setup-client.sh`; server and client OS can be mixed.
-`README.md` is the public, English guide for people; keep it in step with the code.
+The public user guide is the bilingual MkDocs site (`docs/<page>.md` + `.ru.md` twin, published to
+GitHub Pages from `main`); `README.md` is a short quick start that links to it. Keep both in step
+with the code (`claude-context/modules/docs-site.md`).
 
 ## Navigation
 1. `claude-context/context-claude.md` — hub (glossary, data flow, module map, conventions,
    ledger). Always read first.
 2. The module file of your area in `claude-context/modules/`: `stack`, `telemetry-data`,
-   `dashboard`, `setup-scripts`.
+   `materialization`, `dashboard`, `setup-scripts`, `server-update`, `docs-site`.
 3. Source last.
 
 Ledger: `claude-context/pending-bugs.md` (suspected bugs and unverified behaviour).
@@ -29,18 +31,31 @@ server or connecting a PC. Never copy its content into tracked files.
 | Task | Guide |
 | --- | --- |
 | Writing or reviewing SQL views, dashboard JSON, PowerShell, bash, compose/collector config | `claude-context/guides/conventions.md` |
+| Adding or changing a dashboard panel (sizes, fonts, titles, colours, layout) | `claude-context/guides/grafana-style.md` |
 | Checking a change on the live stack (SQL, dashboard queries, scripts) | `claude-context/guides/verification.md` |
 | Drafting a commit message | `claude-context/guides/commit-messages.md` |
-| Writing context docs or the README | `claude-context/guides/docs-writing.md` |
+| Writing context docs, the site pages or the README | `claude-context/guides/docs-writing.md` |
 | Changing the AI setup (junction, agents, skills, hooks, settings) | `claude-context/guides/context-repo.md` |
+| Planning a feature or fix, splitting it into stages | `claude-context/guides/feature-planning.md` |
+| Writing to the ledger, working in a parallel-task worktree | `claude-context/guides/ledgers.md` |
 
 ---
 
 ## The user's tools
-Windows 10, VS Code (editing, diffs, **all git** — Source Control view or a command to paste
-into the VS Code terminal), PowerShell in the terminal. Your Bash tool is Git Bash; a PowerShell
-tool is available too. Docker runs inside WSL here (`wsl -d Ubuntu -- docker compose ...` from
-the repo root).
+VS Code everywhere (editing, diffs, **all git** — Source Control view or a command to paste into
+the VS Code terminal). The session runs on one of two kinds of machine; check which (`uname -s`,
+or the platform in your environment) before running stack commands:
+
+| | Windows PC | Linux PC (server or client) |
+| --- | --- | --- |
+| Terminal | PowerShell; your Bash tool is Git Bash, a PowerShell tool exists | bash; no PowerShell |
+| Docker | inside WSL: `wsl -d Ubuntu -- docker compose ...` | native: `docker compose ...` |
+| Python | `py -3` (`python` is the Store stub) | `python3` |
+| `.claude` | directory junction | directory symlink |
+
+The guides write stack commands in the Windows form. On Linux drop the `wsl -d Ubuntu --` prefix,
+pipe with `cat <file> |` instead of `Get-Content <file> |`, and skip PowerShell-only steps
+(`*.ps1` runs, UAC) — report them as not verified on this machine.
 
 ## Git
 - Read-only git only: `status`, `log`, `diff`, `show`, `blame`, `ls-files`, `grep`, `rev-parse`,
@@ -60,7 +75,8 @@ the repo root).
 ## Safety
 Never without the user's explicit "yes": anything that deletes data (`docker compose down -v`,
 `docker volume rm`, `wsl --unregister`, `DELETE`/`DROP` in ClickHouse — dump first with
-`linux-server-tools/backup.sh dump`); Windows system settings (network profile, firewall, services); commands
+`linux-server-tools/backup.sh dump`); system settings (Windows network profile, firewall,
+services; Linux firewall, systemd units, `/etc`); commands
 needing admin rights (hand them to the user). Never help bypass corporate controls (VPN,
 firewalls, IT policy); warn before corporate data would go to a personal server. Client setup is
 always per-user, never system-wide.
@@ -85,20 +101,41 @@ it as `model` on the Agent call.
 
 | Agent | Model | Role | Writes |
 | --- | --- | --- | --- |
-| `developer` | sonnet | implements features/fixes in views, dashboard, scripts, config, README; verifies on the live stack | code, README; removes `pending-bugs.md` entries it fixes |
+| `developer` | sonnet | implements features/fixes in views, dashboard, scripts, config, site pages, README; verifies on the live stack | code, `docs/` pages (EN + RU), README; removes `pending-bugs.md` entries it fixes |
 | `reviewer` | sonnet | reviews the diff vs `HEAD`; "review only" and "bug hunt in <area>" | only appends to `pending-bugs.md` |
 | `context-auditor` | opus | keeps `context-claude.md`, `modules/*.md` and the ledger in sync with the code | `claude-context/` docs only |
+| `docs-auditor` | sonnet | user-initiated update/audit of the site pages and README (skill `docs-update`) | `docs/*.md`, `README.md` only |
+| `mr-reviewer` | opus | whole-branch review `<base>...<source>` before a PR; never in the feature chain | only appends to `pending-bugs.md` |
+
+**Plan first** (`guides/feature-planning.md`): every non-trivial "implement X" / "fix Y" starts
+with a plan the main session writes itself (chat or `claude-context/plans/<name>.md`) and the
+user approves; its last section splits the work into stages, one stage = one commit with a
+checkable result. Each stage runs through the feature chain; the next stage starts after the user
+has committed the previous one.
 
 **Feature chain** — always sequential: developer → reviewer (BLOCKED → back to developer with the
-blocker list). **Trivial change** (comment or text, a typo, README wording, a constant the user
-named with its new value, a rename inside one function) → no reviewer; end the reply with the bold
-line **РЕВЬЮЕР НЕ ЗАПУСКАЛСЯ (ТРИВИАЛЬНАЯ ПРАВКА)**. Never trivial: SQL view logic, dashboard
+blocker list). **Trivial change** (comment or text, a typo, README or site-page wording, a
+constant the user named with its new value, a rename inside one function) → no reviewer; end the
+reply with the bold line **РЕВЬЮЕР НЕ ЗАПУСКАЛСЯ (ТРИВИАЛЬНАЯ ПРАВКА)**. Never trivial: SQL view logic, the MV / `events_t` schema / backfill / refresh, dashboard
 queries or variables, collector pipeline, anything in the setup scripts touching the network,
 firewall, WSL, `.env` or user settings files, or more than ~10 lines. In doubt → not trivial.
 
-**Routing:** "implement X" / "fix Y" → full chain. "review only" → reviewer. "find bugs in X" /
+**Routing:** "implement X" / "fix Y" → plan → approval → full chain per stage. "parallel task" /
+"в отдельном worktree" / the main folder already holds someone's uncommitted work →
+`parallel-task` skill (`start`; "фича закончена" → `finish`). "review only" → reviewer. "find bugs in X" /
 "bug hunt" → reviewer in bug-hunt mode (ledger only). Never fix ledger bugs unasked.
+"update / audit the README / the guide / the site" → docs-auditor (after context-auditor when
+both are asked; pass its report). "review the branch / PR" → mr-reviewer. "PR description" → `mr-description` skill, which
+runs mr-reviewer first as the **PR review gate**: BLOCKED → no description.
 
 **Context updates are user-initiated only** — never as the closing step of a feature; pass the
 developer's "Docs impact" to the user instead. "update claude-context / context" →
-context-auditor. Never edit module files directly.
+context-auditor. Never edit module files directly. The same holds for docs-auditor: never as the
+closing step of a feature (the developer keeps the site pages and README in step inside its own change).
+
+**Parallel-task worktree** (`..\cc-telemetry-<name>`, `skills/parallel-task`): `claude-context/`
+is locked there for the session and every subagent (hook `guard-worktree-context.py`) — ledger
+findings and plans go to `<wt>/.wt-ledger/`, other context changes are only reported; no
+`docker compose` there, live checks use the main folder's helpers (`guides/verification.md`).
+Pass the worktree path and this rule in every subagent prompt. Never create, delete or clean up a
+worktree outside the skill's shapes.

@@ -44,5 +44,6 @@ Filter both by prompts > 0 OR tokens > 0. The data stays in the database.
 ```
 
 Drafts go into a scratchpad file (`commit-cc-telemetry-<area>.txt`), checked with
-`py -3 claude-context/skills/commit-message/scripts/check-msg.py <file> --repo .`, so the user
+`py -3 claude-context/skills/commit-message/scripts/check-msg.py <file> --repo .` (`python3` on
+Linux), so the user
 can run `git commit -F <file>`. The `commit-message` skill does exactly this.

@@ -1,0 +1,2 @@
+<!-- No limits (CLICKHOUSE_LIMITS=none, the default): ClickHouse keeps its own defaults. -->
+<clickhouse/>
