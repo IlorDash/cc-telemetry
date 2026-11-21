@@ -193,6 +193,41 @@ for ($i = 0; $i -lt 90; $i++) {
 if ($state -eq 'exited 0') { Ok 'cc.* views are ready' }
 else { Compose logs views-init; Fail "views-init did not finish cleanly ($state)" }
 
+# `compose up -d` recreates only containers whose service definition changed, so a changed bind-mounted config
+# file (a git pull before this run) stays unloaded. Restart a service when one of its config files is newer than
+# the running container (stateless). A container just created by `compose up -d` is newer than its files. A file
+# only touched, with no content change, costs one restart of a few seconds: accepted. grafana/dashboards is
+# re-read by Grafana itself; clickhouse/ is read by views-init on every run.
+Step 'Reload changed configuration'
+$restarted = $false
+$configFiles = [ordered]@{
+  'otel-collector' = @(Join-Path $root 'otel-collector.yaml')
+  'grafana'        = @(Get-ChildItem -Path (Join-Path $root 'grafana\provisioning') -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
+}
+foreach ($svc in $configFiles.Keys) {
+  $cid = (Compose ps -q $svc | Out-String).Trim()
+  if (-not $cid) { continue }
+  if ($script:Mode -eq 'wsl') { $info = (& wsl.exe -d $Distro -- docker inspect -f '{{.State.Running}} {{.State.StartedAt}}' $cid | Out-String).Trim() }
+  else { $info = (& docker inspect -f '{{.State.Running}} {{.State.StartedAt}}' $cid | Out-String).Trim() }
+  if ($LASTEXITCODE -ne 0 -or $info -notlike 'true *') { continue }   # not running: nothing to restart
+  $started = [DateTimeOffset]::MinValue
+  $newest = $null
+  foreach ($f in $configFiles[$svc]) {
+    $t = (Get-Item -LiteralPath $f -ErrorAction SilentlyContinue).LastWriteTimeUtc
+    if ($t -and (-not $newest -or $t -gt $newest)) { $newest = $t }
+  }
+  if (-not [DateTimeOffset]::TryParse($info.Substring(5), [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::AssumeUniversal, [ref]$started) -or -not $newest) {
+    Warn "could not compare the config of $svc with the running container: restart it yourself if its config changed (docker compose restart $svc)"
+    continue
+  }
+  if ([DateTimeOffset]$newest -gt $started.AddSeconds(1)) {
+    Compose restart $svc
+    Ok "$svc restarted (its config is newer than the running container)"
+    $restarted = $true
+  }
+}
+if (-not $restarted) { Ok 'collector and Grafana provisioning config is not newer than the containers: nothing to restart' }
+
 # ---------------------------------------------------------------- 4. checks
 Step 'Checks'
 $grafanaOk = $false

@@ -510,31 +510,41 @@ finish_update() {
   [ -z "$UPDATE_PREV" ] || echo "   Rollback if something is wrong: git checkout $UPDATE_PREV && bash setup-server.sh"
 }
 
-# Update re-run, after `compose up -d`: that recreates only containers whose service definition changed,
-# so a pulled change to a bind-mounted config file stays unloaded. Restart the services those files
-# belong to. ./grafana/dashboards is re-read by Grafana every 30 s: no restart. ./clickhouse is read by
-# the one-shot views-init, which `compose up -d` starts again on every run: nothing to do for it.
+# Every run, after `compose up -d`: that recreates only containers whose service definition changed, so a
+# change to a bind-mounted config file (a git pull before this run, an edit) stays unloaded. Restart a service
+# when one of its config files is newer than the running container (stateless: no hash to save). A container
+# that `compose up -d` just created is newer than its files and is not restarted again. A file that was only
+# touched, with no content change, costs one restart of a few seconds: accepted. ./grafana/dashboards is
+# re-read by Grafana every 30 s: no restart. ./clickhouse is read by the one-shot views-init, which
+# `compose up -d` starts again on every run: nothing to do for it.
+newest_mtime() { # path...: newest mtime (epoch seconds) of the files and of the files under the folders
+  find "$@" -type f -exec stat -c %Y {} + 2>/dev/null | sort -n | tail -n 1
+}
 reload_changed_config() {
-  local files svc restart=() f s
-  [ -n "$UPDATE_DIR" ] && [ -n "$UPDATE_PREV" ] || return 0
-  step 'Update: reload changed configuration'
-  if ! files="$(git diff --name-only "$UPDATE_PREV" HEAD 2>/dev/null)"; then
-    warn "could not list the files changed since $UPDATE_PREV: restart otel-collector and grafana yourself if their config changed (docker compose restart <service>)"
-    return 0
-  fi
-  while IFS= read -r f; do
-    case "$f" in
-      otel-collector.yaml) svc=otel-collector ;;
-      grafana/provisioning/*) svc=grafana ;;
-      *) continue ;;
+  local svc cid info started started_s newest restarted=0
+  step 'Reload changed configuration'
+  for svc in otel-collector grafana; do
+    case "$svc" in
+      otel-collector) newest="$(newest_mtime "$ROOT/otel-collector.yaml")" || newest='' ;;
+      *) newest="$(newest_mtime "$ROOT/grafana/provisioning")" || newest='' ;;
     esac
-    case " ${restart[*]-} " in *" $svc "*) ;; *) restart+=("$svc") ;; esac
-  done <<< "$files"
-  for s in "${restart[@]+"${restart[@]}"}"; do
-    compose restart "$s" || fail "docker compose restart $s failed, see the output above."
-    ok "$s restarted (its config changed)"
+    cid="$(compose ps -q "$svc" 2>/dev/null | head -n 1)" || cid=''
+    [ -n "$cid" ] || continue
+    info="$("${D[@]}" inspect -f '{{.State.Running}} {{.State.StartedAt}}' "$cid" 2>/dev/null)" || info=''
+    [ "${info%% *}" = true ] || continue   # not running: nothing to restart
+    started="${info#* }"
+    started_s="$(date -d "$started" +%s 2>/dev/null)" || started_s=''
+    if [ -z "$newest" ] || [ -z "$started_s" ]; then
+      warn "could not compare the config of $svc with the running container: restart it yourself if its config changed (docker compose restart $svc)"
+      continue
+    fi
+    if [ "$newest" -gt "$started_s" ]; then
+      compose restart "$svc" || fail "docker compose restart $svc failed, see the output above."
+      ok "$svc restarted (its config is newer than the running container)"
+      restarted=1
+    fi
   done
-  if [ "${#restart[@]}" -eq 0 ]; then ok 'no collector or Grafana provisioning change: nothing to restart'; fi
+  if [ "$restarted" -eq 0 ]; then ok 'collector and Grafana provisioning config is not newer than the containers: nothing to restart'; fi
 }
 
 # ---- retention: TTL of the otel.* tables and of cc.events_t --------------------------------------------------
