@@ -1,10 +1,6 @@
 # Version 1.0.0
 
-!!! info "In preparation"
-    Version 1.0.0 is not released yet. This page lists what it will contain and changes until the
-    release.
-
-<!-- unreleased: before the PR into main, put the date line back and remove this marker and the banner above it -->
+*Released 21 November 2026.*
 
 This is the first release. It is the whole stack as the guide describes it: a server that stores
 Claude Code telemetry, a script for every PC that sends it, and seven Grafana dashboards that
@@ -13,10 +9,10 @@ read it.
 ## What's new
 
 **Server on Windows or Linux.** One script starts OTel Collector, ClickHouse and Grafana in
-Docker and checks that they answer. On Windows it uses Docker Desktop or Docker Engine inside
-WSL2, and installs Docker into WSL when you agree. On Linux it installs Docker on Debian and
-Ubuntu. Every run is safe on a configured server: `.env` is never regenerated and no data is
-removed. See [Install the server](server.md).
+Docker and checks that they answer. On Windows it uses Docker Engine inside WSL2, and installs
+Docker into WSL when you agree. On Linux it installs Docker on Debian and Ubuntu. Every run is
+safe on a configured server: `.env` is never regenerated and no data is removed. See
+[Install the server](server.md).
 
 **LAN access you choose.** By default a Windows server accepts data from this PC only;
 `-EnableLan` opens the OTLP ports to the LAN after a UAC prompt. A Linux server is reachable
@@ -62,6 +58,12 @@ seconds; the inferred project and the tips refresh every 5 minutes. See
 [Disk use and retention](maintenance.md#disk-use-and-retention).
 
 **A guide in English and Russian.** This site, built from the same page set in both languages.
+
+## Known limitations
+
+**Docker Desktop is not supported on a Windows server.** The stack runs on Docker Engine inside
+WSL2. If Docker Desktop is installed, its WSL integration for the distro must be off; the script
+stops with instructions when it is on. See [Troubleshooting](troubleshooting.md#server-install).
 
 ## Data and privacy
 
