@@ -29,7 +29,8 @@ Linux works.
 ### 1. Server (once)
 
 Docker runs the stack. On Windows you need Docker Desktop (running) or WSL2 with Ubuntu; on
-Linux the script installs Docker on Debian and Ubuntu if it is missing.
+Linux the script installs Docker on Debian and Ubuntu if it is missing. If a Windows PC has both
+Docker Desktop and Docker Engine in WSL, add `-Mode desktop` or `-Mode wsl` on the first run.
 
 Windows (PowerShell):
 

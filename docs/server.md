@@ -39,6 +39,8 @@ plugin](https://docs.docker.com/engine/install/) yourself first.
 4. If the script finds no Docker Desktop but a WSL distro without Docker, it asks `Docker is not
    installed in WSL 'Ubuntu'. Install Docker Engine there now? [Y/n]`. Answer `Y`, or start the
    script with `-Yes` to skip the question.
+   If both Docker Desktop and Docker Engine in WSL answer and the stack is not installed yet,
+   the script stops: add `-Mode desktop` or `-Mode wsl` to the command.
 5. Wait for the `Done` step. It prints the Grafana address and the command to run on a client.
 6. To accept data from other PCs, run the script again with `-EnableLan`. It asks for admin
    rights through UAC; approve it.
@@ -217,6 +219,7 @@ never removes data.
     | --- | --- | --- |
     | `No Docker found. Install Docker Desktop (Windows 10 22H2+ / Windows 11), or on older Windows install WSL2 with Ubuntu (admin: wsl --install -d Ubuntu), reboot, and run this script again.` | Windows: neither Docker Desktop nor a WSL distro was found | Install one of them, then run the script again |
     | `Docker Desktop is not running. Start it and run this script again.` | Windows: `-Mode desktop`, and Docker does not answer | Start Docker Desktop and wait until it is ready |
+    | `Both Docker Desktop and Docker Engine in WSL hold this stack ...`, `... are running this stack ...` or `... are usable and neither has this stack yet. Run the script again with -Mode wsl (Docker Engine in WSL) or -Mode desktop (Docker Desktop).` | Windows, `-Mode auto`: both engines answer and the script cannot tell which one is yours; on a first install with both it cannot choose at all | Run the script again with `-Mode wsl` or `-Mode desktop`; later runs pick the engine that holds the stack |
     | `WSL distro 'Ubuntu' not found (wsl -l -v). Use -Distro <name>.` | Windows: no distro of that name | Pass the name from `wsl -l -v` as `-Distro` |
     | `systemd is off in WSL 'Ubuntu'. Add to /etc/wsl.conf:  [boot]  systemd=true  then run 'wsl --terminate Ubuntu' and this script again.` | Windows: the script cannot install Docker without systemd | Do what the message says |
     | `Docker installation in WSL failed, see the output above.` or `Docker installation failed, see the output above.` | The Docker installer failed | Read the output above the message and fix that error |

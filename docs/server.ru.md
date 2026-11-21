@@ -39,6 +39,8 @@ compose](https://docs.docker.com/engine/install/).
 4. Если Docker Desktop не найден, а в дистрибутиве WSL нет Docker, скрипт спросит `Docker is not
    installed in WSL 'Ubuntu'. Install Docker Engine there now? [Y/n]`. Ответьте `Y` или
    запустите скрипт с `-Yes`, чтобы вопроса не было.
+   Если отвечают и Docker Desktop, и Docker Engine в WSL, а стек ещё не установлен, скрипт
+   останавливается: добавьте к команде `-Mode desktop` или `-Mode wsl`.
 5. Дождитесь шага `Done`. Он выводит адрес Grafana и команду для клиента.
 6. Чтобы принимать данные с других ПК, запустите скрипт ещё раз с `-EnableLan`. Скрипт запросит
    права администратора через UAC; подтвердите запрос.
@@ -225,6 +227,7 @@ Docker открывает порты собственными правилами
     | --- | --- | --- |
     | `No Docker found. Install Docker Desktop (Windows 10 22H2+ / Windows 11), or on older Windows install WSL2 with Ubuntu (admin: wsl --install -d Ubuntu), reboot, and run this script again.` | Windows: не найден ни Docker Desktop, ни дистрибутив WSL | Установите что-то одно и запустите скрипт снова |
     | `Docker Desktop is not running. Start it and run this script again.` | Windows: указан `-Mode desktop`, а Docker не отвечает | Запустите Docker Desktop и дождитесь готовности |
+    | `Both Docker Desktop and Docker Engine in WSL hold this stack ...`, `... are running this stack ...` или `... are usable and neither has this stack yet. Run the script again with -Mode wsl (Docker Engine in WSL) or -Mode desktop (Docker Desktop).` | Windows, `-Mode auto`: отвечают оба движка, и скрипт не может понять, какой ваш; при первой установке с обоими он не может выбрать вовсе | Запустите скрипт снова с `-Mode wsl` или `-Mode desktop`; следующие запуски выберут движок, где лежит стек |
     | `WSL distro 'Ubuntu' not found (wsl -l -v). Use -Distro <name>.` | Windows: нет дистрибутива с таким именем | Передайте имя из `wsl -l -v` в `-Distro` |
     | `systemd is off in WSL 'Ubuntu'. Add to /etc/wsl.conf:  [boot]  systemd=true  then run 'wsl --terminate Ubuntu' and this script again.` | Windows: без systemd скрипт не может установить Docker | Сделайте то, что написано в сообщении |
     | `Docker installation in WSL failed, see the output above.` или `Docker installation failed, see the output above.` | Установщик Docker завершился с ошибкой | Прочитайте вывод над сообщением и устраните ошибку |

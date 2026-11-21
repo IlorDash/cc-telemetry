@@ -46,6 +46,7 @@ The messages of the install scripts, with the cause and the fix of each, are on
 | --- | --- | --- |
 | `No Docker found. Install Docker Desktop ...` | Windows: neither Docker Desktop nor a WSL distro was found | Install one of them, then run the script again |
 | `Docker Desktop is not running. Start it and run this script again.` | Windows: Docker Desktop does not answer | Start it, wait until it is ready, run the script again |
+| `Both Docker Desktop and Docker Engine in WSL ... Run the script again with -Mode wsl ... or -Mode desktop ...` | Windows: both engines answer and the script cannot tell which one holds the stack (on a first install it has no stack to go by) | Run the script again with `-Mode wsl` or `-Mode desktop` |
 | `systemd is off in WSL 'Ubuntu'. ...` | Windows: the script cannot install Docker into WSL without systemd | Do what the message says: add `[boot]` and `systemd=true` to `/etc/wsl.conf`, run `wsl --terminate Ubuntu`, run the script again |
 | `TCP port 3000 is already in use by another program, so Grafana cannot publish it. ...` | Linux: another program uses the Grafana port | `bash setup-server.sh --grafana-port 3001` |
 | `WARN GRAFANA_BIND was missing and OTLP_BIND=0.0.0.0: Grafana is now published on 0.0.0.0, ...` | Linux: `.env` from an older version has `OTLP_BIND` but no `GRAFANA_BIND`, so Grafana is now reachable from the LAN | To keep Grafana on this PC, set `GRAFANA_BIND=127.0.0.1` in `.env` and run the script again, or use `--local-only`. See [the server page](server.md#ports-and-access-on-linux) |

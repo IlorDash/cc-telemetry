@@ -48,6 +48,7 @@
 | --- | --- | --- |
 | `No Docker found. Install Docker Desktop ...` | Windows: не найден ни Docker Desktop, ни дистрибутив WSL | Установите что-то одно и запустите скрипт снова |
 | `Docker Desktop is not running. Start it and run this script again.` | Windows: Docker Desktop не отвечает | Запустите его, дождитесь готовности, запустите скрипт снова |
+| `Both Docker Desktop and Docker Engine in WSL ... Run the script again with -Mode wsl ... or -Mode desktop ...` | Windows: отвечают оба движка, и скрипт не может понять, где стек (при первой установке стека ещё нет) | Запустите скрипт снова с `-Mode wsl` или `-Mode desktop` |
 | `systemd is off in WSL 'Ubuntu'. ...` | Windows: без systemd скрипт не может установить Docker в WSL | Сделайте, что сказано в сообщении: добавьте `[boot]` и `systemd=true` в `/etc/wsl.conf`, выполните `wsl --terminate Ubuntu`, запустите скрипт снова |
 | `TCP port 3000 is already in use by another program, so Grafana cannot publish it. ...` | Linux: порт Grafana занят другой программой | `bash setup-server.sh --grafana-port 3001` |
 | `WARN GRAFANA_BIND was missing and OTLP_BIND=0.0.0.0: Grafana is now published on 0.0.0.0, ...` | Linux: в `.env` от старой версии есть `OTLP_BIND`, но нет `GRAFANA_BIND`, поэтому Grafana теперь доступна из сети | Чтобы оставить Grafana только на этом ПК, задайте `GRAFANA_BIND=127.0.0.1` в `.env` и запустите скрипт снова или используйте `--local-only`. См. [страницу сервера](server.md#порты-и-доступ-на-linux) |

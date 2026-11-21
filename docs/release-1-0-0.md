@@ -56,13 +56,18 @@ restarts what changed and compares the row counts afterwards; it prints `FAIL` w
 rows. `linux-server-tools/backup.sh` dumps and restores the collected data. See
 [Maintain the server](maintenance.md).
 
+**Small servers and retention.** Dashboards read materialized tables, so they stay fast on a
+Raspberry Pi 4. Rows older than `RETENTION_DAYS` are deleted. New events show within about 30
+seconds; the inferred project and the tips refresh every 5 minutes. See
+[Disk use and retention](maintenance.md#disk-use-and-retention).
+
 **A guide in English and Russian.** This site, built from the same page set in both languages.
 
 ## Data and privacy
 
 | What | Behaviour |
 | --- | --- |
-| Where it is stored | Only on the server PC, indefinitely; the collector has no exporter besides ClickHouse |
+| Where it is stored | Only on the server PC, for `RETENTION_DAYS` days (365 by default, 180 with ClickHouse 22.3); the collector has no exporter besides ClickHouse |
 | Prompts | Stored when `OTEL_LOG_USER_PROMPTS=1`, which the client script sets. Remove the variable to stop |
 | Claude's replies | The full text is dropped by the collector before storage; only the length is kept |
 | Session hook | Sends title, git branch, working directory and version; never prompts or replies. `-NoSessionMeta` / `--no-session-meta` removes it |
