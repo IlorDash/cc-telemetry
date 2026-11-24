@@ -762,8 +762,10 @@
     {
       "id": 31,
       "type": "timeseries",
-      "title": "Токены по дням и хит кэша",
-      "description": "Столбцы (левая ось): токены за день. Input: новый текст промпта вне кэша. Output: сгенерировано моделью. Cache create: записано в кэш промпта. Cache read не показан: он в 10-100 раз больше и сплющил бы столбцы. Линия (правая ось, 80-100 %): cache hit rate за день; меньшее значение обрезано. Дни по времени сервера (UTC).",
+      "title": "Токены и хит кэша · за $__interval",
+      "interval": "5m",
+      "maxDataPoints": 100,
+      "description": "Столбцы (левая ось): токены за интервал. Около 100 интервалов на период, каждый не меньше 5 минут: 15 минут за 24 часа, 2 часа за 7 дней, 6 часов за 30 дней. Input: новый текст промпта вне кэша. Output: сгенерировано моделью. Cache create: записано в кэш промпта. Cache read не показан: он в 10-100 раз больше и сплющил бы столбцы. Длина интервала указана в заголовке панели. Столбец начинается в начале своего интервала и покрывает его; заголовок подсказки — начало интервала. Линия (правая ось, 80-100 %): cache hit rate за интервал, нарисована в начале интервала; меньшее значение обрезано.",
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "clickhouse"
@@ -784,7 +786,7 @@
           "editorType": "sql",
           "format": 0,
           "queryType": "timeseries",
-          "rawSql": "SELECT toStartOfDay(ts) AS time, sum(input_tokens) AS input, sum(output_tokens) AS output, sum(cache_creation_tokens) AS cache_create,\n       100 * sum(cache_read_tokens) / greatest(sum(cache_read_tokens + input_tokens + cache_creation_tokens), 1) AS hit_rate\nFROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nGROUP BY time ORDER BY time"
+          "rawSql": "SELECT $__timeInterval(ts) AS time, sum(input_tokens) AS input, sum(output_tokens) AS output, sum(cache_creation_tokens) AS cache_create,\n       100 * sum(cache_read_tokens) / greatest(sum(cache_read_tokens + input_tokens + cache_creation_tokens), 1) AS hit_rate\nFROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nGROUP BY time ORDER BY time"
         }
       ],
       "options": {
@@ -805,7 +807,7 @@
             "drawStyle": "bars",
             "fillOpacity": 100,
             "lineWidth": 1,
-            "barAlignment": 0,
+            "barAlignment": 1,
             "gradientMode": "none",
             "stacking": {
               "mode": "normal",

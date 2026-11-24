@@ -48,8 +48,15 @@ it directly.
    `ts` lies in the range. Panel 225, the new Sessions table and the new tip use this same rule.
 2. **Adaptive buckets.** Overview 31 uses `$__timeInterval(ts)` (ClickHouse plugin macro) with a
    panel `interval` minimum of `5m`; new title "Tokens & cache hit rate". Over a few hours the
-   buckets are minutes, over 30 days hours. The same change goes to Efficiency 223, Agents 475 and
-   Health 161 in a stage of its own (titles and descriptions lose "per day" / "by day").
+   buckets are minutes, over 30 days hours. `maxDataPoints` 100 caps the bucket count (without it
+   Grafana makes one bucket per pixel and the bars become hairlines). Each bar covers its bucket
+   (`barAlignment` 1: it starts at the bucket time), and the panel title names the bucket length
+   through `$__interval` ("Tokens & cache hit rate · per 5m"), so it is visible without hovering;
+   the tooltip header is the bucket start. A tooltip row with the length was tried and dropped
+   (hard to find among the series), and an end time cannot be shown: Grafana formats time units
+   in the browser time zone, not the dashboard's. The same change
+   goes to Efficiency 223, Agents 475 and Health 161 in a stage of its own (titles and
+   descriptions lose "per day" / "by day").
 3. **Sessions: new table "Requests in this session"** (id 445, x3 y30 w21, under 101/8). It needs
    one selected session (same rule as 440–444, 100, 101, 8) and follows actor/skill and the range.
    Columns: time, actor, model family, pause (s, red ≥ 300), input, output, cache read,
