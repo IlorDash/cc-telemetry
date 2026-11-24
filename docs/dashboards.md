@@ -253,7 +253,7 @@ time range and the variables.
 | **Time and friction tips** | The tips without a token value (denials, slow hooks, slow first token) | A title opens the evidence panel |
 | **cost_usd per day by phase** | `cost_usd` per day, split by the work phase of the response | - |
 | **Phase summary** | The same phases: share of the range's `cost_usd` and `cost_usd` per model request | - |
-| **Pauses between requests** | A bar chart of the gaps between consecutive model requests of a session. Past 5 minutes it is red | - |
+| **Pauses between requests** | A bar chart of the gaps between consecutive model requests of the same session and agent. Past 5 minutes it is red | - |
 | **Cache hit rate by project** | Per project: requests, cache hit rate, cache-creation tokens (what a low hit rate costs), `cost_usd` | - |
 | **How tips are made** | The rules table, the same as on [the Tips page](tips.md#the-rules) | - |
 
@@ -261,7 +261,7 @@ time range and the variables.
 | --- | --- |
 | Work phase | Decided by the tools a response called, first match wins in this order: Edit (any `Edit`, `Write`, `MultiEdit`, `NotebookEdit`), Delegate (`Task`, `Agent`, `SendMessage`, `SubagentHandback`, `TaskStop`), Run (`Bash`), Explore (only `Read`, `Grep`, `Glob`, `LS`), Other (any other tools, for example MCP, web or `Skill`). A response with no tool result is Talk: a plain answer, or a tool call whose result was never recorded |
 | Pause over 5 minutes | Past the prompt-cache lifetime the next request writes the cache again instead of reading it |
-| Gap | Between consecutive requests of a session, subagents included; filter Actor = `main` for the main conversation only. The first request in the range has no predecessor and is not counted |
+| Gap | To the previous request of the same session and the same agent: the main conversation (with its auxiliary requests) and each subagent are counted separately, gaps between main and subagent requests are not counted. The previous request is looked up in the whole session history, so the pause before the first request in the range is included; a subagent's first request is not a pause |
 
 ---
 
