@@ -740,8 +740,10 @@
     {
       "id": 161,
       "type": "timeseries",
-      "title": "Время до первого токена по дням",
-      "description": "Средний ttft_ms по дням и семействам моделей (запросы без ttft_ms пропускаются). Красная пунктирная линия: 3 с, порог совета slow-ttft (он считает среднее по проекту и модели). Дни по времени сервера (UTC). Цель совета slow-ttft.",
+      "title": "Время до первого токена · за $__interval",
+      "interval": "5m",
+      "maxDataPoints": 100,
+      "description": "Медиана ttft_ms за интервал и семейство моделей (запросы без ttft_ms пропускаются). Около 100 интервалов на период, каждый не меньше 5 минут: 15 минут за 24 часа, 2 часа за 7 дней, 6 часов за 30 дней. Длина интервала указана в заголовке панели. Точка нарисована в начале интервала; заголовок подсказки — начало интервала. Точки не соединены, а интервал без запросов семейства ничего не показывает. Красная пунктирная линия: 3 с, порог совета slow-ttft. Сам совет считает среднее по проекту и модели за 7 дней, поэтому точка ниже 3 с не исключает совет. Цель совета slow-ttft.",
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "clickhouse"
@@ -762,7 +764,7 @@
           "editorType": "sql",
           "format": 0,
           "queryType": "timeseries",
-          "rawSql": "SELECT toStartOfDay(ts) AS time,\n       if(countIf(fam = 'Opus') = 0, NULL, round(avgIf(ttft_ms, fam = 'Opus'))) AS Opus,\n       if(countIf(fam = 'Sonnet') = 0, NULL, round(avgIf(ttft_ms, fam = 'Sonnet'))) AS Sonnet,\n       if(countIf(fam = 'Haiku') = 0, NULL, round(avgIf(ttft_ms, fam = 'Haiku'))) AS Haiku,\n       if(countIf(fam = 'Other') = 0, NULL, round(avgIf(ttft_ms, fam = 'Other'))) AS Other\nFROM\n(\n    SELECT ts, ttft_ms, multiIf(positionCaseInsensitive(model, 'opus') > 0, 'Opus', positionCaseInsensitive(model, 'sonnet') > 0, 'Sonnet', positionCaseInsensitive(model, 'haiku') > 0, 'Haiku', 'Other') AS fam\n    FROM cc.api_requests WHERE ttft_ms > 0 AND ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\n)\nGROUP BY time ORDER BY time"
+          "rawSql": "SELECT $__timeInterval(ts) AS time,\n       if(countIf(fam = 'Opus') = 0, NULL, round(medianIf(ttft_ms, fam = 'Opus'))) AS Opus,\n       if(countIf(fam = 'Sonnet') = 0, NULL, round(medianIf(ttft_ms, fam = 'Sonnet'))) AS Sonnet,\n       if(countIf(fam = 'Haiku') = 0, NULL, round(medianIf(ttft_ms, fam = 'Haiku'))) AS Haiku,\n       if(countIf(fam = 'Other') = 0, NULL, round(medianIf(ttft_ms, fam = 'Other'))) AS Other\nFROM\n(\n    SELECT ts, ttft_ms, multiIf(positionCaseInsensitive(model, 'opus') > 0, 'Opus', positionCaseInsensitive(model, 'sonnet') > 0, 'Sonnet', positionCaseInsensitive(model, 'haiku') > 0, 'Haiku', 'Other') AS fam\n    FROM cc.api_requests WHERE ttft_ms > 0 AND ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\n)\nGROUP BY time ORDER BY time"
         }
       ],
       "options": {
@@ -785,11 +787,12 @@
             "fixedColor": "#8e8e9e"
           },
           "custom": {
-            "drawStyle": "line",
-            "lineWidth": 2,
+            "drawStyle": "points",
+            "pointSize": 6,
+            "axisSoftMax": 3500,
             "fillOpacity": 0,
-            "showPoints": "auto",
-            "spanNulls": true,
+            "showPoints": "always",
+            "spanNulls": false,
             "thresholdsStyle": {
               "mode": "dashed"
             }

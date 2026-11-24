@@ -43,7 +43,7 @@ session) already chosen. The rules table is repeated at the bottom of **Efficien
 | `agent-outlier` | A subagent's biggest run is over 6 times its mean and over 50,000 tokens, with at least 3 runs (agent type) | Open the session of that run and check what it did | **Sessions**, **Timeline** of that session (session and agent type preset; the range is zoomed to the session) |
 | `denials` | A tool rejected at least 5 times (project, tool) | Add an allow or deny rule if the rejections are not intended; the tip text names the main source (config, hook, user) | **Tools & files**, **Rejected tool calls** |
 | `slow-hook` | A hook's mean duration over 500 ms, with at least 10 runs (hook) | Hooks run synchronously and delay every matching tool call: speed the hook up or make it async | **Health**, **Hook time** |
-| `slow-ttft` | Mean time to first token over 3 s, with at least 10 requests (project, model) | Long contexts or a busy provider; compare the days in the panel | **Health**, **Time to first token by day** |
+| `slow-ttft` | Mean time to first token over 3 s, with at least 10 requests (project, model) | Long contexts or a busy provider; compare the periods in the panel | **Health**, **Time to first token** |
 
 The rules are in `clickhouse/refresh.sql`, which the `cc-refresh` service runs every 5 minutes into
 the table behind the `cc.tips` view. To change a number, edit it there; the next refresh applies it

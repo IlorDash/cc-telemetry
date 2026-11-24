@@ -54,9 +54,9 @@ it directly.
    through `$__interval` ("Tokens & cache hit rate · per 5m"), so it is visible without hovering;
    the tooltip header is the bucket start. A tooltip row with the length was tried and dropped
    (hard to find among the series), and an end time cannot be shown: Grafana formats time units
-   in the browser time zone, not the dashboard's. The same change
-   goes to Efficiency 223, Agents 475 and Health 161 in a stage of its own (titles and
-   descriptions lose "per day" / "by day").
+   in the browser time zone, not the dashboard's. The same change goes to Efficiency 223,
+   Agents 475 and Health 161 in a stage of its own (titles and descriptions lose "per day" /
+   "by day").
 3. **Sessions: new table "Requests in this session"** (id 445, x3 y30 w21, under 101/8). It needs
    one selected session (same rule as 440–444, 100, 101, 8) and follows actor/skill and the range.
    Columns: time, actor, model family, pause (s, red ≥ 300), input, output, cache read,

@@ -1001,8 +1001,10 @@
     {
       "id": 475,
       "type": "timeseries",
-      "title": "cost_usd per day by actor",
-      "description": "cost_usd of the model requests per day: subagents (requests with an agent_id) and main (the main session and auxiliary requests). Days are in server time (UTC).",
+      "title": "cost_usd by actor · per $__interval",
+      "interval": "5m",
+      "maxDataPoints": 100,
+      "description": "cost_usd of the model requests per time bucket: subagents (requests with an agent_id) and main (the main session and auxiliary requests). About 100 buckets per range, at least 5 minutes each: 15 minutes over 24 hours, 2 hours over 7 days, 6 hours over 30 days. The title shows the bucket length. A bar starts at its bucket time and covers the bucket; the tooltip header is the bucket start.",
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "clickhouse"
@@ -1023,7 +1025,7 @@
           "editorType": "sql",
           "format": 0,
           "queryType": "timeseries",
-          "rawSql": "SELECT toStartOfDay(ts) AS time, sumIf(cost_usd, agent_id = '') AS main, sumIf(cost_usd, agent_id != '') AS subagents\nFROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nGROUP BY time ORDER BY time"
+          "rawSql": "SELECT $__timeInterval(ts) AS time, sumIf(cost_usd, agent_id = '') AS main, sumIf(cost_usd, agent_id != '') AS subagents\nFROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\nGROUP BY time ORDER BY time"
         }
       ],
       "options": {
@@ -1042,6 +1044,7 @@
           "unit": "currencyUSD",
           "custom": {
             "drawStyle": "bars",
+            "barAlignment": 1,
             "stacking": {
               "mode": "normal"
             },

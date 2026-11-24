@@ -251,7 +251,7 @@ time range and the variables.
 | **Affected tokens by category** | The same sum per category, biggest first; time tips have no value and are not shown | - |
 | **Token tips** | The tips about tokens, biggest first: category, title, affected tokens, `cost_usd` | A title opens the evidence panel |
 | **Time and friction tips** | The tips without a token value (denials, slow hooks, slow first token) | A title opens the evidence panel |
-| **cost_usd per day by phase** | `cost_usd` per day, split by the work phase of the response | - |
+| **cost_usd by phase** | Stacked bars: `cost_usd` per time bucket, split by the work phase of the response. Buckets follow the time range (about 100, at least 5 minutes each: 15 minutes over 24 hours, 2 hours over 7 days, 6 hours over 30 days). A bar starts at its bucket time and covers the bucket; the panel title ends with the bucket length (`per 15m`) and the tooltip header is the bucket start | - |
 | **Phase summary** | The same phases: share of the range's `cost_usd` and `cost_usd` per model request | - |
 | **Pauses between requests** | A bar chart of the gaps between consecutive model requests of the same session and agent. Past 5 minutes it is red | - |
 | **Cache hit rate by project** | Per project: requests, cache hit rate, cache-creation tokens (what a low hit rate costs), `cost_usd` | - |
@@ -278,7 +278,7 @@ time range and the variables.
 | **Skills used** | Distinct skills activated and the number of activations. `0` with an agent picked as Actor | - |
 | **Outlier runs** | The runs under the outlier rule below. Green with none, yellow with one or more | - |
 | **Subagent types** | Per agent type: runs, mean and maximum tokens of one run, max against mean (above 4 yellow, above 6 red), `cost_usd`; sorted by `cost_usd` | Filters the dashboard by the type (Actor) |
-| **cost_usd per day by actor** | `cost_usd` per day: subagents against main (the main session and auxiliary requests) | - |
+| **cost_usd by actor** | `cost_usd` per time bucket: subagents against main (the main session and auxiliary requests). Buckets follow the time range (about 100, at least 5 minutes each: 15 minutes over 24 hours, 2 hours over 7 days, 6 hours over 30 days). A bar starts at its bucket time and covers the bucket; the panel title ends with the bucket length (`per 15m`) and the tooltip header is the bucket start | - |
 | **Skills** | Per skill: activations, sessions and projects, `cost_usd` of the turns after the skill was invoked, until the end of the prompt | Filters the dashboard by the skill (Skill) |
 | **Biggest subagent runs** | The 5 completed runs with the most tokens in the range: session, agent type, tokens, `cost_usd`; an outlier is marked red | Opens the session on **Sessions**, range zoomed |
 
@@ -326,7 +326,7 @@ time range and the variables.
 | **API latency p95** | The 95th percentile of the total duration of a model request, all models together | - |
 | **API errors** | The failed attempts of model requests (retries included) as a share of the model requests | - |
 | **Hook time** | The total time spent in your hooks; the second line: the number of runs. Ignores Skill | - |
-| **Time to first token by day** | The mean time to first token per day and model family; the dashed red line is 3 s. Target of the `slow-ttft` tip | - |
+| **Time to first token** | The median time to first token per time bucket and model family, drawn as points (not joined; a bucket with no request of a family shows nothing). The dashed red line is 3 s, the threshold of the `slow-ttft` tip; the tip itself uses the mean per project and model over 7 days, so a point below 3 s does not rule out it. Buckets follow the time range (about 100, at least 5 minutes each: 15 minutes over 24 hours, 2 hours over 7 days, 6 hours over 30 days). A point is drawn at its bucket start; the panel title ends with the bucket length (`per 15m`). Target of the `slow-ttft` tip | - |
 | **Hook time** (the table) | Per hook: runs, mean and total duration; a mean above 200 ms is yellow, above 500 ms red. Ignores Skill. Target of the `slow-hook` tip | - |
 | **API errors** (the table) | Failed requests per HTTP status and error text (first 100 characters), with the time of the last one; 50 rows at most. A dash means an error without a status, for example a network error | - |
 | **API request duration** | Requests by total duration: green below 5 s, yellow to 10 s, orange to 20 s, red above | - |
