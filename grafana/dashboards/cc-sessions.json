@@ -2218,7 +2218,7 @@
       "id": 445,
       "type": "table",
       "title": "Requests in this session",
-      "description": "Every model request of the selected session in the time range, oldest first, 1000 at most. A row = one request: the actor (main, an agent or aux:<query source>), the model family, the pause, its tokens by type and its cost_usd. Pause = the gap to the previous request of the same session and the same agent, looked up in the whole session history, so the first row in the range still has its pause; the first request of a chain has none. A red pause is past the 5-minute prompt-cache lifetime: the request most likely wrote the whole context to the cache again (see cache create and cost_usd). Filtered by the time range, Actor and Skill.",
+      "description": "Every model request of the selected session in the time range, oldest first, 1000 at most. A row = one request: the actor (main, an agent or aux:<query source>), the model family, the pause, its tokens by type and its cost_usd. Pause = the gap to the previous request of the same session and the same agent, looked up in the whole session history, so the first row in the range still has its pause; the first request of a chain has none. A red pause is past the 5-minute prompt-cache lifetime: the request most likely wrote the whole context to the cache again (see cache create and cost_usd). The cache create bar is full at 50k tokens and turns red from there, the threshold of the cache-rewrite tip. Filtered by the time range, Actor and Skill.",
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "clickhouse"
@@ -2468,22 +2468,45 @@
                 "value": "short"
               },
               {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 50000
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "#5794F2",
+                      "value": null
+                    },
+                    {
+                      "color": "#F2495C",
+                      "value": 50000
+                    }
+                  ]
+                }
+              },
+              {
                 "id": "color",
                 "value": {
-                  "mode": "fixed",
-                  "fixedColor": "#5794F2"
+                  "mode": "thresholds"
                 }
               },
               {
                 "id": "custom.cellOptions",
                 "value": {
                   "type": "gauge",
-                  "mode": "gradient"
+                  "mode": "basic"
                 }
               },
               {
-                "id": "custom.minWidth",
-                "value": 150
+                "id": "custom.width",
+                "value": 290
               }
             ]
           },

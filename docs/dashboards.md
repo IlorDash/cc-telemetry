@@ -192,7 +192,7 @@ one session you select. Pick it by a click on a name in the table or in the Sess
 | **Timeline** | One cell per time step of the range; see below | - |
 | **Cumulative cost_usd & tokens** | The running total over the session, one step per model request: `cost_usd` on the left axis (green), billable tokens on the right (blue) | - |
 | **Prompts in this session** | The prompts of the session, oldest first: tokens and tool calls | A prompt opens it in **Prompts** |
-| **Requests in this session** | Every model request of the session in the range, oldest first, 1000 at most: actor, model family, pause, input, output, cache read and cache create tokens, `cost_usd`. The pause is the gap to the previous request of the same session and agent, taken from the whole session history, so the first row has its pause too. A red pause is past the 5-minute cache lifetime: the request most likely wrote the whole context to the cache again (see **Cache create**) | - |
+| **Requests in this session** | Every model request of the session in the range, oldest first, 1000 at most: actor, model family, pause, input, output, cache read and cache create tokens, `cost_usd`. The pause is the gap to the previous request of the same session and agent, taken from the whole session history, so the first row has its pause too. A red pause is past the 5-minute cache lifetime: the request most likely wrote the whole context to the cache again (see **Cache create**: its bar is full at 50k tokens and red from there, the threshold of the `cache-rewrite` tip) | - |
 
 | Term | Meaning |
 | --- | --- |
