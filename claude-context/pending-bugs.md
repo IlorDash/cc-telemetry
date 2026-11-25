@@ -97,7 +97,7 @@ behaviour, **L** cosmetic, trap; `?` = unsure or unverified.
 - **?** `cc.tips` rules (now in `refresh.sql`) ran on 25.8.33.6 (`refresh ok`, 15 rows, 2026-11-21)
   but were not compared rule by rule with the 22.3 result.
 - **?** `cc.tips` rules `cache`, `agent-outlier`, `slow-ttft` have not fired on real data yet
-  (2026-11-19, still none 2026-11-21): SQL and thresholds unconfirmed.
+  (2026-11-19, still none 2026-11-25): SQL and thresholds unconfirmed.
 - **?** `api_error` is in the live data now (12 events, all `status_code` 429, Claude Code
   2.1.325–2.1.328, observed 2026-11-21): attribute names, `agent_id` / `skill.name` and
   `cc.events_t.status_code` / `error` confirmed; the Health panels 493/495 were not reviewed

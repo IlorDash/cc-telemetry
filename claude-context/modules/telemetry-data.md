@@ -168,7 +168,7 @@ range and variables). Columns: `category`, `title`, `body`, `scope` (project / a
 variables preset; always has a query string — the dashboards append `&` + the time range),
 `affected` (Nullable UInt64, tokens the tip is about; NULL for the time tips `denials`,
 `slow-hook`, `slow-ttft`), `cost_usd` (Nullable Float64; only `cache`, `short-opus`,
-`agent-outlier`). Rows ordered by `affected` desc, NULLs last. Shown in the Tips section of
+`agent-outlier`, `cache-rewrite`). Nine categories. Rows ordered by `affected` desc, NULLs last. Shown in the Tips section of
 Efficiency and the rail tiles (`modules/dashboard.md`). Thresholds are first guesses, meant to be tuned.
 
 | category | link target | `affected` | `cost_usd` |
@@ -178,6 +178,7 @@ Efficiency and the rail tiles (`modules/dashboard.md`). Thresholds are first gue
 | `big-results` | `/d/cc-tools` panel 140, `var-project` | sum of the big results' bytes / 4 | NULL |
 | `short-opus` | `/d/cc-prompts` panel 180, `var-project` | input + output + cache-creation tokens of the short answers | their cost |
 | `agent-outlier` | `/d/cc-sessions` panel 100, `var-session` (biggest run), `var-actor`, `from`/`to` = the session zoom (`modules/dashboard.md`) | tokens of the biggest run | that run's requests (by `agent_id`); NULL if unmatched |
+| `cache-rewrite` | `/d/cc-sessions` panel 445, `var-session` (session of the most expensive rewrite), `from`/`to` = the session zoom | cache-creation tokens of the rewrites | the rewrites' cost (upper bound of the waste) |
 | `denials` | `/d/cc-tools` panel 19, `var-project` | NULL | NULL |
 | `slow-hook` | `/d/cc-health` panel 26 | NULL | NULL |
 | `slow-ttft` | `/d/cc-health` panel 161, `var-project` | NULL | NULL |
@@ -193,10 +194,16 @@ These panel ids are fixed: renumbering one breaks its tip link.
 | `big-results` | `cc.events` | ≥ 5 `tool_result` with `result_bytes` > 200000 (project) | count |
 | `short-opus` | `cc.api_requests` | model contains `opus`: ≥ 20 answers < 500 output tokens and ≥ half of all (project) | their `cost_usd` |
 | `agent-outlier` | `cc.events` | `subagent_completed`: max > 6 × mean and > 50k tokens, ≥ 3 runs (agent_type); link = session of the biggest run | max tokens |
+| `cache-rewrite` | `cc.api_requests` | requests in 7 d with pause ≥ 300 s (rule 1, below) and `cache_creation_tokens` ≥ 50000: ≥ 3 of them or their `cost_usd` ≥ $2 (project) | count |
 | `denials` | `cc.events` | `tool_decision` `reject` ≥ 5 (project, tool); body names the top `decision_source` | count |
 | `slow-hook` | `cc.events_raw` | `hook_execution_complete` mean > 500 ms, ≥ 10 runs (hook_name) | mean ms |
 | `slow-ttft` | `cc.events` | `api_request` mean `ttft_ms` > 3000, ≥ 10 requests (project, model) | mean ms |
 
+- **Rule 1 (pause)**: gap to the previous `api_request` of the same (`session_id`, `agent_id`),
+  `lagInFrame` over the whole history of the sessions with a request in the window (so the first
+  request in the window keeps its pause; a chain's first request has none), then only requests in the
+  window count. Shared by `cache-rewrite`, Efficiency 225 and Sessions 445 (`modules/dashboard.md`).
+- `cache-rewrite` body writes the tokens as `669k` / `2.19M` (`k` below 999500, else `M` with 2 decimals).
 - Savings come from `cost_usd` only — no price table; the `short-opus` metric is an upper bound.
 - **No repeated-Bash rule, on purpose:** `bash_cmd` holds only the first word (`cd`, `git`), so
   counting it is noise. Do not add one while Claude Code sends only that.

@@ -23,6 +23,8 @@ Branch flow: feature branches → `develop` → `main`; the user guide site publ
 | update | `setup-server.sh --update`: safety dump + row counts, `git pull --ff-only`, re-run (which, like every run of either setup script, restarts collector/Grafana when their config is newer than the container), row-count check |
 | backfill | `clickhouse/backfill.sql`: copies `otel.otel_logs` rows missing from `cc.events_t` (not a backfill from transcripts) |
 | refresh | `cc-refresh` service rebuilding `cc.session_project_t` and `cc.tips_t` every 300 s; the inferred project of a new session and the tips lag ≤ 5 min |
+| pause (rule 1) | gap to the previous model request of the same (`session_id`, `agent_id`), looked up in the session's whole history; Efficiency 225, Sessions 445 and the `cache-rewrite` tip |
+| cache rewrite | a request after a pause ≥ 300 s (the 5-min prompt-cache lifetime) writing ≥ 50k cache-creation tokens: the context written to the cache again; tip `cache-rewrite` |
 | retention | `RETENTION_DAYS`-day TTL (`.env`; 180 for ClickHouse 22.3 via `setup-server.sh`, else 365) on `otel.*` and `cc.events_t` (day partitions); views-init sets it where none exists, `setup-server.sh` `apply_retention` (every run) adds or changes it; Windows: no change of an existing TTL |
 | small server | ClickHouse 22.3 (old ARM): `setup-server.sh` defaults `CLICKHOUSE_LIMITS=small` (`clickhouse/limits/small/`), `CLICKHOUSE_CPUS=2`, 180 days; every other tag `none` / 0 / 365 |
 | old ARM | `aarch64` without `lrcpc` (Raspberry Pi 4): only ClickHouse ≤ 22.3 runs → `CLICKHOUSE_VERSION=22.3.20.29` |

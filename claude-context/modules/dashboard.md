@@ -9,8 +9,8 @@ not repeated here.
 
 | Path | uid | Title | Content |
 | --- | --- | --- | --- |
-| `grafana/dashboards/overview.json` | `cc-usage` (kept from the old single dashboard: old bookmarks open it) | Overview | Grafana home page; totals, daily tokens, projects, models, rhythm, tools, recent sessions |
-| `grafana/dashboards/cc-sessions.json` | `cc-sessions` | Sessions | sessions table; header, tiles, timeline, cumulative cost and prompts of one session |
+| `grafana/dashboards/overview.json` | `cc-usage` (kept from the old single dashboard: old bookmarks open it) | Overview | Grafana home page; totals, tokens over time, projects, models, rhythm, tools, recent sessions |
+| `grafana/dashboards/cc-sessions.json` | `cc-sessions` | Sessions | sessions table; header, tiles, timeline, cumulative cost, prompts and requests of one session |
 | `grafana/dashboards/cc-prompts.json` | `cc-prompts` | Prompts | most expensive prompts (`cc.prompts`), cost buckets, cost per model |
 | `grafana/dashboards/cc-efficiency.json` | `cc-efficiency` | Efficiency | Tips (`cc.tips`), where cost goes (work phases), cache; replaced the Tips dashboard (`cc-tips`, deleted) |
 | `grafana/dashboards/cc-agents.json` | `cc-agents` | Agents & skills | subagent types, skills, biggest runs |
@@ -92,25 +92,40 @@ rail.json nav[] (uid, title, hint, idBase) + panels[] (idOffset, gridPos.h)
 
 | Dashboard | Panels (top to bottom) |
 | --- | --- |
-| Overview | 401 header; 30 cost_usd, 33 Cache hit rate, 52 Billable tokens, 53 Tool error rate (+ p95 API latency); 31 Daily tokens & cache hit rate; 34 Projects (LIMIT 50), 35 cost_usd by model (pie, families); 39 Work rhythm (weekday × 3-h block table), 36 Top tools (7); 37 Recent sessions (6, panel link "all →") |
-| Sessions | 421 header; 430 Sessions, 431 Median length, 432 Median cost_usd, 433 Sessions with errors; 7 Sessions (≤ 500); 422 `$session_header`; 440 cost_usd, 441 Tokens, 442 Turns, 443 Cache hit rate, 444 Tool errors; 100 Timeline; 101 Cumulative cost_usd & tokens, 8 Prompts in this session |
+| Overview | 401 header; 30 cost_usd, 33 Cache hit rate, 52 Billable tokens, 53 Tool error rate (+ p95 API latency); 31 Tokens & cache hit rate · per $__interval; 34 Projects (LIMIT 50), 35 cost_usd by model (pie, families); 39 Work rhythm (weekday × 3-h block table), 36 Top tools (7); 37 Recent sessions (6, panel link "all →") |
+| Sessions | 421 header; 430 Sessions, 431 Median length, 432 Median cost_usd, 433 Sessions with errors; 7 Sessions (≤ 500); 422 `$session_header`; 440 cost_usd, 441 Tokens, 442 Turns, 443 Cache hit rate, 444 Tool errors; 100 Timeline; 101 Cumulative cost_usd & tokens, 8 Prompts in this session; 445 Requests in this session (x3 y30 w21 h12) |
 | Prompts | 431 header; 450 Prompts, 451 Median cost_usd, 452 p95 cost_usd, 453 Requests per prompt; 180 Most expensive prompts (8); 460 Prompts by cost_usd (buckets), 461 Mean cost_usd per prompt by model |
-| Efficiency | 412 header "Tips · fixed last 7 days"; 220 Tips · 7d (x3 w3 h8), 227 Affected · 7d (x6 w4 h8), 221 Affected tokens by category (x10 w14 h8); 222 Token tips; 228 Time and friction tips; 411 "Where cost goes"; 223 cost_usd per day by phase, 224 Phase summary; 413 "Cache"; 225 Pauses between requests, 226 Cache hit rate by project; 204 How tips are made (rule table) |
-| Agents & skills | 470 header; 471 Subagent share, 472 Subagent runs, 473 Skills used, 474 Outlier runs; 13 Subagent types, 475 cost_usd per day by actor; 14 Skills (LIMIT 50), 476 Biggest subagent runs (5) |
+| Efficiency | 412 header "Tips · fixed last 7 days"; 220 Tips · 7d (x3 w3 h10), 227 Affected · 7d (x6 w4 h10), 221 Affected tokens by category (x10 w14 h10); 222 Token tips; 228 Time and friction tips; 411 "Where cost goes"; 223 cost_usd by phase · per $__interval, 224 Phase summary; 413 "Cache"; 225 Pauses between requests, 226 Cache hit rate by project; 204 How tips are made (rule table) |
+| Agents & skills | 470 header; 471 Subagent share, 472 Subagent runs, 473 Skills used, 474 Outlier runs; 13 Subagent types, 475 cost_usd by actor · per $__interval; 14 Skills (LIMIT 50), 476 Biggest subagent runs (5) |
 | Tools & files | 480 header; 481 Tool calls, 482 Error rate, 483 Rejected, 484 Median result size; 485 Calls by tool (7), 19 Rejected tool calls (50); 24 Files re-read within one session (50), 140 Largest tool results (50); 486 Bash by first word (5), 487 Most edited files (5) |
-| Health | 490 header; 491 TTFT mean, 492 API latency p95, 493 API errors, 494 Hook time; 161 Time to first token by day (3 s threshold line), 26 Hook time; 495 API errors (`api_error` by status and text, 50), 496 API request duration (buckets) |
+| Health | 490 header; 491 TTFT mean, 492 API latency p95, 493 API errors, 494 Hook time; 161 Time to first token · per $__interval (points, median per bucket and model family, 3 s threshold line, `axisSoftMax` 3500), 26 Hook time; 495 API errors (`api_error` by status and text, 50), 496 API request duration (buckets) |
 
 - **Work phase** (223/224): per `request_id`, from the `tool_result` events of that response, first
   match of Edit (Edit/Write/MultiEdit/NotebookEdit) → Delegate (Task/Agent/SendMessage/
   SubagentHandback/TaskStop) → Run (Bash) → Explore (only Read/Grep/Glob/LS) → Other; no tool
-  result = Talk. 225: gap between consecutive requests of a session, red past the 5-min cache TTL.
+  result = Talk.
+- **Pause (rule 1)** — 225, 445 and the `cache-rewrite` tip: gap to the previous request of the same
+  (`session_id`, `agent_id`), `lagInFrame` over the whole history of the sessions with a request in
+  the range (filtered by the variables), `ts <= $__toTime`; then the variables + `$__timeFilter(ts)`
+  — the first request in the range keeps its pause. Red from 300 s (the 5-min cache TTL).
+- **Range-bucketed time charts** (31, 223, 475, 161): `$__timeInterval(ts)`, panel `interval`
+  `5m` (minimum), `maxDataPoints` 100 (≈ 15 m over 24 h, 2 h over 7 d, 6 h over 30 d),
+  `barAlignment` 1 on the bar charts (a bar covers its bucket), bucket length in the title via
+  `$__interval`. Without the 100-point cap the bars are hairlines; the tooltip time is the bucket
+  start in the browser time zone, so the descriptions name no "until"/UTC day.
 - Tips section (412, 220–222, 227, 228) reads `cc.tips`: fixed 7 days, no variables; 222 =
   `affected IS NOT NULL`, 228 = time tips (`affected IS NULL`). Their headers come from
   `displayName` overrides (Category, Title, Text, Scope, Metric) so the RU build can translate them;
-  the overrides still match `byName` on the raw column names.
+  the overrides still match `byName` on the raw column names. Category colours (221 overrides, 222
+  mappings): cache #5794F2, repeated-read #B877D9, big-results #FF9830, short-opus #FADE2A,
+  agent-outlier #2DBFB1, cache-rewrite #FF7383. 204 = the rule table, one row per category (nine).
 - Sessions: 430–433 and 7 follow the range (by `last_prompt`) and account/project/actor/skill but
-  **not** the Session variable; 422, 440–444, 100, 101, 8 need one selected session
+  **not** the Session variable; 422, 440–444, 100, 101, 8, 445 need one selected session
   (`'${session}' != '__all'`). 7 marks the selected row with `▶`.
+- **Requests 445**: one row per `api_request` of the session in the range (rule 1 pause), `ORDER BY
+  ts LIMIT 1000`; columns At (`MM-DD HH:mm:ss`, w150), Actor, Model (family), Pause (s, red ≥ 300),
+  Input, Output, Cache read, Cache create (gauge min 0 max 50000, red from 50000 = the
+  `cache-rewrite` threshold, w290), cost_usd. Target of the `cache-rewrite` tip.
 - **Session length** (431, header) = activity time: union of `[ts − duration_ms, ts]` of its
   `api_request` and `tool_result` events, overlaps counted once, idle time not counted.
 - **Timeline 100**: one cell per `$__interval_s` step, a bar covers the time an item ran (end
@@ -128,7 +143,7 @@ rail.json nav[] (uid, title, hint, idBase) + panels[] (idOffset, gridPos.h)
   Ranges: 1–299 the dashboards' own panels, 300–399 the rail (`sync-rail.js` deletes them), 400–499
   headers and the redesign's panels.
 - `cc.tips.link` opens panels via `viewPanel=panel-<id>` (`modules/telemetry-data.md`): cc-tools 19,
-  24, 140; cc-health 26, 161; cc-efficiency 226; cc-prompts 180; cc-sessions 100 — never renumber them.
+  24, 140; cc-health 26, 161; cc-efficiency 226; cc-prompts 180; cc-sessions 100, 445 — never renumber them.
 - Deleted in the redesign: Overview 1, 9, 10, 11, 32, 38, 40, 42, 43,
   51, 54–59; Sessions 102; Prompts 181–183; Agents 120, 121; Tools 15–18, 20–23, 141–143; Health
   160, 162–165; the Tips dashboard 200–202. Retired earlier: 6, 12, 25, 41.
@@ -148,13 +163,16 @@ rail.json nav[] (uid, title, hint, idBase) + panels[] (idOffset, gridPos.h)
 | 180 `project` | `/d/cc-prompts?…&var-project=${__value.raw:percentencode}`, account and session kept, actor/skill `$__all` |
 | 13 `type` / 14 `skill` | `/d/cc-agents?…&var-actor=` / `&var-skill=${__value.raw:percentencode}`, other vars kept |
 | 476 `session` | `/d/cc-sessions?from/to`, account, project, `var-session=sid`, actor/skill `$__all` |
-| 222, 228 `title` | `${__data.fields.open}${__url_time_range}`; `open` = `cc.tips.link` + `&` (+ `var-project=%24__all&` for `/d/cc-sessions`) |
+| 222, 228 `title` | `${__data.fields.open}${__url_time_range}`; `open` = `cc.tips.link` + `&` (+ `concat('var-project=', char(36), '__all&')` for `/d/cc-sessions`) |
 | rail tips tiles | `/d/cc-efficiency?${__url_time_range}` |
 
-- **Session zoom** (7, 37, 180, 476 and the `agent-outlier` tip): `from_ms`/`to_ms` = the session's
+- **Session zoom** (7, 37, 180, 476 and the `agent-outlier` / `cache-rewrite` tips): `from_ms`/`to_ms` = the session's
   activity span (first start to last end of its prompts, requests, tool calls; a start =
   `ts − duration_ms`) ± max(3 %, 5 s); no such events → `started`..`last_event` (476: the run's end).
   The helper fields (`sid`, `session_id`, `from_ms`, `to_ms`, `open`) are hidden by `custom.hidden`.
+- **Do not write `%24__all` as a literal in a link built in SQL**: Grafana 12.1 encodes it again
+  (`%2524__all`) and Sessions opens with no project matching, empty panels (commit 8fc22e1). Build
+  the `$` with `char(36)` instead.
 - The `agent-outlier` link carries `from`/`to` and the dashboards append `${__url_time_range}`:
   Grafana uses the first pair (observed in the browser, Grafana 12.1, 2026-11-19).
 
