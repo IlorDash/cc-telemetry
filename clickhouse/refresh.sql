@@ -212,7 +212,8 @@ UNION ALL
 SELECT
     'cache-rewrite',
     concat(toString(n), ' cache rewrites after pauses in ', project),
-    concat(toString(n), ' requests in 7 days came after a pause of 5 minutes or more and rewrote ', formatReadableQuantity(created),
+    concat(toString(n), ' requests in 7 days came after a pause of 5 minutes or more and rewrote ',
+           multiIf(created < 999500, concat(toString(round(created / 1000)), 'k'), concat(toString(round(created / 1000000, 2)), 'M')),
            ' tokens of cache, $', toString(round(rw_cost, 2)), ' together (the most you could save). ',
            'Run /compact before a long break, or start a new session instead of resuming a huge one.'),
     project,

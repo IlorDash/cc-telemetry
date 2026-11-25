@@ -528,7 +528,7 @@ def run_prompt(S, t, idx, text, slash=None, force_outlier=False):
     return t
 
 
-def run_session(S, t0, n_prompts, live=False, force_outlier=False, slow_think=False):
+def run_session(S, t0, n_prompts, live=False, force_outlier=False, rewrite=False):
     S.pid = ""
     t = t0
     emit(S, t, "mcp_server_connection", {"server_name": R.choice(["github", "postgres", "playwright"]),
@@ -563,8 +563,9 @@ def run_session(S, t0, n_prompts, live=False, force_outlier=False, slow_think=Fa
         if t > S.limit:
             break
         think = R.uniform(25, 200)
-        if slow_think:
-            think = R.uniform(30, 70)
+        if rewrite:
+            # a break longer than the cache lifetime before every prompt: its first request rewrites the cache
+            think = R.uniform(305, 400) if live else R.uniform(620, 1500)
         elif R.random() < 0.08:
             think = R.uniform(600, 2400)
         t += think
@@ -583,7 +584,7 @@ def meta(S, t, source):
                                    "cc_version": S.res["service.version"]}})
 
 
-def make_session(u, pname, t0, now, days_ago, bad_days, spike_days, **kw):
+def make_session(u, pname, t0, now, days_ago, bad_days, spike_days, ctx0=None, n=None, **kw):
     S = Session()
     S.u, S.pname, S.proj = u, pname, PROJECTS[pname]
     S.sid = new_uuid()
@@ -604,8 +605,10 @@ def make_session(u, pname, t0, now, days_ago, bad_days, spike_days, **kw):
              "os.version": u["osver"], "host.arch": "arm64" if u["os"] == "darwin" else "amd64", "host": u["host"]}
     if labelled:
         S.res["project"] = pname
-    n = R.choice([2, 3, 3, 4, 5, 6])
-    run_session(S, t0, n, **kw)
+    n_prompts = R.choice([2, 3, 3, 4, 5, 6])
+    if ctx0:  # a resumed session with a big context (the cache-rewrite sessions)
+        S.cs = Ctx(ctx0)
+    run_session(S, t0, n or n_prompts, **kw)
 
 
 def main():
@@ -627,12 +630,17 @@ def main():
                 if t0 > now - 600:
                     continue
                 make_session(u, wchoice(u["projects"]), t0, now, d, bad_days, spike_days)
-    alice, bob = USERS[0], USERS[1]
+    alice, bob, carol = USERS
     # the Explore outlier of the tips: a session two days ago
     make_session(alice, "web-shop", now - 2 * 86400 - 4 * 3600, now, 2, bad_days, spike_days, force_outlier=True)
     # a session still running now, and one that ended a while ago today
-    make_session(alice, "web-shop", now - 3300, now, 0, bad_days, spike_days, live=True, slow_think=True)
+    # (this one is resumed after breaks of 5-7 minutes with a big context: every prompt rewrites the cache,
+    # and it is the newest session, so the screenshot "session-selected" shows the rewrites in the table)
+    make_session(alice, "web-shop", now - 3300, now, 0, bad_days, spike_days, ctx0=75000, live=True, rewrite=True)
     make_session(bob, "mobile-app", now - 3 * 3600, now, 0, bad_days, spike_days)
+    # resumed sessions with a big context after long breaks in the other two projects: cache rewrites
+    make_session(bob, "data-pipeline", now - 36 * 3600, now, 1, bad_days, spike_days, ctx0=90000, n=5, rewrite=True)
+    make_session(carol, "mobile-app", now - 20 * 3600, now, 0, bad_days, spike_days, ctx0=80000, n=5, rewrite=True)
     ROWS.sort(key=lambda r: r["Timestamp"])
     out = sys.stdout
     for r in ROWS:

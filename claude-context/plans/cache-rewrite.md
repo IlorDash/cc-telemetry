@@ -1,7 +1,8 @@
 # Plan: make cache rewrites visible on the dashboards
 
-Status: approved 2026-11-24. All checks (dashboards, charts, new panels) run on the local WSL
-stack only; the user updates the Raspberry Pi and checks it there after the PR is merged.
+Status: done (2026-11-25). Approved 2026-11-24. All checks (dashboards, charts, new panels) run on
+the local WSL stack only; the user updates the Raspberry Pi and checks it there after the PR is
+merged.
 
 ## Goal
 
