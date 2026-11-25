@@ -2213,6 +2213,310 @@
           }
         ]
       }
+    },
+    {
+      "id": 445,
+      "type": "table",
+      "title": "Requests in this session",
+      "description": "Every model request of the selected session in the time range, oldest first, 1000 at most. A row = one request: the actor (main, an agent or aux:<query source>), the model family, the pause, its tokens by type and its cost_usd. Pause = the gap to the previous request of the same session and the same agent, looked up in the whole session history, so the first row in the range still has its pause; the first request of a chain has none. A red pause is past the 5-minute prompt-cache lifetime: the request most likely wrote the whole context to the cache again (see cache create and cost_usd). Filtered by the time range, Actor and Skill.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "x": 3,
+        "y": 30,
+        "w": 21,
+        "h": 12
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT ts, actor, fam AS model_family,\n       if(prev > 0, cur - prev, NULL) AS pause,\n       input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, cost_usd\nFROM\n(\n  SELECT ts, account_uuid, project, session_id, actor, skill,\n         multiIf(positionCaseInsensitive(model, 'opus') > 0, 'Opus', positionCaseInsensitive(model, 'sonnet') > 0, 'Sonnet', positionCaseInsensitive(model, 'haiku') > 0, 'Haiku', model) AS fam,\n         input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, cost_usd,\n         toUnixTimestamp(ts) AS cur,\n         lagInFrame(toUnixTimestamp(ts), 1, 0) OVER (PARTITION BY session_id, agent_id ORDER BY ts ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS prev\n  FROM cc.api_requests\n  WHERE session_id IN (SELECT session_id FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND '${session}' != '__all' AND $__timeFilter(ts)) AND ts <= $__toTime\n)\nWHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND '${session}' != '__all' AND $__timeFilter(ts)\nORDER BY ts\nLIMIT 1000"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": [
+          {
+            "displayName": "At",
+            "desc": false
+          }
+        ]
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": false,
+            "minWidth": 50
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ts"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "At"
+              },
+              {
+                "id": "unit",
+                "value": "time:MM-DD HH:mm:ss"
+              },
+              {
+                "id": "custom.width",
+                "value": 150
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#8e8e9e"
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "actor"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Actor"
+              },
+              {
+                "id": "custom.minWidth",
+                "value": 150
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "model_family"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Model"
+              },
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "pause"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Pause"
+              },
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.width",
+                "value": 100
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "#73BF69",
+                      "value": null
+                    },
+                    {
+                      "color": "#F2495C",
+                      "value": 300
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "input_tokens"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Input"
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "output_tokens"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Output"
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cache_read_tokens"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Cache read"
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cache_creation_tokens"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Cache create"
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5794F2"
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "gauge",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "custom.minWidth",
+                "value": 150
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cost_usd"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "cost_usd"
+              },
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 3
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          }
+        ]
+      }
     }
   ]
 }
