@@ -410,7 +410,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT if(tips = 0, 'none', concat(multiIf(top = 'cache', 'Cache rebuilds', top = 'repeated-read', 'Repeated reads', top = 'big-results', 'Big tool results', top = 'short-opus', 'Short Opus answers', top = 'agent-outlier', 'Costly agent run', top = 'denials', 'Denied tool calls', top = 'slow-hook', 'Slow hooks', top = 'slow-ttft', 'Slow first token', top), ' (', toString(n), ')')) AS most_frequent\nFROM\n(\n    SELECT sum(c) AS tips,\n           argMin(category, (-toInt64(c), category)) AS top,\n           max(c) AS n\n    FROM (SELECT category, count() AS c FROM cc.tips GROUP BY category)\n)"
+          "rawSql": "SELECT if(tips = 0, 'none', concat(multiIf(top = 'cache', 'Cache rebuilds', top = 'repeated-read', 'Repeated reads', top = 'big-results', 'Big tool results', top = 'short-opus', 'Short Opus answers', top = 'agent-outlier', 'Costly agent run', top = 'cache-rewrite', 'Cache rewrites', top = 'denials', 'Denied tool calls', top = 'slow-hook', 'Slow hooks', top = 'slow-ttft', 'Slow first token', top), ' (', toString(n), ')')) AS most_frequent\nFROM\n(\n    SELECT sum(c) AS tips,\n           argMin(category, (-toInt64(c), category)) AS top,\n           max(c) AS n\n    FROM (SELECT category, count() AS c FROM cc.tips GROUP BY category)\n)"
         }
       ],
       "options": {

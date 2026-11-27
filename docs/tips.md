@@ -41,9 +41,10 @@ session) already chosen. The rules table is repeated at the bottom of **Efficien
 | `big-results` | At least 5 tool results over 200 KB (project) | Narrow the search or limit the read range: big outputs fill the context | **Tools & files**, **Largest tool results** |
 | `short-opus` | Opus model: at least 20 answers under 500 output tokens, and they are at least half of its requests (project) | A smaller model may handle such turns; the cost shown is an upper bound of the saving | **Prompts**, **Most expensive prompts** |
 | `agent-outlier` | A subagent's biggest run is over 6 times its mean and over 50,000 tokens, with at least 3 runs (agent type) | Open the session of that run and check what it did | **Sessions**, **Timeline** of that session (session and agent type preset; the range is zoomed to the session) |
+| `cache-rewrite` | At least 3 requests that wrote 50,000 or more cache-creation tokens right after a pause of 5 minutes or more (the cache lifetime), or those requests cost $2 or more together (project) | Run `/compact` before a long break, or start a new session instead of resuming a huge one; the cost shown is an upper bound of the waste, because a fresh session writes a cache too, only a smaller one | **Sessions**, **Requests in this session** of the session with the most expensive rewrite (the range is zoomed to the session) |
 | `denials` | A tool rejected at least 5 times (project, tool) | Add an allow or deny rule if the rejections are not intended; the tip text names the main source (config, hook, user) | **Tools & files**, **Rejected tool calls** |
 | `slow-hook` | A hook's mean duration over 500 ms, with at least 10 runs (hook) | Hooks run synchronously and delay every matching tool call: speed the hook up or make it async | **Health**, **Hook time** |
-| `slow-ttft` | Mean time to first token over 3 s, with at least 10 requests (project, model) | Long contexts or a busy provider; compare the days in the panel | **Health**, **Time to first token by day** |
+| `slow-ttft` | Mean time to first token over 3 s, with at least 10 requests (project, model) | Long contexts or a busy provider; compare the periods in the panel | **Health**, **Time to first token** |
 
 The rules are in `clickhouse/refresh.sql`, which the `cc-refresh` service runs every 5 minutes into
 the table behind the `cc.tips` view. To change a number, edit it there; the next refresh applies it
@@ -58,8 +59,8 @@ saving.
 
 | Value | Meaning |
 | --- | --- |
-| Affected tokens | Roughly the tokens the tip refers to. `cache`: cache-creation tokens. `repeated-read` and `big-results`: result size / 4, because the telemetry carries the size in bytes and 4 bytes per token is a rule of thumb, so the figure is approximate. `short-opus`: input + output + cache-create tokens of the short answers (cache reads excluded). `agent-outlier`: the tokens of the biggest run |
-| `cost_usd` | The `cost_usd` of the requests the tip is about; empty where it cannot be measured. `cache`: the cost of all the project's requests in 7 days, not only the wasted part. `short-opus`: the short answers. `agent-outlier`: the biggest run, empty if the run cannot be matched to its requests. Empty for `repeated-read`, `big-results` and the time tips |
+| Affected tokens | Roughly the tokens the tip refers to. `cache`: cache-creation tokens. `repeated-read` and `big-results`: result size / 4, because the telemetry carries the size in bytes and 4 bytes per token is a rule of thumb, so the figure is approximate. `short-opus`: input + output + cache-create tokens of the short answers (cache reads excluded). `agent-outlier`: the tokens of the biggest run. `cache-rewrite`: the cache-creation tokens of the rewrites |
+| `cost_usd` | The `cost_usd` of the requests the tip is about; empty where it cannot be measured. `cache`: the cost of all the project's requests in 7 days, not only the wasted part. `short-opus`: the short answers. `agent-outlier`: the biggest run, empty if the run cannot be matched to its requests. `cache-rewrite`: the rewrite requests only (an upper bound of the waste). Empty for `repeated-read`, `big-results` and the time tips |
 
 Time tips (`denials`, `slow-hook`, `slow-ttft`) have no token value. They are listed in **Time
 and friction tips** with the number behind them: a count or a mean in milliseconds. `cost_usd`
@@ -73,8 +74,9 @@ A tip's link opens the evidence panel full-screen on the dashboard named in the 
 the rules table, with the project preset (the hook tip has none, hooks belong to no project). It
 keeps the time range of the dashboard you clicked from, so you can look at the same period.
 
-The `agent-outlier` tip is the exception: it opens the session of the biggest run and zooms the
-time range to that session (its activity span, padded by 3 %, at least 5 seconds each side). The
-browser Back button returns you to the earlier range.
+The `agent-outlier` and `cache-rewrite` tips are the exception: they open a session and zoom the
+time range to it (its activity span, padded by 3 %, at least 5 seconds each side). `agent-outlier`
+opens the session of the biggest run; `cache-rewrite` opens the session of the most expensive
+rewrite. The browser Back button returns you to the earlier range.
 
 For the other panels and what their clicks do, see [Clicks](dashboards.md#clicks).

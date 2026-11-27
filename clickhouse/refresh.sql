@@ -57,9 +57,9 @@ DROP TABLE cc.session_project_new;
 --      cache = cache_creation tokens; repeated-read / big-results = result bytes / 4, i.e. "~ tokens"
 --      (an APPROXIMATION: the telemetry carries result size in bytes only, 4 bytes per token is a rule of thumb);
 --      short-opus = input + output + cache_creation tokens of the short answers (cache reads excluded);
---      agent-outlier = tokens of the biggest run.
+--      agent-outlier = tokens of the biggest run; cache-rewrite = cache-creation tokens of the rewrites.
 --    cost_usd (Nullable Float64): sum of cost_usd of the requests the tip is about; only cache, short-opus,
---      agent-outlier, NULL otherwise. cache: the cost of ALL the project's requests in 7 days.
+--      agent-outlier, cache-rewrite, NULL otherwise. cache: the cost of ALL the project's requests in 7 days.
 --      agent-outlier: NULL when the biggest run has no agent_id or no matching api_request.
 --      Money comes only from api_request cost_usd (no price table).
 --    The order of the rows is set by the view cc.tips (views.sql).
@@ -201,6 +201,63 @@ FROM
         )
         GROUP BY session_id
     ) AS w ON w.session_id = o.session
+)
+UNION ALL
+-- Cache rewrites: a request after a pause of 5 min or more (the cache lifetime) that wrote 50k or more
+-- cache-creation tokens. The pause is the gap to the previous request of the same (session_id, agent_id), found
+-- over the whole history of the sessions active in the window (as Efficiency 225 and Sessions 445 do); only
+-- the requests inside the 7 days are counted. Fires on 3 rewrites or more, or on $2 or more in total.
+-- cost_usd is the upper bound of the waste: a fresh session writes a cache too, only a smaller one.
+-- The link opens Sessions 445 for the session of the most expensive rewrite, zoomed to its activity span.
+SELECT
+    'cache-rewrite',
+    concat(toString(n), ' cache rewrites after pauses in ', project),
+    concat(toString(n), ' requests in 7 days came after a pause of 5 minutes or more and rewrote ',
+           multiIf(created < 999500, concat(toString(round(created / 1000)), 'k'), concat(toString(round(created / 1000000, 2)), 'M')),
+           ' tokens of cache, $', toString(round(rw_cost, 2)), ' together (the most you could save). ',
+           'Run /compact before a long break, or start a new session instead of resuming a huge one.'),
+    project,
+    toFloat64(n),
+    concat('/d/cc-sessions?viewPanel=panel-445&var-session=', encodeURLComponent(session),
+           -- zoom to the session: its activity span, padded by 3 % (at least 5 s), as the Sessions table does
+           if(t1 = 0, '', concat('&from=', toString(t0 - greatest(intDiv(3 * (t1 - t0), 100), 5000)),
+                                 '&to=', toString(t1 + greatest(intDiv(3 * (t1 - t0), 100), 5000))))),
+    toNullable(created),
+    toNullable(rw_cost)
+FROM
+(
+    SELECT r.project AS project, r.n AS n, r.created AS created, r.rw_cost AS rw_cost, r.session AS session,
+           w.t0 AS t0, w.t1 AS t1
+    FROM
+    (
+        SELECT project, count() AS n, sum(cache_creation_tokens) AS created, sum(cost_usd) AS rw_cost,
+               argMax(session_id, cost_usd) AS session
+        FROM
+        (
+            SELECT ts, project, session_id, cache_creation_tokens, cost_usd,
+                   toUnixTimestamp(ts) AS cur,
+                   lagInFrame(toUnixTimestamp(ts), 1, 0) OVER (PARTITION BY session_id, agent_id ORDER BY ts ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS prev
+            FROM cc.api_requests
+            WHERE session_id IN (SELECT session_id FROM cc.api_requests WHERE ts >= now() - INTERVAL 7 DAY)
+        )
+        WHERE ts >= now() - INTERVAL 7 DAY AND prev > 0 AND cur - prev >= 300 AND cache_creation_tokens >= 50000
+        GROUP BY project
+        HAVING n >= 3 OR rw_cost >= 2
+    ) AS r
+    LEFT JOIN
+    (
+        -- activity span of the session in ms (0 when none), as in agent-outlier
+        SELECT session_id, min(a_s) AS t0, max(a_e) AS t1
+        FROM
+        (
+            SELECT session_id, toUnixTimestamp64Milli(ts) - if(event = 'user_prompt', toInt64(0), toInt64(duration_ms)) AS a_s,
+                   toUnixTimestamp64Milli(ts) AS a_e
+            FROM cc.events_raw
+            WHERE event IN ('user_prompt', 'api_request', 'tool_result')
+              AND session_id IN (SELECT session_id FROM cc.api_requests WHERE ts >= now() - INTERVAL 7 DAY)
+        )
+        GROUP BY session_id
+    ) AS w ON w.session_id = r.session
 )
 UNION ALL
 -- Frequent permission denials for one tool: an allow-list or deny-list candidate.

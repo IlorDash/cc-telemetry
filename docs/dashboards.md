@@ -142,7 +142,7 @@ Picking a session in the Session variable does not zoom: narrow the range yourse
 
 **Question:** what did I spend, and how well did the cache work, in this period?
 
-[![The Overview dashboard: cost, cache hit rate, daily tokens, projects, models and recent sessions](assets/overview.png)](assets/overview.png)
+[![The Overview dashboard: cost, cache hit rate, tokens over time, projects, models and recent sessions](assets/overview.png)](assets/overview.png)
 
 | Panel | Shows | Click |
 | --- | --- | --- |
@@ -150,7 +150,7 @@ Picking a session in the Session variable does not zoom: narrow the range yourse
 | **Cache hit rate** | See the definitions below. Per project: **Cache hit rate by project** on **Efficiency** | - |
 | **Billable tokens** | Input + output + cache-create tokens | - |
 | **Tool error rate** | The share of failed tool calls: below 2 % green, 2 % and above yellow, 5 % and above red. The second line is the 95th percentile of the API request duration | - |
-| **Daily tokens & cache hit rate** | Bars (left axis): input, output and cache-create tokens per day. Line (right axis, 80-100 %): the cache hit rate of the day; a lower value is clipped. Cache reads are not drawn: they are 10-100 times larger and would flatten the bars | - |
+| **Tokens & cache hit rate** | Bars (left axis): input, output and cache-create tokens per time bucket; about 100 buckets per time range, at least 5 minutes each (15 minutes over 24 hours, 2 hours over 7 days, 6 hours over 30 days). A bar starts at its bucket time and covers the bucket; the panel title ends with the bucket length (`per 15m`) and the tooltip header is the bucket start. Line (right axis, 80-100 %): the cache hit rate of the bucket; a lower value is clipped. Cache reads are not drawn: they are 10-100 times larger and would flatten the bars | - |
 | **Projects** | Per project: `cost_usd`, billable tokens, cache hit rate, sessions. `unknown` means the project could not be determined | Filters **Overview** by the project |
 | **cost_usd by model** | The share of `cost_usd` by model family (Opus, Sonnet, Haiku; Other is any other name); the legend shows the share and the dollars | - |
 | **Work rhythm** | Requests by weekday (rows) and 3-hour block (columns `00`, `03`, ... `21`). A cell is brighter the closer it is to the busiest cell. It is a table with coloured cells because the Grafana heatmap cannot put the time of day on its X axis | - |
@@ -192,6 +192,7 @@ one session you select. Pick it by a click on a name in the table or in the Sess
 | **Timeline** | One cell per time step of the range; see below | - |
 | **Cumulative cost_usd & tokens** | The running total over the session, one step per model request: `cost_usd` on the left axis (green), billable tokens on the right (blue) | - |
 | **Prompts in this session** | The prompts of the session, oldest first: tokens and tool calls | A prompt opens it in **Prompts** |
+| **Requests in this session** | Every model request of the session in the range, oldest first, 1000 at most: actor, model family, pause, input, output, cache read and cache create tokens, `cost_usd`. The pause is the gap to the previous request of the same session and agent, taken from the whole session history, so the first row has its pause too. A red pause is past the 5-minute cache lifetime: the request most likely wrote the whole context to the cache again (see **Cache create**: its bar is full at 50k tokens and red from there, the threshold of the `cache-rewrite` tip) | - |
 
 | Term | Meaning |
 | --- | --- |
@@ -251,9 +252,9 @@ time range and the variables.
 | **Affected tokens by category** | The same sum per category, biggest first; time tips have no value and are not shown | - |
 | **Token tips** | The tips about tokens, biggest first: category, title, affected tokens, `cost_usd` | A title opens the evidence panel |
 | **Time and friction tips** | The tips without a token value (denials, slow hooks, slow first token) | A title opens the evidence panel |
-| **cost_usd per day by phase** | `cost_usd` per day, split by the work phase of the response | - |
+| **cost_usd by phase** | Stacked bars: `cost_usd` per time bucket, split by the work phase of the response. Buckets follow the time range (about 100, at least 5 minutes each: 15 minutes over 24 hours, 2 hours over 7 days, 6 hours over 30 days). A bar starts at its bucket time and covers the bucket; the panel title ends with the bucket length (`per 15m`) and the tooltip header is the bucket start | - |
 | **Phase summary** | The same phases: share of the range's `cost_usd` and `cost_usd` per model request | - |
-| **Pauses between requests** | A bar chart of the gaps between consecutive model requests of a session. Past 5 minutes it is red | - |
+| **Pauses between requests** | A bar chart of the gaps between consecutive model requests of the same session and agent. Past 5 minutes it is red | - |
 | **Cache hit rate by project** | Per project: requests, cache hit rate, cache-creation tokens (what a low hit rate costs), `cost_usd` | - |
 | **How tips are made** | The rules table, the same as on [the Tips page](tips.md#the-rules) | - |
 
@@ -261,7 +262,7 @@ time range and the variables.
 | --- | --- |
 | Work phase | Decided by the tools a response called, first match wins in this order: Edit (any `Edit`, `Write`, `MultiEdit`, `NotebookEdit`), Delegate (`Task`, `Agent`, `SendMessage`, `SubagentHandback`, `TaskStop`), Run (`Bash`), Explore (only `Read`, `Grep`, `Glob`, `LS`), Other (any other tools, for example MCP, web or `Skill`). A response with no tool result is Talk: a plain answer, or a tool call whose result was never recorded |
 | Pause over 5 minutes | Past the prompt-cache lifetime the next request writes the cache again instead of reading it |
-| Gap | Between consecutive requests of a session, subagents included; filter Actor = `main` for the main conversation only. The first request in the range has no predecessor and is not counted |
+| Gap | To the previous request of the same session and the same agent: the main conversation (with its auxiliary requests) and each subagent are counted separately, gaps between main and subagent requests are not counted. The previous request is looked up in the whole session history, so the pause before the first request in the range is included; a subagent's first request is not a pause |
 
 ---
 
@@ -278,7 +279,7 @@ time range and the variables.
 | **Skills used** | Distinct skills activated and the number of activations. `0` with an agent picked as Actor | - |
 | **Outlier runs** | The runs under the outlier rule below. Green with none, yellow with one or more | - |
 | **Subagent types** | Per agent type: runs, mean and maximum tokens of one run, max against mean (above 4 yellow, above 6 red), `cost_usd`; sorted by `cost_usd` | Filters the dashboard by the type (Actor) |
-| **cost_usd per day by actor** | `cost_usd` per day: subagents against main (the main session and auxiliary requests) | - |
+| **cost_usd by actor** | `cost_usd` per time bucket: subagents against main (the main session and auxiliary requests). Buckets follow the time range (about 100, at least 5 minutes each: 15 minutes over 24 hours, 2 hours over 7 days, 6 hours over 30 days). A bar starts at its bucket time and covers the bucket; the panel title ends with the bucket length (`per 15m`) and the tooltip header is the bucket start | - |
 | **Skills** | Per skill: activations, sessions and projects, `cost_usd` of the turns after the skill was invoked, until the end of the prompt | Filters the dashboard by the skill (Skill) |
 | **Biggest subagent runs** | The 5 completed runs with the most tokens in the range: session, agent type, tokens, `cost_usd`; an outlier is marked red | Opens the session on **Sessions**, range zoomed |
 
@@ -326,7 +327,7 @@ time range and the variables.
 | **API latency p95** | The 95th percentile of the total duration of a model request, all models together | - |
 | **API errors** | The failed attempts of model requests (retries included) as a share of the model requests | - |
 | **Hook time** | The total time spent in your hooks; the second line: the number of runs. Ignores Skill | - |
-| **Time to first token by day** | The mean time to first token per day and model family; the dashed red line is 3 s. Target of the `slow-ttft` tip | - |
+| **Time to first token** | The median time to first token per time bucket and model family, drawn as points (not joined; a bucket with no request of a family shows nothing). The dashed red line is 3 s, the threshold of the `slow-ttft` tip; the tip itself uses the mean per project and model over 7 days, so a point below 3 s does not rule it out. Buckets follow the time range (about 100, at least 5 minutes each: 15 minutes over 24 hours, 2 hours over 7 days, 6 hours over 30 days). A point is drawn at its bucket start; the panel title ends with the bucket length (`per 15m`). Target of the `slow-ttft` tip | - |
 | **Hook time** (the table) | Per hook: runs, mean and total duration; a mean above 200 ms is yellow, above 500 ms red. Ignores Skill. Target of the `slow-hook` tip | - |
 | **API errors** (the table) | Failed requests per HTTP status and error text (first 100 characters), with the time of the last one; 50 rows at most. A dash means an error without a status, for example a network error | - |
 | **API request duration** | Requests by total duration: green below 5 s, yellow to 10 s, orange to 20 s, red above | - |

@@ -410,7 +410,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT if(tips = 0, 'нет', concat(multiIf(top = 'cache', 'Пересборка кэша', top = 'repeated-read', 'Повтор чтений', top = 'big-results', 'Крупные выводы', top = 'short-opus', 'Opus на мелочи', top = 'agent-outlier', 'Дорогой агент', top = 'denials', 'Отклонения', top = 'slow-hook', 'Медленные хуки', top = 'slow-ttft', 'Долгий TTFT', top), ' (', toString(n), ')')) AS most_frequent\nFROM\n(\n    SELECT sum(c) AS tips,\n           argMin(category, (-toInt64(c), category)) AS top,\n           max(c) AS n\n    FROM (SELECT category, count() AS c FROM cc.tips GROUP BY category)\n)"
+          "rawSql": "SELECT if(tips = 0, 'нет', concat(multiIf(top = 'cache', 'Пересборка кэша', top = 'repeated-read', 'Повтор чтений', top = 'big-results', 'Крупные выводы', top = 'short-opus', 'Opus на мелочи', top = 'agent-outlier', 'Дорогой агент', top = 'cache-rewrite', 'Перезапись кэша', top = 'denials', 'Отклонения', top = 'slow-hook', 'Медленные хуки', top = 'slow-ttft', 'Долгий TTFT', top), ' (', toString(n), ')')) AS most_frequent\nFROM\n(\n    SELECT sum(c) AS tips,\n           argMin(category, (-toInt64(c), category)) AS top,\n           max(c) AS n\n    FROM (SELECT category, count() AS c FROM cc.tips GROUP BY category)\n)"
         }
       ],
       "options": {

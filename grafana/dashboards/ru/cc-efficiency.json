@@ -410,7 +410,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT if(tips = 0, 'нет', concat(multiIf(top = 'cache', 'Пересборка кэша', top = 'repeated-read', 'Повтор чтений', top = 'big-results', 'Крупные выводы', top = 'short-opus', 'Opus на мелочи', top = 'agent-outlier', 'Дорогой агент', top = 'denials', 'Отклонения', top = 'slow-hook', 'Медленные хуки', top = 'slow-ttft', 'Долгий TTFT', top), ' (', toString(n), ')')) AS most_frequent\nFROM\n(\n    SELECT sum(c) AS tips,\n           argMin(category, (-toInt64(c), category)) AS top,\n           max(c) AS n\n    FROM (SELECT category, count() AS c FROM cc.tips GROUP BY category)\n)"
+          "rawSql": "SELECT if(tips = 0, 'нет', concat(multiIf(top = 'cache', 'Пересборка кэша', top = 'repeated-read', 'Повтор чтений', top = 'big-results', 'Крупные выводы', top = 'short-opus', 'Opus на мелочи', top = 'agent-outlier', 'Дорогой агент', top = 'cache-rewrite', 'Перезапись кэша', top = 'denials', 'Отклонения', top = 'slow-hook', 'Медленные хуки', top = 'slow-ttft', 'Долгий TTFT', top), ' (', toString(n), ')')) AS most_frequent\nFROM\n(\n    SELECT sum(c) AS tips,\n           argMin(category, (-toInt64(c), category)) AS top,\n           max(c) AS n\n    FROM (SELECT category, count() AS c FROM cc.tips GROUP BY category)\n)"
         }
       ],
       "options": {
@@ -500,7 +500,7 @@
         "x": 3,
         "y": 1,
         "w": 3,
-        "h": 8
+        "h": 10
       },
       "targets": [
         {
@@ -560,7 +560,7 @@
         "x": 6,
         "y": 1,
         "w": 4,
-        "h": 8
+        "h": 10
       },
       "targets": [
         {
@@ -644,7 +644,7 @@
         "x": 10,
         "y": 1,
         "w": 14,
-        "h": 8
+        "h": 10
       },
       "targets": [
         {
@@ -765,6 +765,21 @@
                 }
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "cache-rewrite"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#FF7383"
+                }
+              }
+            ]
           }
         ]
       }
@@ -781,7 +796,7 @@
       "timeFrom": "7d",
       "gridPos": {
         "x": 3,
-        "y": 9,
+        "y": 11,
         "w": 21,
         "h": 10
       },
@@ -795,7 +810,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT category, title, body, scope, metric, affected, cost_usd,\n       concat(replaceRegexpOne(link, '^/d/([a-z-]+)', '/d/\\\\1-ru'), if(position(link, '?') > 0, '&', '?'),\n              if(startsWith(link, '/d/cc-sessions'), 'var-project=%24__all&', '')) AS open\nFROM cc.tips\nWHERE affected IS NOT NULL\nORDER BY affected DESC, category, title"
+          "rawSql": "SELECT category, title, body, scope, metric, affected, cost_usd,\n       concat(replaceRegexpOne(link, '^/d/([a-z-]+)', '/d/\\\\1-ru'), if(position(link, '?') > 0, '&', '?'),\n              if(startsWith(link, '/d/cc-sessions'), concat('var-project=', char(36), '__all&'), '')) AS open\nFROM cc.tips\nWHERE affected IS NOT NULL\nORDER BY affected DESC, category, title"
         }
       ],
       "options": {
@@ -868,6 +883,10 @@
                       "agent-outlier": {
                         "color": "#2DBFB1",
                         "index": 4
+                      },
+                      "cache-rewrite": {
+                        "color": "#FF7383",
+                        "index": 5
                       }
                     }
                   }
@@ -1104,7 +1123,7 @@
       "timeFrom": "7d",
       "gridPos": {
         "x": 3,
-        "y": 19,
+        "y": 21,
         "w": 21,
         "h": 7
       },
@@ -1118,7 +1137,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT category, title, body, scope, metric,\n       concat(replaceRegexpOne(link, '^/d/([a-z-]+)', '/d/\\\\1-ru'), if(position(link, '?') > 0, '&', '?'),\n              if(startsWith(link, '/d/cc-sessions'), 'var-project=%24__all&', '')) AS open\nFROM cc.tips\nWHERE affected IS NULL\nORDER BY category, metric DESC, title"
+          "rawSql": "SELECT category, title, body, scope, metric,\n       concat(replaceRegexpOne(link, '^/d/([a-z-]+)', '/d/\\\\1-ru'), if(position(link, '?') > 0, '&', '?'),\n              if(startsWith(link, '/d/cc-sessions'), concat('var-project=', char(36), '__all&'), '')) AS open\nFROM cc.tips\nWHERE affected IS NULL\nORDER BY category, metric DESC, title"
         }
       ],
       "options": {
@@ -1314,7 +1333,7 @@
       "transparent": true,
       "gridPos": {
         "x": 3,
-        "y": 26,
+        "y": 28,
         "w": 21,
         "h": 1
       },
@@ -1326,15 +1345,17 @@
     {
       "id": 223,
       "type": "timeseries",
-      "title": "cost_usd по дням и фазам",
-      "description": "cost_usd каждого запроса к модели по фазе ответа. Фаза определяется инструментами, вызванными в том же ответе (события tool_result с тем же request_id, что у api_request): Правка = любой Edit / Write / MultiEdit / NotebookEdit; Делегирование = Task / Agent (запуск субагента) / SendMessage / SubagentHandback / TaskStop (управление субагентом); Запуск = Bash (без правок и делегирования); Изучение = только Read / Grep / Glob / LS; Диалог = без результата инструмента (простой ответ; также вызов, чей результат не записан); Прочее = любая другая смесь (MCP, web, Skill, ...). Ответ с инструментами нескольких видов берёт первую подходящую фазу в порядке Правка, Делегирование, Запуск, Изучение, Прочее. Дни по времени сервера (UTC).",
+      "title": "cost_usd по фазам · за $__interval",
+      "interval": "5m",
+      "maxDataPoints": 100,
+      "description": "cost_usd каждого запроса к модели за интервал по фазе ответа. Около 100 интервалов на период, каждый не меньше 5 минут: 15 минут за 24 часа, 2 часа за 7 дней, 6 часов за 30 дней. Длина интервала указана в заголовке панели. Столбец начинается в начале своего интервала и покрывает его; заголовок подсказки — начало интервала. Фаза определяется инструментами, вызванными в том же ответе (события tool_result с тем же request_id, что у api_request): Правка = любой Edit / Write / MultiEdit / NotebookEdit; Делегирование = Task / Agent (запуск субагента) / SendMessage / SubagentHandback / TaskStop (управление субагентом); Запуск = Bash (без правок и делегирования); Изучение = только Read / Grep / Glob / LS; Диалог = без результата инструмента (простой ответ; также вызов, чей результат не записан); Прочее = любая другая смесь (MCP, web, Skill, ...). Ответ с инструментами нескольких видов берёт первую подходящую фазу в порядке Правка, Делегирование, Запуск, Изучение, Прочее.",
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "clickhouse"
       },
       "gridPos": {
         "x": 3,
-        "y": 27,
+        "y": 29,
         "w": 12,
         "h": 9
       },
@@ -1348,7 +1369,7 @@
           "editorType": "sql",
           "format": 0,
           "queryType": "timeseries",
-          "rawSql": "SELECT time,\n       sumIf(c, ph = 'Explore') AS Explore,\n       sumIf(c, ph = 'Edit') AS Edit,\n       sumIf(c, ph = 'Run') AS Run,\n       sumIf(c, ph = 'Delegate') AS Delegate,\n       sumIf(c, ph = 'Talk') AS Talk,\n       sumIf(c, ph = 'Other') AS Other\nFROM\n(\nSELECT toStartOfDay(a.ts) AS time, if(t.tool_phase = '', 'Talk', t.tool_phase) AS ph, a.cost_usd AS c\nFROM cc.api_requests AS a\nLEFT JOIN (SELECT request_id AS rid, multiIf(countIf(tool_name IN ('Edit', 'Write', 'MultiEdit', 'NotebookEdit')) > 0, 'Edit', countIf(tool_name IN ('Task', 'Agent', 'SendMessage', 'SubagentHandback', 'TaskStop')) > 0, 'Delegate', countIf(tool_name = 'Bash') > 0, 'Run', countIf(tool_name NOT IN ('Read', 'Grep', 'Glob', 'LS')) = 0, 'Explore', 'Other') AS tool_phase FROM cc.events WHERE event = 'tool_result' AND request_id != '' GROUP BY request_id) AS t ON t.rid = a.request_id\nWHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\n)\nGROUP BY time ORDER BY time"
+          "rawSql": "SELECT time,\n       sumIf(c, ph = 'Explore') AS Explore,\n       sumIf(c, ph = 'Edit') AS Edit,\n       sumIf(c, ph = 'Run') AS Run,\n       sumIf(c, ph = 'Delegate') AS Delegate,\n       sumIf(c, ph = 'Talk') AS Talk,\n       sumIf(c, ph = 'Other') AS Other\nFROM\n(\nSELECT $__timeInterval(a.ts) AS time, if(t.tool_phase = '', 'Talk', t.tool_phase) AS ph, a.cost_usd AS c\nFROM cc.api_requests AS a\nLEFT JOIN (SELECT request_id AS rid, multiIf(countIf(tool_name IN ('Edit', 'Write', 'MultiEdit', 'NotebookEdit')) > 0, 'Edit', countIf(tool_name IN ('Task', 'Agent', 'SendMessage', 'SubagentHandback', 'TaskStop')) > 0, 'Delegate', countIf(tool_name = 'Bash') > 0, 'Run', countIf(tool_name NOT IN ('Read', 'Grep', 'Glob', 'LS')) = 0, 'Explore', 'Other') AS tool_phase FROM cc.events WHERE event = 'tool_result' AND request_id != '' GROUP BY request_id) AS t ON t.rid = a.request_id\nWHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\n)\nGROUP BY time ORDER BY time"
         }
       ],
       "options": {
@@ -1363,6 +1384,7 @@
           "unit": "currencyUSD",
           "custom": {
             "drawStyle": "bars",
+            "barAlignment": 1,
             "stacking": {
               "mode": "normal"
             },
@@ -1499,7 +1521,7 @@
       },
       "gridPos": {
         "x": 15,
-        "y": 27,
+        "y": 29,
         "w": 9,
         "h": 9
       },
@@ -1715,7 +1737,7 @@
       "transparent": true,
       "gridPos": {
         "x": 3,
-        "y": 36,
+        "y": 38,
         "w": 21,
         "h": 1
       },
@@ -1728,14 +1750,14 @@
       "id": 225,
       "type": "barchart",
       "title": "Паузы между запросами",
-      "description": "Пауза между соседними запросами к модели сессии (запросы, прошедшие переменные и период, все исполнители вместе), на каждый запрос. После 5 минут жизни кэша промпта (TTL) следующий запрос пишет кэш заново вместо чтения: такие паузы красные (зелёные: в пределах 5 минут). Паузы считаются между соседними запросами сессии, включая субагентов (для одного основного диалога выберите Исполнитель = main); у первого запроса в периоде нет предшественника, он не считается. Действуют период и все переменные.",
+      "description": "Пауза до предыдущего запроса к модели той же сессии и того же агента, на каждый запрос. После 5 минут жизни кэша промпта (TTL) следующий запрос пишет кэш заново вместо чтения: такие паузы красные (зелёные: в пределах 5 минут). Основной диалог (со служебными запросами) и каждый субагент — отдельные цепочки: паузы между запросами основного диалога и субагента не считаются, а первый запрос субагента паузой не является. Предыдущий запрос ищется во всей истории сессии, поэтому пауза перед первым запросом периода учитывается. Действуют период и все переменные.",
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "clickhouse"
       },
       "gridPos": {
         "x": 3,
-        "y": 37,
+        "y": 39,
         "w": 9,
         "h": 7
       },
@@ -1749,7 +1771,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT multiIf(gap < 60, '<1м', gap < 300, '1–5м', gap < 900, '5–15м', gap < 3600, '15–60м', '>1ч') AS bucket,\n       count() AS requests,\n       max(gap >= 300) AS over_ttl\nFROM\n(\n  SELECT cur - prev AS gap\n  FROM\n  (\n    SELECT toUnixTimestamp(ts) AS cur,\n           lagInFrame(toUnixTimestamp(ts), 1, 0) OVER (PARTITION BY session_id ORDER BY ts ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS prev\n    FROM cc.api_requests\n    WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\n  )\n  WHERE prev > 0\n)\nGROUP BY bucket\nORDER BY min(gap)"
+          "rawSql": "SELECT multiIf(gap < 60, '<1м', gap < 300, '1–5м', gap < 900, '5–15м', gap < 3600, '15–60м', '>1ч') AS bucket,\n       count() AS requests,\n       max(gap >= 300) AS over_ttl\nFROM\n(\n  SELECT cur - prev AS gap\n  FROM\n  (\n    SELECT ts, account_uuid, project, session_id, actor, skill,\n           toUnixTimestamp(ts) AS cur,\n           lagInFrame(toUnixTimestamp(ts), 1, 0) OVER (PARTITION BY session_id, agent_id ORDER BY ts ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS prev\n    FROM cc.api_requests\n    WHERE session_id IN (SELECT session_id FROM cc.api_requests WHERE ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)) AND ts <= $__toTime\n  )\n  WHERE prev > 0 AND ('__all' IN (${account:singlequote}) OR account_uuid IN (${account:singlequote})) AND ('${project}' = '__all' OR project = '${project}') AND ('${session}' = '__all' OR session_id = '${session}') AND ('${actor}' = '__all' OR actor = '${actor}') AND ('${skill}' = '__all' OR skill = '${skill}') AND $__timeFilter(ts)\n)\nGROUP BY bucket\nORDER BY min(gap)"
         }
       ],
       "options": {
@@ -1853,7 +1875,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 37,
+        "y": 39,
         "w": 12,
         "h": 7
       },
@@ -2050,13 +2072,13 @@
       "description": "",
       "gridPos": {
         "x": 3,
-        "y": 44,
+        "y": 46,
         "w": 21,
         "h": 18
       },
       "options": {
         "mode": "markdown",
-        "content": "| Категория | Срабатывает (последние 7 дней) | Что смотреть / делать | Ссылка открывает |\n| --- | --- | --- | --- |\n| cache | по проекту: не менее 20 запросов и хит кэша ниже 40 % | держите префикс промпта (CLAUDE.md, инструменты) стабильным; реже /clear и смена модели | Эффективность: Хит кэша по проектам |\n| repeated-read | по проекту и файлу: прочитан более 10 раз | храните ключевые факты в CLAUDE.md или заметке, а не перечитывайте | Инструменты и файлы: Файлы, перечитанные в сессии |\n| big-results | по проекту: не менее 5 результатов инструментов больше 200 КБ | сузьте поиск или ограничьте диапазон чтения | Инструменты и файлы: Крупнейшие результаты инструментов |\n| short-opus | по проекту: не менее 20 запросов Opus короче 500 output токенов, и это не менее половины всех запросов Opus | такие ходы может выполнить модель поменьше; показанная стоимость это верхняя граница экономии | Промпты: Самые дорогие промпты |\n| agent-outlier | по типу субагента: не менее 3 запусков, крупнейший больше 6 средних и больше 50k токенов | проверьте, что делал этот запуск | Сессии: Таймлайн (сессия и исполнитель выбраны) |\n| denials | по проекту и инструменту: не менее 5 отклонённых разрешений | если правило задумано, игнорируйте; иначе пересмотрите правила разрешений | Инструменты и файлы: Отклонённые вызовы |\n| slow-hook | по хуку: не менее 10 запусков и среднее больше 500 мс | хуки выполняются синхронно и задерживают каждый подходящий вызов инструмента | Состояние: Время хуков |\n| slow-ttft | по проекту и модели: не менее 10 запросов и среднее время до первого токена больше 3 с | длинные контексты или занятый провайдер | Состояние: Время до первого токена по дням |"
+        "content": "| Категория | Срабатывает (последние 7 дней) | Что смотреть / делать | Ссылка открывает |\n| --- | --- | --- | --- |\n| cache | по проекту: не менее 20 запросов и хит кэша ниже 40 % | держите префикс промпта (CLAUDE.md, инструменты) стабильным; реже /clear и смена модели | Эффективность: Хит кэша по проектам |\n| repeated-read | по проекту и файлу: прочитан более 10 раз | храните ключевые факты в CLAUDE.md или заметке, а не перечитывайте | Инструменты и файлы: Файлы, перечитанные в сессии |\n| big-results | по проекту: не менее 5 результатов инструментов больше 200 КБ | сузьте поиск или ограничьте диапазон чтения | Инструменты и файлы: Крупнейшие результаты инструментов |\n| short-opus | по проекту: не менее 20 запросов Opus короче 500 output токенов, и это не менее половины всех запросов Opus | такие ходы может выполнить модель поменьше; показанная стоимость это верхняя граница экономии | Промпты: Самые дорогие промпты |\n| agent-outlier | по типу субагента: не менее 3 запусков, крупнейший больше 6 средних и больше 50k токенов | проверьте, что делал этот запуск | Сессии: Таймлайн (сессия и исполнитель выбраны) |\n| cache-rewrite | по проекту: не менее 3 запросов, записавших 50k и больше токенов кэша после паузы от 5 мин, либо эти запросы вместе стоят $2 и больше | выполните /compact перед долгим перерывом или начните новую сессию вместо возобновления огромной; показанная стоимость это верхняя граница потерь | Сессии: Запросы сессии (сессия самой дорогой перезаписи, период сужен до неё) |\n| denials | по проекту и инструменту: не менее 5 отклонённых разрешений | если правило задумано, игнорируйте; иначе пересмотрите правила разрешений | Инструменты и файлы: Отклонённые вызовы |\n| slow-hook | по хуку: не менее 10 запусков и среднее больше 500 мс | хуки выполняются синхронно и задерживают каждый подходящий вызов инструмента | Состояние: Время хуков |\n| slow-ttft | по проекту и модели: не менее 10 запросов и среднее время до первого токена больше 3 с | длинные контексты или занятый провайдер | Состояние: Время до первого токена |"
       }
     }
   ]

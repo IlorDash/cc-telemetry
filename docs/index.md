@@ -28,7 +28,7 @@ the time range and the variables.
 
 | Dashboard | Question it answers |
 | --- | --- |
-| **Overview** | What did I spend and how well did the cache work in this period, by day, project and model? |
+| **Overview** | What did I spend and how well did the cache work in this period, over time, by project and model? |
 | **Sessions** | What happened in one session: its prompts, requests, subagents and tools over time? |
 | **Prompts** | Which prompts cost the most, and what does a typical prompt cost? |
 | **Efficiency** | Where are tokens and money lost, and which tips apply to my work? |

@@ -89,6 +89,13 @@ quick start (commands, requirements, ports) changes.
 | `screenshots.js` | Playwright function (needs a runner passing `page`): 1920 px, dark theme; one run, two passes: EN uids → `docs/assets/*.png`, then `<uid>-ru` → `docs/assets/ru/*.png` (same names and ranges); `session-selected` follows the first session link by title (`Open session` / `Открыть сессию`) |
 
 - Run from the repo root: `wsl -d Ubuntu -- bash tools/docs-demo/demo.sh up`.
+- `demo.sh` runs `generate.py` without `--now`: the data ends at the current time, so the
+  screenshots' numbers differ between runs (same seed, other timestamps).
+- `generate.py` special sessions (`make_session` kwargs `ctx0` = starting context, `n` = prompts,
+  `rewrite` = breaks over the 5-min cache lifetime before every prompt; `run_session` `live`,
+  `force_outlier`): the Explore outlier two days ago; cache-rewrite sessions in all three demo
+  projects, one of them the live web-shop session (newest, so `session-selected` shows the rewrites
+  in Sessions 445).
 - The demo passwords in `demo.sh` are fixed throwaway values; it never touches the live stack.
 - `demo.sh` images: `clickhouse/clickhouse-server:${CH_DEMO_VERSION:-25.8}` (on a Raspberry Pi 4:
   `CH_DEMO_VERSION=22.3.20.29`) and hardcoded `grafana/grafana:12.1.0` — keep the default tags in

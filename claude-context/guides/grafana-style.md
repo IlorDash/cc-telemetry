@@ -48,8 +48,8 @@ query (display name), sits above the number; Grafana centres the content vertica
 
 - A KPI row is 4 tiles: w5, w5, w5, w6 (5 tiles: w4 ×4 + w5).
 - **Exception (user's decision):** Efficiency Tips (w3) and Affected (w4) share a row with
-  Affected tokens by category (w14), which needs h8 to show all five categories. So these two
-  tiles keep their own design, outside the levels above: h8, `titleSize 15`, `valueSize 56`, no `wideLayout`, and the scope in
+  Affected tokens by category (w14), which needs h10 to show all six categories. So these two
+  tiles keep their own design, outside the levels above: h10, `titleSize 15`, `valueSize 56`, no `wideLayout`, and the scope in
   the title (`Tips · 7d`, `Affected · 7d`).
 - Colour: a fixed colour or thresholds on the value, never `background`.
 - Units: money `currencyUSD` 2 decimals; counts `locale` 0 decimals; tokens `short` 1–2
@@ -72,9 +72,12 @@ query (display name), sits above the number; Grafana centres the content vertica
   every cell's text).
 - Columns, left to right: the main name (link), text columns, numbers. Numbers right-aligned
   with a fixed `width` (70–100); the name column gets `minWidth` and takes the rest.
-- Dates: unit `time:MM-DD HH:mm`, width 130, grey text.
+- Dates: unit `time:MM-DD HH:mm`, width 130, grey text. A per-request table (Sessions 445) adds
+  seconds: `time:MM-DD HH:mm:ss`, width 150.
 - Secondary text (ids, dates, notes): `color-text` with `#8e8e9e`.
-- A value bar inside a cell: `gauge` with `mode gradient`, fixed colour `#5794F2`.
+- A value bar inside a cell: `gauge` with `mode gradient`, fixed colour `#5794F2`. A bar with a
+  fixed threshold (Sessions 445 cache create: max 50000) uses `mode basic`, threshold colours
+  `#5794F2` then `#F2495C`, and `min`/`max` set.
 - Rates with good / bad levels: `color-text` with thresholds `#F2495C` → `#FADE2A` → `#73BF69`.
 - Links use Grafana's default link colour; a selected row is marked with `▶ ` in the name.
 - Hidden helper fields (`sid`, `from_ms`, `to_ms`, `open`): `custom.hidden true`.
