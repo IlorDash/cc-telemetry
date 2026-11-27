@@ -142,7 +142,7 @@ Picking a session in the Session variable does not zoom: narrow the range yourse
 
 **Question:** what did I spend, and how well did the cache work, in this period?
 
-[![The Overview dashboard: cost, cache hit rate, daily tokens, projects, models and recent sessions](assets/overview.png)](assets/overview.png)
+[![The Overview dashboard: cost, cache hit rate, tokens over time, projects, models and recent sessions](assets/overview.png)](assets/overview.png)
 
 | Panel | Shows | Click |
 | --- | --- | --- |
@@ -327,7 +327,7 @@ time range and the variables.
 | **API latency p95** | The 95th percentile of the total duration of a model request, all models together | - |
 | **API errors** | The failed attempts of model requests (retries included) as a share of the model requests | - |
 | **Hook time** | The total time spent in your hooks; the second line: the number of runs. Ignores Skill | - |
-| **Time to first token** | The median time to first token per time bucket and model family, drawn as points (not joined; a bucket with no request of a family shows nothing). The dashed red line is 3 s, the threshold of the `slow-ttft` tip; the tip itself uses the mean per project and model over 7 days, so a point below 3 s does not rule out it. Buckets follow the time range (about 100, at least 5 minutes each: 15 minutes over 24 hours, 2 hours over 7 days, 6 hours over 30 days). A point is drawn at its bucket start; the panel title ends with the bucket length (`per 15m`). Target of the `slow-ttft` tip | - |
+| **Time to first token** | The median time to first token per time bucket and model family, drawn as points (not joined; a bucket with no request of a family shows nothing). The dashed red line is 3 s, the threshold of the `slow-ttft` tip; the tip itself uses the mean per project and model over 7 days, so a point below 3 s does not rule it out. Buckets follow the time range (about 100, at least 5 minutes each: 15 minutes over 24 hours, 2 hours over 7 days, 6 hours over 30 days). A point is drawn at its bucket start; the panel title ends with the bucket length (`per 15m`). Target of the `slow-ttft` tip | - |
 | **Hook time** (the table) | Per hook: runs, mean and total duration; a mean above 200 ms is yellow, above 500 ms red. Ignores Skill. Target of the `slow-hook` tip | - |
 | **API errors** (the table) | Failed requests per HTTP status and error text (first 100 characters), with the time of the last one; 50 rows at most. A dash means an error without a status, for example a network error | - |
 | **API request duration** | Requests by total duration: green below 5 s, yellow to 10 s, orange to 20 s, red above | - |

@@ -171,8 +171,8 @@ rail.json nav[] (uid, title, hint, idBase) + panels[] (idOffset, gridPos.h)
   `ts − duration_ms`) ± max(3 %, 5 s); no such events → `started`..`last_event` (476: the run's end).
   The helper fields (`sid`, `session_id`, `from_ms`, `to_ms`, `open`) are hidden by `custom.hidden`.
 - **Do not write `%24__all` as a literal in a link built in SQL**: Grafana 12.1 encodes it again
-  (`%2524__all`) and Sessions opens with no project matching, empty panels (commit 8fc22e1). Build
-  the `$` with `char(36)` instead.
+  (`%2524__all`) and Sessions opens with no project matching, empty panels. Build the `$` with
+  `char(36)` instead.
 - The `agent-outlier` link carries `from`/`to` and the dashboards append `${__url_time_range}`:
   Grafana uses the first pair (observed in the browser, Grafana 12.1, 2026-11-19).
 
